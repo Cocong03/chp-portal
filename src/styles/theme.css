@@ -1,0 +1,104 @@
+/* Scan only src/ for class names. */
+@import 'tailwindcss' source('..');
+@import 'tw-animate-css';
+
+@custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
+
+/* Tokens from the wireframe (docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html),
+   mapped onto the shadcn/ui variable names. */
+:root {
+  --radius: 0.5rem;
+  --background: #f5f8fb;
+  --foreground: #17222e;
+  --card: #ffffff;
+  --card-foreground: #17222e;
+  --popover: #ffffff;
+  --popover-foreground: #17222e;
+  --primary: #2560a8;
+  --primary-foreground: #ffffff;
+  --secondary: #eef2f6;
+  --secondary-foreground: #17222e;
+  --muted: #eef2f6;
+  --muted-foreground: #5b6b7c;
+  --faint: #8b98a6;
+  --accent: #e7eff9;
+  --accent-foreground: #1e4d82;
+  --destructive: #b3261e;
+  --destructive-soft: #fae7e6;
+  --success: #227a50;
+  --success-soft: #e4f3ea;
+  --warning: #9a6400;
+  --warning-soft: #fbf1dc;
+  --border: #dce3ea;
+  --input: #dce3ea;
+  --ring: #2560a8;
+}
+
+[data-theme='dark'] {
+  --background: #10161d;
+  --foreground: #e7ecf1;
+  --card: #161f29;
+  --card-foreground: #e7ecf1;
+  --popover: #161f29;
+  --popover-foreground: #e7ecf1;
+  --primary: #6fa8dc;
+  --primary-foreground: #0b1621;
+  --secondary: #1d2732;
+  --secondary-foreground: #e7ecf1;
+  --muted: #1d2732;
+  --muted-foreground: #98a7b7;
+  --faint: #6e7c8c;
+  --accent: #1e3149;
+  --accent-foreground: #bfdbf7;
+  --destructive: #e5877f;
+  --destructive-soft: #3a1b1980;
+  --success: #79c99a;
+  --success-soft: #16302380;
+  --warning: #e4b34c;
+  --warning-soft: #3a2e1180;
+  --border: #2b3948;
+  --input: #2b3948;
+  --ring: #6fa8dc;
+}
+
+@theme inline {
+  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-faint: var(--faint);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-soft: var(--destructive-soft);
+  --color-success: var(--success);
+  --color-success-soft: var(--success-soft);
+  --color-warning: var(--warning);
+  --color-warning-soft: var(--warning-soft);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+}
