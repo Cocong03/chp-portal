@@ -11,18 +11,25 @@ function load(server: unknown): { get: () => string } {
 
 const ACCOUNT = { name: 'J.D. Santos Hardware & Construction Supply', chp_bccustomerno: '10482', chp_bccompanyname: 'Solid Cement' }
 
-function fakeServer({ user = { contactid: 'c-1', Roles: ['Authenticated Users', 'Full Access'] } as unknown, record = {} as unknown } = {}) {
+const ROLE_OPTIONS = '$select=contactid&$expand=powerpagecomponent_mspp_webrole_contact($select=name)'
+const FORBIDDEN = { StatusCode: 403, IsSuccessStatusCode: false, ReasonPhrase: 'Forbidden', Body: '' }
+
+function fakeServer({
+  user = { contactid: 'c-1', Roles: 'System.String[]' } as unknown,
+  record = {} as unknown,
+  roleRecord = { powerpagecomponent_mspp_webrole_contact: [{ name: 'Full Access' }] } as unknown,
+} = {}) {
   const calls: unknown[][] = []
   return {
     calls,
     server: {
       User: user,
-      Logger: { Log() {}, Error() {} },
+      Logger: { Log() {}, Error() {}, Warn() {} },
       Connector: {
         Dataverse: {
           RetrieveRecord: (...args: unknown[]) => {
             calls.push(args)
-            return record
+            return args[2] === ROLE_OPTIONS ? roleRecord : record
           },
         },
       },
@@ -32,12 +39,12 @@ function fakeServer({ user = { contactid: 'c-1', Roles: ['Authenticated Users', 
 
 const contact = (parent: unknown) => ({ fullname: 'J.D. Santos', emailaddress1: 'full@example.com', parentcustomerid_account: parent })
 
-test('returns the contact, the linked account and the roles', () => {
+test('returns the contact, the linked account and the web roles read from Dataverse', () => {
   const { server, calls } = fakeServer({ record: contact(ACCOUNT) })
   expect(JSON.parse(load(server).get())).toEqual({
     contact: { name: 'J.D. Santos', email: 'full@example.com' },
     account: { customerNo: '10482', customerName: 'J.D. Santos Hardware & Construction Supply', company: 'Solid Cement' },
-    roles: ['Authenticated Users', 'Full Access'],
+    roles: ['Full Access'],
   })
   expect(calls).toEqual([
     [
@@ -45,7 +52,22 @@ test('returns the contact, the linked account and the roles', () => {
       'c-1',
       '$select=fullname,emailaddress1&$expand=parentcustomerid_account($select=name,chp_bccustomerno,chp_bccompanyname)',
     ],
+    ['contacts', 'c-1', ROLE_OPTIONS],
   ])
+})
+
+// On Dev (2026-10-04) Server.User.Roles reached the script as the text "System.String[]".
+test('ignores the unusable Server.User.Roles text when Dataverse supplies the roles', () => {
+  const { server } = fakeServer({
+    record: contact(ACCOUNT),
+    roleRecord: { powerpagecomponent_mspp_webrole_contact: [{ name: 'Orders & Delivery' }, { name: 'View Only' }] },
+  })
+  expect(JSON.parse(load(server).get()).roles).toEqual(['Orders & Delivery', 'View Only'])
+})
+
+test('falls back to Server.User.Roles if the role read fails, without failing me', () => {
+  const { server } = fakeServer({ user: { contactid: 'c-1', Roles: ['View Only'] }, record: contact(ACCOUNT), roleRecord: FORBIDDEN })
+  expect(JSON.parse(load(server).get()).roles).toEqual(['View Only'])
 })
 
 test('a contact without a parent account gets account null', () => {
@@ -61,9 +83,9 @@ test('accepts the record as a JSON string or inside a {StatusCode, Body} envelop
 })
 
 test('accepts roles as a comma-separated string or as objects', () => {
-  const asString = fakeServer({ user: { contactid: 'c-1', Roles: 'Authenticated Users, View Only' }, record: contact(ACCOUNT) })
+  const asString = fakeServer({ user: { contactid: 'c-1', Roles: 'Authenticated Users, View Only' }, record: contact(ACCOUNT), roleRecord: FORBIDDEN })
   expect(JSON.parse(load(asString.server).get()).roles).toEqual(['Authenticated Users', 'View Only'])
-  const asObjects = fakeServer({ user: { contactid: 'c-1', Roles: [{ Name: 'View Only' }] }, record: contact(ACCOUNT) })
+  const asObjects = fakeServer({ user: { contactid: 'c-1', Roles: [{ Name: 'View Only' }] }, record: contact(ACCOUNT), roleRecord: FORBIDDEN })
   expect(JSON.parse(load(asObjects.server).get()).roles).toEqual(['View Only'])
 })
 
@@ -71,9 +93,9 @@ test('accepts roles as a comma-separated string or as objects', () => {
 // Array.isArray is false, and it exposes Length plus an indexer.
 test('reads roles from a .NET string[] (Length + indexer) and from any iterable', () => {
   const clrArray = { Length: 2, 0: 'Full Access', 1: 'Authenticated Users', toString: () => 'System.String[]' }
-  const asClr = fakeServer({ user: { contactid: 'c-1', Roles: clrArray }, record: contact(ACCOUNT) })
+  const asClr = fakeServer({ user: { contactid: 'c-1', Roles: clrArray }, record: contact(ACCOUNT), roleRecord: FORBIDDEN })
   expect(JSON.parse(load(asClr.server).get()).roles).toEqual(['Full Access', 'Authenticated Users'])
-  const asIterable = fakeServer({ user: { contactid: 'c-1', Roles: new Set(['View Only']) }, record: contact(ACCOUNT) })
+  const asIterable = fakeServer({ user: { contactid: 'c-1', Roles: new Set(['View Only']) }, record: contact(ACCOUNT), roleRecord: FORBIDDEN })
   expect(JSON.parse(load(asIterable.server).get()).roles).toEqual(['View Only'])
 })
 
@@ -84,7 +106,7 @@ test('an anonymous caller gets a customer-safe error and no Dataverse call', () 
 })
 
 test('a failed Dataverse call becomes the same customer-safe error', () => {
-  const { server } = fakeServer({ record: { StatusCode: 403, IsSuccessStatusCode: false, ReasonPhrase: 'Forbidden', Body: '' } })
+  const { server } = fakeServer({ record: FORBIDDEN })
   expect(() => load(server).get()).toThrow("We couldn't load your account details.")
 })
 

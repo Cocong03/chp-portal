@@ -54,12 +54,29 @@ function get() {
         );
         var account = contact.parentcustomerid_account;
 
+        // Server.User.Roles reached scripts as the text "System.String[]" on Dev (2026-10-04),
+        // so read the contact's web roles from Dataverse; fall back to Server.User.Roles if that read fails.
+        var roles;
+        try {
+            var withRoles = asRecord(
+                Server.Connector.Dataverse.RetrieveRecord(
+                    "contacts",
+                    user.contactid,
+                    "$select=contactid&$expand=powerpagecomponent_mspp_webrole_contact($select=name)"
+                )
+            );
+            roles = roleNames(withRoles.powerpagecomponent_mspp_webrole_contact || []);
+        } catch (roleErr) {
+            Server.Logger.Warn("me: web role read failed, using Server.User.Roles: " + roleErr.message);
+            roles = roleNames(user.Roles);
+        }
+
         return JSON.stringify({
             contact: { name: contact.fullname || "", email: contact.emailaddress1 || "" },
             account: account
                 ? { customerNo: account.chp_bccustomerno || "", customerName: account.name || "", company: account.chp_bccompanyname || "" }
                 : null,
-            roles: roleNames(user.Roles)
+            roles: roles
         });
     } catch (err) {
         Server.Logger.Error("me GET failed: " + err.message);
