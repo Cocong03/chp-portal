@@ -32,7 +32,8 @@ export function AppShell() {
         <Skeleton className="h-4 w-80" />
       </div>
     )
-  } else if (me.isError) {
+  } else if (me.isError && !me.data) {
+    // A failed background refetch keeps the cached account on screen instead of unmounting the page.
     content = (
       <div className="flex flex-col items-start gap-3">
         <p className="text-[13.5px] text-muted-foreground">We couldn't load your account details. Please try again.</p>

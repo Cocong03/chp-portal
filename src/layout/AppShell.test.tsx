@@ -1,4 +1,4 @@
-import { screen, within } from '@testing-library/react'
+import { act, screen, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import { ApiError, serverLogic } from '@/api/serverLogic'
@@ -84,6 +84,18 @@ test('a failed account load offers Retry', async () => {
   expect(await screen.findByText("We couldn't load your account details. Please try again.")).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Retry' }))
   expect(await screen.findByRole('navigation', { name: 'Portal sections' })).toBeInTheDocument()
+})
+
+test('a failed background refresh keeps the current page on screen', async () => {
+  const { client } = signInAs('full@test.ph')
+  expect(await screen.findByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+  vi.mocked(serverLogic).mockRejectedValueOnce(new ApiError(503, 'down'))
+  await act(() => client.refetchQueries({ queryKey: ['me'] }))
+  // TanStack notifies observers on a setTimeout; flush it so the failed refetch reaches the UI.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+  expect(client.getQueryState(['me'])?.status).toBe('error')
+  expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
+  expect(screen.queryByText("We couldn't load your account details. Please try again.")).not.toBeInTheDocument()
 })
 
 test('Help lists all eight section overviews whatever the role', async () => {

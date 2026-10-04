@@ -6,9 +6,10 @@ import { MemoryRouter } from 'react-router-dom'
 /** Renders with the app's providers. Each call gets a fresh QueryClient so tests share no cache. */
 export function renderApp(ui: ReactElement, { route = '/' }: { route?: string } = {}) {
   const client = new QueryClient({ defaultOptions: { queries: { retry: false } } })
-  return render(
+  const result = render(
     <QueryClientProvider client={client}>
       <MemoryRouter initialEntries={[route]}>{ui}</MemoryRouter>
     </QueryClientProvider>,
   )
+  return { ...result, client }
 }

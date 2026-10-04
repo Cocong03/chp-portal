@@ -33,6 +33,15 @@ export class InvalidInvitationError extends Error {
   }
 }
 
+// Browser network errors ("Failed to fetch") aren't customer copy.
+async function send(input: string, init?: RequestInit): Promise<Response> {
+  try {
+    return await fetch(input, init)
+  } catch {
+    throw new Error(SERVICE_UNREACHABLE)
+  }
+}
+
 export function getPortalUser(): PortalUser | undefined {
   if (import.meta.env.DEV) {
     const email = sessionStorage.getItem(MOCK_SESSION_KEY)
@@ -53,7 +62,7 @@ export function getPortalUser(): PortalUser | undefined {
 
 // ponytail: token fetched per request; cache it per page load if the extra round trip shows up in S2 timings.
 export async function fetchAntiForgeryToken(): Promise<string> {
-  const response = await fetch('/_layout/tokenhtml', { credentials: 'same-origin' })
+  const response = await send('/_layout/tokenhtml', { credentials: 'same-origin' })
   const token = response.ok ? (await response.text()).match(/value="([^"]+)"/)?.[1] : undefined
   if (!token) throw new Error(SERVICE_UNREACHABLE)
   return token
@@ -66,7 +75,7 @@ export async function signIn(email: string, password: string): Promise<void> {
     go('/')
     return
   }
-  const response = await fetch('/SignIn', {
+  const response = await send('/SignIn', {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     credentials: 'same-origin',
@@ -96,7 +105,7 @@ export async function redeemInvitation(code: string, email: string, password: st
     go('/')
     return
   }
-  const pageResponse = await fetch(`/Account/Login/Register?${new URLSearchParams({ returnUrl: '/', invitationCode: code })}`, {
+  const pageResponse = await send(`/Account/Login/Register?${new URLSearchParams({ returnUrl: '/', invitationCode: code })}`, {
     credentials: 'same-origin',
   })
   if (!pageResponse.ok) throw new Error(SERVICE_UNREACHABLE)
@@ -130,7 +139,7 @@ export async function redeemInvitation(code: string, email: string, password: st
   const submit = doc.querySelector<HTMLInputElement>('#SubmitButton')
   if (submit) body.set(submit.name, submit.value || 'Register')
 
-  const response = await fetch(action.pathname + action.search, {
+  const response = await send(action.pathname + action.search, {
     method: 'POST',
     headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
     credentials: 'same-origin',
@@ -155,7 +164,7 @@ export async function requestActivation(email: string): Promise<void> {
   // Set in sub-project C (S1-03) once the flow exists in the ConcreatHub solution.
   const flowId: string | undefined = import.meta.env.VITE_ACTIVATION_FLOW_ID
   if (!flowId) throw new Error(ACTIVATION_SEND_FAILED)
-  const response = await fetch(`/_api/cloudflow/v1.0/trigger/${flowId}`, {
+  const response = await send(`/_api/cloudflow/v1.0/trigger/${flowId}`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',

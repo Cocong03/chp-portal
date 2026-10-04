@@ -87,6 +87,20 @@ describe('on the deployed site', () => {
     expect(go).not.toHaveBeenCalled()
   })
 
+  test.each([
+    ['signIn', () => signIn('jd@x.ph', 'S3cret!')],
+    ['redeemInvitation', () => redeemInvitation('code', 'jd@x.ph', 'Abcdefg1', 'Abcdefg1')],
+  ])('%s turns a browser network failure into customer copy', async (_name, call) => {
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (url: string) => {
+        if (url === '/_layout/tokenhtml') return new Response(TOKEN_PAGE)
+        throw new TypeError('Failed to fetch')
+      }),
+    )
+    await expect(call()).rejects.toThrow("We couldn't reach the sign-in service. Please try again.")
+  })
+
   test('redeemInvitation rejects an invitation the server no longer offers', async () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response('<html><body><p>Not found</p></body></html>')))
     await expect(redeemInvitation('used-code', 'jd@x.ph', 'Abcdefg1', 'Abcdefg1')).rejects.toBeInstanceOf(InvalidInvitationError)
