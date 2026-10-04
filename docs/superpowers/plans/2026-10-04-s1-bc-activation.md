@@ -303,7 +303,7 @@ function bcConfig() {
     var names = { tenantId: "BC/TenantId", environment: "BC/EnvironmentName", basePath: "BC/ApiBasePath", clientId: "BC/ClientId", clientSecret: "BC/ClientSecret" };
     var cfg = {};
     Object.keys(names).forEach((key) => {
-        var value = Server.Sitesetting.Get(names[key]);
+        var value = Server.SiteSetting.Get(names[key]);
         if (!value || !String(value).trim()) {
             throw new Error("bc-config " + names[key] + " is not set");
         }
@@ -516,7 +516,7 @@ function fakeServer({
   const server = {
     User: user,
     Context: context,
-    Sitesetting: { Get: (name: string) => settings[name] },
+    SiteSetting: { Get: (name: string) => settings[name] },
     Logger: { Log() {}, Error() {}, Warn() {} },
     Connector: {
       Dataverse: { RetrieveRecord: () => ({ contactid: 'c-1', parentcustomerid_account: account }) },

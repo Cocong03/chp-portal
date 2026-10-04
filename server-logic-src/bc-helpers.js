@@ -20,7 +20,7 @@ function bcConfig() {
     var names = { tenantId: "BC/TenantId", environment: "BC/EnvironmentName", basePath: "BC/ApiBasePath", clientId: "BC/ClientId", clientSecret: "BC/ClientSecret" };
     var cfg = {};
     Object.keys(names).forEach((key) => {
-        var value = Server.Sitesetting.Get(names[key]);
+        var value = Server.SiteSetting.Get(names[key]);
         if (!value || !String(value).trim()) {
             throw new Error("bc-config " + names[key] + " is not set");
         }

@@ -28,7 +28,7 @@ function fakeServer({
   const server = {
     User: user,
     Context: context,
-    Sitesetting: { Get: (name: string) => settings[name] },
+    SiteSetting: { Get: (name: string) => settings[name] },
     Logger: { Log() {}, Error() {}, Warn() {} },
     Connector: {
       Dataverse: { RetrieveRecord: () => ({ contactid: 'c-1', parentcustomerid_account: account }) },
