@@ -5,10 +5,11 @@
 var bcTokenCache = null;
 
 // HttpClient and connector results arrive as the record, a JSON string, or a { StatusCode, Body } envelope.
-function parseResult(result) {
+// step names the call in the log. StatusCode 0 means no HTTP answer; the platform's reason is in ServerErrorMessage.
+function parseResult(result, step) {
     var value = typeof result === "string" ? JSON.parse(result) : result;
     if (value && (value.IsSuccessStatusCode === false || (typeof value.StatusCode === "number" && value.StatusCode >= 400))) {
-        throw new Error("bc-" + value.StatusCode + " " + (value.ReasonPhrase || ""));
+        throw new Error(step + " " + value.StatusCode + " " + (value.ReasonPhrase || "") + " " + (value.ServerErrorMessage || ""));
     }
     if (value && typeof value.Body === "string") {
         value = value.Body ? JSON.parse(value.Body) : {};
@@ -40,7 +41,8 @@ function sessionScope() {
             "contacts",
             user.contactid,
             "$select=contactid&$expand=parentcustomerid_account($select=name,chp_bccustomerno,chp_bccompanyid)"
-        )
+        ),
+        "dataverse"
     );
     var account = contact.parentcustomerid_account;
     if (!account || !account.chp_bccustomerno || !account.chp_bccompanyid) {
@@ -80,7 +82,8 @@ async function bcToken(cfg) {
             form,
             {},
             "application/x-www-form-urlencoded"
-        )
+        ),
+        "token"
     );
     if (!response || !response.access_token) {
         throw new Error("bc-auth no access_token");
@@ -98,7 +101,8 @@ async function bcGet(scope, entity, query) {
     var cfg = bcConfig();
     var token = await bcToken(cfg);
     return parseResult(
-        await Server.Connector.HttpClient.GetAsync(bcUrl(cfg, scope, entity, query), { Authorization: "Bearer " + token, Accept: "application/json" })
+        await Server.Connector.HttpClient.GetAsync(bcUrl(cfg, scope, entity, query), { Authorization: "Bearer " + token, Accept: "application/json" }),
+        "bc-get " + entity
     );
 }
 
@@ -111,7 +115,8 @@ async function bcPost(scope, entity, body) {
             JSON.stringify(body),
             { Authorization: "Bearer " + token, Accept: "application/json" },
             "application/json"
-        )
+        ),
+        "bc-post " + entity
     );
 }
 
@@ -120,7 +125,12 @@ async function respond(work) {
     try {
         return JSON.stringify(await work());
     } catch (err) {
-        Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + err.message);
+        // Platform messages can echo a request; never let a secret or token reach the log.
+        var detail = String(err.message)
+            .replace(/client_secret=[^&\s"']*/gi, "client_secret=[removed]")
+            .replace(/Bearer\s+[^\s"']+/gi, "Bearer [removed]")
+            .replace(/access_token["':=\s]+[^\s"',}]+/gi, "access_token=[removed]");
+        Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + detail);
         throw new Error("We couldn't load this information. Please try again.");
     }
 }

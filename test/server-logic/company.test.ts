@@ -21,21 +21,25 @@ function fakeServer({
   account = { name: 'BESTRADE COMMODITY SALES CORP.', chp_bccustomerno: 'C00000009', chp_bccompanyid: 'co-1' } as unknown,
   rows = [ROW] as unknown[],
   tokenStatus = 200,
+  tokenResponse = undefined as unknown,
   settings = SETTINGS,
   context = { ServerLogicName: 'company', QueryParameters: {}, Body: '' } as unknown,
 } = {}) {
   const http: { method: string; url: string; body?: string; headers?: unknown; contentType?: string }[] = []
+  const errors: string[] = []
   const server = {
     User: user,
     Context: context,
     SiteSetting: { Get: (name: string) => settings[name] },
-    Logger: { Log() {}, Error() {}, Warn() {} },
+    Logger: { Log() {}, Error: (message: string) => errors.push(message), Warn() {} },
     Connector: {
       Dataverse: { RetrieveRecord: () => ({ contactid: 'c-1', parentcustomerid_account: account }) },
       HttpClient: {
         PostAsync: async (url: string, body: string, headers: unknown, contentType: string) => {
           http.push({ method: 'POST', url, body, headers, contentType })
-          return JSON.stringify({ StatusCode: tokenStatus, IsSuccessStatusCode: tokenStatus < 400, Body: JSON.stringify({ access_token: 'tok-1' }) })
+          return JSON.stringify(
+            tokenResponse ?? { StatusCode: tokenStatus, IsSuccessStatusCode: tokenStatus < 400, Body: JSON.stringify({ access_token: 'tok-1' }) },
+          )
         },
         GetAsync: async (url: string, headers: unknown) => {
           http.push({ method: 'GET', url, headers })
@@ -44,7 +48,7 @@ function fakeServer({
       },
     },
   }
-  return { server, http }
+  return { server, http, errors }
 }
 
 const SAFE = "We couldn't load this information. Please try again."
@@ -108,4 +112,20 @@ test('makes no BC call when nobody is signed in', async () => {
   const { server, http } = fakeServer({ user: null })
   await expect(load(server).get()).rejects.toThrow(SAFE)
   expect(http).toEqual([])
+})
+
+// Seen on Dev 2026-10-04: the log only said "bc-0" — status 0 means the call never got an HTTP answer.
+test('a call that gets no HTTP answer logs the failing step and the platform reason, with secrets removed', async () => {
+  const { server, errors } = fakeServer({
+    tokenResponse: {
+      StatusCode: 0, IsSuccessStatusCode: false, ReasonPhrase: null, ServerError: true,
+      ServerErrorMessage: 'Request to login.microsoftonline.com failed: client_secret=s%26x%3D1 Authorization: Bearer abc.def.ghi',
+    },
+  })
+  await expect(load(server).get()).rejects.toThrow(SAFE)
+  expect(errors).toHaveLength(1)
+  expect(errors[0]).toContain('token')
+  expect(errors[0]).toContain('Request to login.microsoftonline.com failed')
+  expect(errors[0]).not.toContain('s%26x%3D1')
+  expect(errors[0]).not.toContain('abc.def.ghi')
 })
