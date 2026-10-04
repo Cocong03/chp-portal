@@ -6,7 +6,8 @@ export function HelpDialog({ open, onOpenChange }: { open: boolean; onOpenChange
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-h-[calc(100vh-40px)] overflow-y-auto p-[22px] sm:max-w-[720px]">
-        <DialogHeader>
+        {/* Left-aligned like the wireframe; right padding keeps the title clear of the close button on phones. */}
+        <DialogHeader className="pr-8 text-left">
           <DialogTitle>Getting around Concreat Connect</DialogTitle>
           <DialogDescription>A quick guide to what each section of the portal is for.</DialogDescription>
         </DialogHeader>
