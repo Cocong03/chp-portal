@@ -1,6 +1,5 @@
 import type { ReactNode } from 'react'
 import { ClipboardList, FileText, LayoutGrid } from 'lucide-react'
-import { cn } from '@/lib/utils'
 import { Logo } from '@/ui/Logo'
 
 // Wireframe #auth-signin brand screen. Fixed light palette (DESIGN.md §7), whatever the app theme.
@@ -11,10 +10,11 @@ const FEATURES = [
   { icon: FileText, title: 'Everything on record', desc: 'Invoices, delivery receipts, and other documents ready to view and download.' },
 ]
 
+// Bag photos supplied by the client (public/*-cement-bag.webp, 432×560).
 const BRANDS = [
-  { name: 'APO', pill: 'APO CEMENT', ribbon: 'bg-primary' },
-  { name: 'RIZAL', pill: 'RIZAL CEMENT', ribbon: 'bg-destructive' },
-  { name: 'ISLAND', pill: 'ISLAND CEMENT', ribbon: 'bg-brand-ink' },
+  { pill: 'APO CEMENT', image: '/apo-cement-bag.webp' },
+  { pill: 'RIZAL CEMENT', image: '/rizal-cement-bag.webp' },
+  { pill: 'ISLAND CEMENT', image: '/island-cement-bag.webp' },
 ]
 
 export const labelClass = 'text-[12.5px] font-semibold text-muted-foreground'
@@ -25,10 +25,7 @@ export function AuthLayout({ children }: { children: ReactNode }) {
   return (
     <div data-theme="light" className="flex min-h-screen flex-wrap bg-card text-foreground">
       <div className="flex flex-[1_1_560px] flex-col justify-center px-[clamp(24px,6vw,76px)] py-[clamp(32px,5vw,64px)]">
-        <div className="mb-[34px] flex items-center gap-3.5">
-          <Logo size={50} />
-          <span className="text-[21px] font-extrabold tracking-[0.01em] text-brand-ink">CONCREAT</span>
-        </div>
+        <Logo className="mb-[30px] h-[72px] self-start" />
         <p className="mb-1.5 text-xs font-bold tracking-[0.12em] text-brand-blue uppercase">Welcome to</p>
         <h1 className="mb-1.5 text-[clamp(28px,3.4vw,38px)] leading-[1.08] font-extrabold text-balance text-brand-ink">
           Concreat Connect
@@ -53,15 +50,9 @@ export function AuthLayout({ children }: { children: ReactNode }) {
         </ul>
         <div className="flex flex-wrap gap-[18px]">
           {BRANDS.map((brand) => (
-            <div key={brand.name} className="flex flex-col items-center gap-[9px]">
-              <div
-                aria-hidden="true"
-                className="relative flex h-[98px] w-[74px] flex-col items-center justify-center overflow-hidden rounded-md border border-brand-field bg-linear-180 from-muted to-border text-center"
-              >
-                <div className={cn('absolute top-[9px] -right-[25px] h-[15px] w-20 rotate-40', brand.ribbon)} />
-                <div className="text-[11.5px] font-extrabold tracking-[0.01em]">{brand.name}</div>
-                <div className="mt-[3px] text-[8px] font-semibold tracking-[0.03em] text-muted-foreground uppercase">Portland Cement</div>
-              </div>
+            <div key={brand.pill} className="flex flex-col items-center gap-[9px]">
+              {/* Decorative: the pill below names the brand. */}
+              <img src={brand.image} alt="" width={432} height={560} className="h-[110px] w-auto" />
               <span className="rounded-full bg-brand-soft px-[11px] py-1 text-[10.5px] font-bold tracking-[0.02em] whitespace-nowrap text-accent-foreground">
                 {brand.pill}
               </span>

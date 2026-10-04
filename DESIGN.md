@@ -107,7 +107,7 @@ Tables scroll horizontally inside their wrapper (min width 640px; `tight` tables
 
 | Wireframe                       | Build with                                                                                     |
 | ------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Top bar**: logo mark (30px conic ring) + "Concreat Connect" (15.5px/700) + sub-line (11.5px, faint); right side: account name + user chip | `layout/AppShell.tsx`. Logo is an inline SVG component in `src/ui/Logo.tsx`. User chip = shadcn **Avatar** (26px, `bg-primary text-primary-foreground`, initials 11px/700) inside a **DropdownMenu** (profile, sign out). |
+| **Top bar**: client logo (`public/concreat-logo.webp`, 40px high) + "Concreat Connect" (15.5px/700) + sub-line (11.5px, faint); right side: account name + user chip | `layout/AppShell.tsx`. Logo is `src/ui/Logo.tsx` (an `<img>` of the client-supplied logo, alt "Concreat"). User chip = shadcn **Avatar** (26px, `bg-primary text-primary-foreground`, initials 11px/700) inside a **DropdownMenu** (profile, sign out). |
 | Account switch ("Change" link next to the account name) | Phase 2 only. Button `variant="link"`; opens a **Dialog** with the account picker (§7). Hidden while one link per contact. |
 | **Section nav**: rounded pills (Dashboard, Orders, …), active = `bg-accent text-accent-foreground font-extrabold` with a 3px glowing underline | React Router `NavLink` styled as pills (this is routing, not shadcn Tabs). Underline is an `after:` pseudo-element: `after:absolute after:inset-x-3.5 after:-bottom-2 after:h-[3px] after:rounded-full after:bg-primary after:shadow-[0_0_6px_1px_var(--primary)]`. Inactive: `text-muted-foreground hover:bg-muted hover:text-foreground`. Hide items the role can't use (UX only). |
 | "Soon" tag on disabled sections | **Badge** `variant="soon"` (10px uppercase, `bg-muted text-faint`); item `opacity-55`, not clickable. |
@@ -214,8 +214,7 @@ These screens **don't follow light/dark** — they stay on-brand like a product 
 | `--brand-navy`   | `#1B2E63`                               | Sign-in button, gradient start          |
 | `--brand-navy-deep` | `#0C1633`                            | Gradient end (`linear-gradient(160deg, navy, navy-deep)`) |
 | `--brand-ink`    | `#16255A`                               | Logo word, headings                     |
-| `--brand-blue`   | `#3E63B8`                               | Eyebrow, logo segment                   |
-| `--brand-sky`    | `#9AD3EC`, `--brand-steel` `#A7ADB6`, `#142B63` | Logo conic ring segments       |
+| `--brand-blue`   | `#3E63B8`                               | Eyebrow                                 |
 | `--brand-soft`   | `#EAF1FC`                               | Feature icon boxes, brand pills         |
 | field border     | `#D7DCE2`; dividers `#EAEDF1`           |                                         |
 
@@ -231,7 +230,7 @@ Layout: two panels that wrap — left white panel (`flex-[1_1_560px]`, `p-[clamp
 
 - **Lucide React** only, `stroke-width` 1.8–2, size 16px in buttons/inputs, 18px in cards, 15px inside 32px feature boxes.
 - Icons next to text inherit `currentColor`. Icon-only buttons need `aria-label`.
-- The logo is the only custom SVG.
+- Logos are the client-supplied images in `public/` (`concreat-logo.webp`, `*-cement-bag.webp`); don't redraw them.
 
 ---
 

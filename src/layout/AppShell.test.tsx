@@ -50,6 +50,7 @@ test('the topbar shows the company, account and signed-in user', async () => {
   expect(await screen.findByText('Solid Cement')).toBeInTheDocument()
   expect(screen.getByText(/J\.D\. Santos Hardware & Construction Supply/)).toBeInTheDocument()
   expect(screen.getByRole('button', { name: /J\.D\. Santos/ })).toHaveTextContent('JS')
+  expect(screen.getByRole('img', { name: 'Concreat' })).toHaveAttribute('src', '/concreat-logo.webp')
 })
 
 test('a deep link inside the role lands on that section and marks it current', async () => {

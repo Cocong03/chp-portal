@@ -1,24 +1,6 @@
-// Concreat ring mark (wireframe .topbar-logo-mark): four quarter arcs, rotated to match `conic-gradient(from -45deg …)`.
-const SEGMENTS = ['var(--brand-blue)', 'var(--brand-ring-navy)', 'var(--brand-steel)', 'var(--brand-sky)']
-const RADIUS = 11
-const QUARTER = (2 * Math.PI * RADIUS) / 4
+import { cn } from '@/lib/utils'
 
-export function Logo({ size = 30 }: { size?: number }) {
-  return (
-    <svg width={size} height={size} viewBox="0 0 30 30" aria-hidden="true" className="shrink-0">
-      <g transform="rotate(-135 15 15)" fill="none" strokeWidth={8}>
-        {SEGMENTS.map((color, i) => (
-          <circle
-            key={color}
-            cx={15}
-            cy={15}
-            r={RADIUS}
-            stroke={color}
-            strokeDasharray={`${QUARTER} ${QUARTER * 3}`}
-            strokeDashoffset={-QUARTER * i}
-          />
-        ))}
-      </g>
-    </svg>
-  )
+/** Concreat logo supplied by the client (public/concreat-logo.webp, 500×327). It includes the CONCREAT wordmark. */
+export function Logo({ className }: { className?: string }) {
+  return <img src="/concreat-logo.webp" alt="Concreat" width={500} height={327} className={cn('h-10 w-auto shrink-0', className)} />
 }

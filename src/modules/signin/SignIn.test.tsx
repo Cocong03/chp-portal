@@ -28,6 +28,15 @@ test('shows the wireframe copy and sets the title', () => {
   expect(document.title).toBe('Sign in — Concreat Connect')
 })
 
+test('shows the client-supplied Concreat logo and cement bag images', () => {
+  const { container } = renderApp(<SignIn />)
+  expect(screen.getByRole('img', { name: 'Concreat' })).toHaveAttribute('src', '/concreat-logo.webp')
+  // Bags are decorative (the pills below name them), so they carry empty alt text.
+  const bags = [...container.querySelectorAll('img[alt=""]')].map((img) => img.getAttribute('src'))
+  expect(bags).toEqual(['/apo-cement-bag.webp', '/rizal-cement-bag.webp', '/island-cement-bag.webp'])
+  expect(screen.getByText('APO CEMENT')).toBeInTheDocument()
+})
+
 test('asks for both fields before calling the server', async () => {
   const user = userEvent.setup()
   renderApp(<SignIn />)
