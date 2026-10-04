@@ -36,6 +36,16 @@ test.each([
   expect(redeemInvitation).not.toHaveBeenCalled()
 })
 
+test('both password fields have their own show/hide button', async () => {
+  const user = userEvent.setup()
+  renderApp(<SetPassword />, { route: ROUTE })
+  const [first, second] = screen.getAllByRole('button', { name: 'Show password' })
+  await user.click(second)
+  expect(screen.getByLabelText('Confirm password')).toHaveAttribute('type', 'text')
+  expect(screen.getByLabelText('Password')).toHaveAttribute('type', 'password')
+  expect(first).toHaveAccessibleName('Show password')
+})
+
 test('rejects mismatched passwords', async () => {
   renderApp(<SetPassword />, { route: ROUTE })
   await fill('Abcdefg1', 'Abcdefg2')

@@ -9,10 +9,11 @@ import { usePageTitle } from '@/lib/usePageTitle'
 import { Button } from '@/ui/button'
 import { Field, FieldError, FieldGroup, FieldLabel } from '@/ui/field'
 import { Input } from '@/ui/input'
+import { PasswordInput } from '@/ui/PasswordInput'
 import { ActivationNote, AuthCardHeader, AuthLayout, brandButton, FormAlert, inputClass, labelClass, SupportLine } from './AuthLayout'
 
 const schema = z.object({
-  email: z.string().trim().min(1, 'Enter your user ID or email.'),
+  email: z.string().trim().min(1, 'Enter your email.').email('Enter a valid email address.'),
   password: z.string().min(1, 'Enter your password.'),
 })
 type Values = z.infer<typeof schema>
@@ -42,9 +43,17 @@ export function SignIn() {
         <FieldGroup className="gap-[18px]">
           <Field data-invalid={errors.email ? true : undefined}>
             <FieldLabel htmlFor="signin-email" className={labelClass}>
-              User ID or email
+              Email
             </FieldLabel>
-            <Input id="signin-email" autoComplete="username" className={inputClass} aria-invalid={!!errors.email} {...register('email')} />
+            <Input
+              id="signin-email"
+              type="email"
+              autoComplete="username"
+              placeholder="j.santos@sample-customer.ph"
+              className={inputClass}
+              aria-invalid={!!errors.email}
+              {...register('email')}
+            />
             <FieldError errors={[errors.email]} />
           </Field>
           <Field data-invalid={errors.password ? true : undefined}>
@@ -56,9 +65,8 @@ export function SignIn() {
                 Forgot password?
               </a>
             </div>
-            <Input
+            <PasswordInput
               id="signin-password"
-              type="password"
               autoComplete="current-password"
               placeholder="••••••••••••"
               className={inputClass}

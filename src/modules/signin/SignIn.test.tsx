@@ -11,7 +11,7 @@ vi.mock('@/auth/session', async (importOriginal) => ({
 
 async function fillAndSubmit(email: string, password: string) {
   const user = userEvent.setup()
-  await user.type(screen.getByLabelText('User ID or email'), email)
+  await user.type(screen.getByLabelText('Email'), email)
   await user.type(screen.getByLabelText('Password'), password)
   await user.click(screen.getByRole('button', { name: 'Sign in' }))
   return user
@@ -51,12 +51,36 @@ test('asks for both fields before calling the server', async () => {
   const user = userEvent.setup()
   renderApp(<SignIn />)
   await user.click(screen.getByRole('button', { name: 'Sign in' }))
-  expect(await screen.findByText('Enter your user ID or email.')).toBeInTheDocument()
+  expect(await screen.findByText('Enter your email.')).toBeInTheDocument()
   expect(screen.getByText('Enter your password.')).toBeInTheDocument()
   expect(signIn).not.toHaveBeenCalled()
 })
 
-test('signs in with the trimmed user ID and the password', async () => {
+test('labels the field Email, with the sample placeholder', () => {
+  renderApp(<SignIn />)
+  expect(screen.getByLabelText('Email')).toHaveAttribute('placeholder', 'j.santos@sample-customer.ph')
+  expect(screen.queryByText('User ID or email')).not.toBeInTheDocument()
+})
+
+test('rejects something that is not an email address', async () => {
+  renderApp(<SignIn />)
+  await fillAndSubmit('jdsantos', 'S3cret!')
+  expect(await screen.findByText('Enter a valid email address.')).toBeInTheDocument()
+  expect(signIn).not.toHaveBeenCalled()
+})
+
+test('the eye button shows and hides the password', async () => {
+  const user = userEvent.setup()
+  renderApp(<SignIn />)
+  const password = screen.getByLabelText('Password')
+  expect(password).toHaveAttribute('type', 'password')
+  await user.click(screen.getByRole('button', { name: 'Show password' }))
+  expect(password).toHaveAttribute('type', 'text')
+  await user.click(screen.getByRole('button', { name: 'Hide password' }))
+  expect(password).toHaveAttribute('type', 'password')
+})
+
+test('signs in with the trimmed email and the password', async () => {
   vi.mocked(signIn).mockResolvedValue()
   renderApp(<SignIn />)
   await fillAndSubmit('  jd@x.ph ', 'S3cret!')
@@ -76,7 +100,7 @@ test('a double click sends one sign-in request', async () => {
   vi.mocked(signIn).mockReturnValue(new Promise(() => {}))
   const user = userEvent.setup()
   renderApp(<SignIn />)
-  await user.type(screen.getByLabelText('User ID or email'), 'jd@x.ph')
+  await user.type(screen.getByLabelText('Email'), 'jd@x.ph')
   await user.type(screen.getByLabelText('Password'), 'S3cret!')
   await user.dblClick(screen.getByRole('button', { name: 'Sign in' }))
   expect(await screen.findByRole('button', { name: 'Signing in…' })).toBeDisabled()

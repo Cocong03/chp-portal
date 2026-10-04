@@ -9,6 +9,7 @@ import { usePageTitle } from '@/lib/usePageTitle'
 import { Button } from '@/ui/button'
 import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/ui/field'
 import { Input } from '@/ui/input'
+import { PasswordInput } from '@/ui/PasswordInput'
 import { AuthCardHeader, AuthLayout, brandButton, FormAlert, inputClass, labelClass, SupportLine } from './AuthLayout'
 
 // Mirrors Power Pages' default policy (PasswordValidator/EnforcePasswordPolicy = true, RequiredLength = 8).
@@ -86,9 +87,8 @@ export function SetPassword() {
             <FieldLabel htmlFor="setpw-password" className={labelClass}>
               Password
             </FieldLabel>
-            <Input
+            <PasswordInput
               id="setpw-password"
-              type="password"
               autoComplete="new-password"
               className={inputClass}
               aria-invalid={!!errors.password}
@@ -101,9 +101,8 @@ export function SetPassword() {
             <FieldLabel htmlFor="setpw-confirm" className={labelClass}>
               Confirm password
             </FieldLabel>
-            <Input
+            <PasswordInput
               id="setpw-confirm"
-              type="password"
               autoComplete="new-password"
               className={inputClass}
               aria-invalid={!!errors.confirm}
