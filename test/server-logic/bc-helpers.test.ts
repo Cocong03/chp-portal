@@ -29,3 +29,35 @@ test('the helper source avoids every pattern the Power Pages validator rejects',
     expect(source).not.toMatch(pattern)
   }
 })
+
+// Mirrors the power-pages plugin validator's brace scan (validate-serverlogic.js, findTopLevelFunctions): it skips
+// comments and quoted strings but not regex literals, so a quote inside a regex literal makes it miscount braces.
+function topLevelFunctions(content: string): string[] {
+  const names: string[] = []
+  let depth = 0
+  for (let i = 0; i < content.length; i++) {
+    const ch = content[i]
+    if (ch === '/' && content[i + 1] === '/') {
+      while (i < content.length && content[i] !== '\n') i++
+    } else if (ch === '/' && content[i + 1] === '*') {
+      i = content.indexOf('*/', i + 2) + 1
+    } else if (ch === "'" || ch === '"' || ch === '`') {
+      for (i++; i < content.length && content[i] !== ch; i++) if (content[i] === '\\') i++
+    } else if (ch === '{') depth++
+    else if (ch === '}') depth--
+    else if (depth === 0) {
+      const m = content.slice(i).match(/^(?:async\s+)?function\s+([a-zA-Z0-9_]+)\s*\(/)
+      if (m) {
+        names.push(m[1])
+        i += m[0].length - 1
+      }
+    }
+  }
+  return names
+}
+
+test('the plugin validator sees only HTTP verb functions at the top level of every stamped endpoint', () => {
+  for (const file of endpointFiles) {
+    expect(topLevelFunctions(readFileSync(file, 'utf8')).filter((name) => !['get', 'post', 'put', 'patch', 'del'].includes(name)), file).toEqual([])
+  }
+})

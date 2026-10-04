@@ -53,7 +53,7 @@ function sessionScope() {
 
 // OData string literal with single quotes doubled (architecture rule 4).
 function odataLiteral(value) {
-    return "'" + String(value).replace(/'/g, "''") + "'";
+    return "'" + String(value).split("'").join("''") + "'";
 }
 
 // Query string with every value URL-encoded; BC answers a misleading 401 to a badly encoded query.
@@ -125,11 +125,16 @@ async function respond(work) {
         return JSON.stringify(await work());
     } catch (err) {
         // Platform messages can echo a request; never let a secret or token reach the log.
-        var detail = String(err.message)
-            .replace(/client_secret=[^&\s"']*/gi, "client_secret=[removed]")
-            .replace(/client_secret"\s*:\s*"[^"]*"/gi, 'client_secret": "[removed]"')
-            .replace(/Bearer\s+[^\s"']+/gi, "Bearer [removed]")
-            .replace(/access_token["':=\s]+[^\s"',}]+/gi, "access_token=[removed]");
+        // Patterns are RegExp strings: quotes inside regex literals break the plugin validator's brace scan.
+        var detail = String(err.message);
+        [
+            ["client_secret=[^&\\s\"']*", "client_secret=[removed]"],
+            ["client_secret\"\\s*:\\s*\"[^\"]*\"", "client_secret\": \"[removed]\""],
+            ["Bearer\\s+[^\\s\"']+", "Bearer [removed]"],
+            ["access_token[\"':=\\s]+[^\\s\"',}]+", "access_token=[removed]"]
+        ].forEach((rule) => {
+            detail = detail.replace(new RegExp(rule[0], "gi"), rule[1]);
+        });
         Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + detail);
         throw new Error("We couldn't load this information. Please try again.");
     }
