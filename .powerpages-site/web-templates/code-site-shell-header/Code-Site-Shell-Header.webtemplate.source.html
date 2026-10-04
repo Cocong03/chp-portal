@@ -1,0 +1,20 @@
+<div/>
+<script>
+  // Code Site Shell Header: sends server-rendered auth pages back into the SPA.
+  // Separate template because pac pages upload-code-site wipes the "Header" template on every upload.
+  (function () {
+    var path = window.location.pathname.toLowerCase();
+    var params = new URLSearchParams(window.location.search);
+    function go(target) { window.location.replace(window.location.origin + target); }
+
+    // Invitation links (either casing of the code param) land on the SPA Set password page.
+    if (path === '/account/login/redeeminvitation' || path === '/account/login/register') {
+      var code = params.get('invitation') || params.get('InvitationCode') || params.get('invitationCode');
+      return go(code ? '/activate/complete?code=' + encodeURIComponent(code) : '/activate');
+    }
+    // /Register is the server alias for RedeemInvitation without a code.
+    if (path === '/register') return go('/activate');
+    // Server bounces unauthenticated users to /SignIn; our sign-in lives at /.
+    if (path === '/signin') return go('/');
+  })();
+</script>

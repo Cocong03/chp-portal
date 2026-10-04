@@ -1,0 +1,4 @@
+description: SPA can't render the server CAPTCHA
+id: 4a795c78-e377-45f9-ac2f-658f449f7572
+name: Authentication/Registration/IsCaptchaEnabledForRegistration
+value: false

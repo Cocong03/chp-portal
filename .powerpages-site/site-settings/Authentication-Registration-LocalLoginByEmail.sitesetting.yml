@@ -1,0 +1,4 @@
+description: Local sign-in uses the email address (the SPA posts Email)
+id: 0476f2d2-edf4-4101-9eee-e734f6e576a3
+name: Authentication/Registration/LocalLoginByEmail
+value: true
