@@ -21,11 +21,19 @@ export const labelClass = 'text-[12.5px] font-semibold text-muted-foreground'
 export const inputClass = 'h-auto border-brand-field bg-card px-3 py-2.5 text-[13.5px]'
 export const brandButton = 'h-auto w-full rounded-[7px] bg-brand-navy py-3 text-sm font-bold text-white hover:bg-brand-navy'
 
+// Desktop (≥980px, where the wireframe's 560px + 420px flex panels fit; calc(50%+70px) reproduces their split): intro and features stack in the
+// left column, the card fills the right. Phones: intro, then the card, then features — the form is reached first.
+const DESKTOP = 'min-[980px]:col-start-1'
+const GUTTER = 'px-[clamp(24px,6vw,76px)]'
+
 export function AuthLayout({ children }: { children: ReactNode }) {
   return (
-    <div data-theme="light" className="flex min-h-screen flex-wrap bg-card text-foreground">
-      <div className="flex flex-[1_1_560px] flex-col justify-center px-[clamp(24px,6vw,76px)] py-[clamp(32px,5vw,64px)]">
-        <Logo className="mb-[30px] h-[72px] self-start" />
+    <div
+      data-theme="light"
+      className="grid min-h-screen bg-card text-foreground min-[980px]:grid-cols-[calc(50%+70px)_1fr] min-[980px]:grid-rows-[1fr_auto_auto_1fr]"
+    >
+      <div className={`${GUTTER} pt-[clamp(32px,5vw,64px)] pb-1 ${DESKTOP} min-[980px]:row-start-2 min-[980px]:pb-0`}>
+        <Logo className="mb-[30px] h-[72px]" />
         <p className="mb-1.5 text-xs font-bold tracking-[0.12em] text-brand-blue uppercase">Welcome to</p>
         <h1 className="mb-1.5 text-[clamp(28px,3.4vw,38px)] leading-[1.08] font-extrabold text-balance text-brand-ink">
           Concreat Connect
@@ -35,6 +43,11 @@ export function AuthLayout({ children }: { children: ReactNode }) {
           Concreat Connect gives you a secure view of every account registered to your email across APO Cement Corporation and
           Solid Cement Corporation — orders, deliveries, credit, and documents in one place.
         </p>
+      </div>
+      <div className="flex items-center justify-center bg-linear-160 from-brand-navy to-brand-navy-deep px-[26px] py-10 min-[980px]:col-start-2 min-[980px]:row-span-4 min-[980px]:row-start-1">
+        <div className="w-full max-w-[420px] rounded-[14px] bg-card px-[34px] py-9 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">{children}</div>
+      </div>
+      <div className={`${GUTTER} py-[clamp(32px,5vw,64px)] ${DESKTOP} min-[980px]:row-start-3 min-[980px]:pt-0`}>
         <ul className="mb-[30px] flex max-w-[480px] flex-col gap-[15px]">
           {FEATURES.map(({ icon: Icon, title, desc }) => (
             <li key={title} className="flex items-start gap-[13px]">
@@ -59,9 +72,6 @@ export function AuthLayout({ children }: { children: ReactNode }) {
             </div>
           ))}
         </div>
-      </div>
-      <div className="flex flex-[1_1_420px] items-center justify-center bg-linear-160 from-brand-navy to-brand-navy-deep px-[26px] py-10">
-        <div className="w-full max-w-[420px] rounded-[14px] bg-card px-[34px] py-9 shadow-[0_20px_50px_rgba(0,0,0,0.35)]">{children}</div>
       </div>
     </div>
   )

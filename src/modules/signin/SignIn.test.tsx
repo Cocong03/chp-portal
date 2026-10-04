@@ -37,6 +37,16 @@ test('shows the client-supplied Concreat logo and cement bag images', () => {
   expect(screen.getByText('APO CEMENT')).toBeInTheDocument()
 })
 
+test('on phones the form comes right after the intro, before the features and bags', () => {
+  renderApp(<SignIn />)
+  const follows = (a: Element, b: Element) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING) !== 0
+  const lede = screen.getByText(/gives you a secure view of every account/)
+  const form = screen.getByRole('heading', { name: 'Sign in to Concreat Connect' })
+  const features = screen.getByText('See your account at a glance')
+  expect(follows(lede, form)).toBe(true)
+  expect(follows(form, features)).toBe(true)
+})
+
 test('asks for both fields before calling the server', async () => {
   const user = userEvent.setup()
   renderApp(<SignIn />)
