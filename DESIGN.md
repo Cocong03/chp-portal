@@ -107,7 +107,7 @@ Tables scroll horizontally inside their wrapper (min width 640px; `tight` tables
 
 | Wireframe                       | Build with                                                                                     |
 | ------------------------------- | ---------------------------------------------------------------------------------------------- |
-| **Top bar**: logo mark (30px conic ring) + "Concreat Hub" (15.5px/700) + sub-line (11.5px, faint); right side: account name + user chip | `layout/AppShell.tsx`. Logo is an inline SVG component in `src/ui/Logo.tsx`. User chip = shadcn **Avatar** (26px, `bg-primary text-primary-foreground`, initials 11px/700) inside a **DropdownMenu** (profile, sign out). |
+| **Top bar**: logo mark (30px conic ring) + "Concreat Connect" (15.5px/700) + sub-line (11.5px, faint); right side: account name + user chip | `layout/AppShell.tsx`. Logo is an inline SVG component in `src/ui/Logo.tsx`. User chip = shadcn **Avatar** (26px, `bg-primary text-primary-foreground`, initials 11px/700) inside a **DropdownMenu** (profile, sign out). |
 | Account switch ("Change" link next to the account name) | Phase 2 only. Button `variant="link"`; opens a **Dialog** with the account picker (§7). Hidden while one link per contact. |
 | **Section nav**: rounded pills (Dashboard, Orders, …), active = `bg-accent text-accent-foreground font-extrabold` with a 3px glowing underline | React Router `NavLink` styled as pills (this is routing, not shadcn Tabs). Underline is an `after:` pseudo-element: `after:absolute after:inset-x-3.5 after:-bottom-2 after:h-[3px] after:rounded-full after:bg-primary after:shadow-[0_0_6px_1px_var(--primary)]`. Inactive: `text-muted-foreground hover:bg-muted hover:text-foreground`. Hide items the role can't use (UX only). |
 | "Soon" tag on disabled sections | **Badge** `variant="soon"` (10px uppercase, `bg-muted text-faint`); item `opacity-55`, not clickable. |
@@ -237,7 +237,7 @@ Layout: two panels that wrap — left white panel (`flex-[1_1_560px]`, `p-[clamp
 
 ## 9. Content & accessibility
 
-- Use the wireframe's copy verbatim (labels, button text such as "+ New Multiple Order", empty states, captions). Every page sets `document.title = "<Page> — Concreat Hub"`.
+- Use the wireframe's copy verbatim (labels, button text such as "+ New Multiple Order", empty states, captions). Every page sets `document.title = "<Page> — Concreat Connect"`.
 - No BC jargon in UI text (location codes, table names, internal service-centre system name).
 - Colour is never the only signal: pills always carry text; stat-tile alerts change both colour and copy.
 - Contrast: all token pairs above meet WCAG AA for their sizes; check any new pairing.

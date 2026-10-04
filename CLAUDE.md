@@ -1,4 +1,6 @@
-# CHP Portal (Concreat Hub)
+# CHP Portal (Concreat Connect)
+
+Customers see the portal as **Concreat Connect** (wireframe name; decided 2026-10-04). "Concreat Hub" survives only in internal identifiers (solution `ConcreatHub`, doc file names).
 
 Customer portal for **Concreat Holdings (CHP)** customers. Customers sign in, place and track cement orders, view their ledger and documents, manage delivery sites, and submit requests/complaints. **Business Central (BC) is the system of record**; the portal consumes BC through APIs built by the BC team.
 
@@ -99,7 +101,7 @@ docs/               architecture, plan, registration docs
 - **All environment-specific values are Dataverse environment variables**: BC tenant, BC environment name, company IDs, API base path, site URL, sender mailbox. **Secrets: Key Vault → secret env var → site setting.** Never hardcode them.
 - Order status mapping (confirmed 2026-09-14): BC Open → _Open_ · Pending Prepayment → _Pending Prepayment_ · Released → _Ready for Dispatch_ · archived + Completely Shipped → _Completely Shipped_ · Completely Shipped + Invoiced → _Invoiced_.
 - Customer-facing copy uses the wireframe's wording exactly (renames per the packages, e.g. "+ New Multiple Order", "Account and User Management"). Never show BC jargon (location codes, table names) or the name of CHP's internal service-center system.
-- Every page sets `document.title` as `"<Page> — Concreat Hub"`.
+- Every page sets `document.title` as `"<Page> — Concreat Connect"`.
 - Publisher **Concreat Holdings**, prefix `chp_` (option-value prefix 77500), solution **`ConcreatHub`**. Create every Dataverse component in that solution.
 - Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCSolidCementCompanyId`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`. The BC client-secret variable is added when S0-03 delivers the Key Vault secret.
 
