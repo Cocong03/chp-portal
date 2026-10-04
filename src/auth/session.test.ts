@@ -106,6 +106,26 @@ describe('on the deployed site', () => {
     await expect(redeemInvitation('used-code', 'jd@x.ph', 'Abcdefg1', 'Abcdefg1')).rejects.toBeInstanceOf(InvalidInvitationError)
   })
 
+  // Captured on the Dev site 2026-10-04: a used code still gets the Register form on GET;
+  // the POST re-renders it with this validation summary.
+  test('redeemInvitation maps "Invalid invitation code." after the POST to InvalidInvitationError', async () => {
+    const registerPage =
+      '<form id="Register" action="./Register?x=1"><input id="__VIEWSTATE" value="vs" />' +
+      '<input id="EmailTextBox" name="ctl00$Email" /><input id="PasswordTextBox" name="ctl00$Pw" />' +
+      '<input id="ConfirmPasswordTextBox" name="ctl00$Pw2" /><input id="SubmitButton" name="ctl00$Go" value="Register" /></form>'
+    const rejected =
+      '<div id="ValidationSummary1" class="validation-summary-errors listStyleTypeNone alert alert-block alert-danger"> <ul><li>Invalid invitation code.</li></ul> </div>'
+    vi.stubGlobal(
+      'fetch',
+      vi.fn(async (_url: string, init?: RequestInit) =>
+        init?.method === 'POST'
+          ? ({ redirected: false, url: 'https://site.example/Account/Login/Register', text: async () => rejected } as Response)
+          : new Response(registerPage),
+      ),
+    )
+    await expect(redeemInvitation('used-code', 'jd@x.ph', 'Abcdefg1', 'Abcdefg1')).rejects.toBeInstanceOf(InvalidInvitationError)
+  })
+
   test('requestActivation fails cleanly until the flow id is configured', async () => {
     vi.stubEnv('VITE_ACTIVATION_FLOW_ID', '')
     await expect(requestActivation('jd@x.ph')).rejects.toThrow("We couldn't send the activation email right now.")

@@ -149,7 +149,10 @@ export async function redeemInvitation(code: string, email: string, password: st
     go(response.url)
     return
   }
-  throw new Error(parseServerErrors(await response.text()).join(' ') || ACTIVATION_FAILED)
+  const errors = parseServerErrors(await response.text())
+  // A used or expired code still gets the form; the POST answers "Invalid invitation code." (seen on Dev 2026-10-04).
+  if (errors.some((message) => /invitation code/i.test(message))) throw new InvalidInvitationError()
+  throw new Error(errors.join(' ') || ACTIVATION_FAILED)
 }
 
 /**
