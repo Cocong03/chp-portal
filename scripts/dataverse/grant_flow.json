@@ -1,0 +1,228 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": { "defaultValue": {}, "type": "SecureObject" },
+    "$connections": { "defaultValue": {}, "type": "Object" }
+  },
+  "triggers": {
+    "When_an_access_grant_is_added_or_modified": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 4,
+          "subscriptionRequest/entityname": "chp_accessgrant",
+          "subscriptionRequest/scope": 4,
+          "subscriptionRequest/filteringattributes": "chp_email,chp_bccustomerno,chp_webrole"
+        }
+      }
+    }
+  },
+  "actions": {
+    "List_contacts_by_email": {
+      "type": "OpenApiConnection",
+      "runAfter": {},
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "contacts",
+          "$select": "contactid,_parentcustomerid_value",
+          "$filter": "emailaddress1 eq '@{replace(triggerOutputs()?['body/chp_email'], '''', '''''')}' and statecode eq 0",
+          "$top": 2
+        }
+      }
+    },
+    "Switch_on_contact_count": {
+      "type": "Switch",
+      "runAfter": { "List_contacts_by_email": ["Succeeded"] },
+      "expression": "@length(outputs('List_contacts_by_email')?['body/value'])",
+      "cases": {
+        "No_contact": {
+          "case": 0,
+          "actions": {
+            "Set_status_Pending": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "chp_accessgrants",
+                  "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
+                  "item/chp_status": 775000000
+                }
+              }
+            }
+          }
+        },
+        "One_contact": {
+          "case": 1,
+          "actions": {
+            "Get_parent_account": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "accounts",
+                  "recordId": "@first(outputs('List_contacts_by_email')?['body/value'])?['_parentcustomerid_value']",
+                  "$select": "chp_bccustomerno"
+                }
+              }
+            },
+            "Customer_matches": {
+              "type": "If",
+              "runAfter": { "Get_parent_account": ["Succeeded", "Failed"] },
+              "expression": {
+                "and": [
+                  { "equals": ["@actions('Get_parent_account')?['status']", "Succeeded"] },
+                  { "equals": ["@outputs('Get_parent_account')?['body/chp_bccustomerno']", "@triggerOutputs()?['body/chp_bccustomerno']"] }
+                ]
+              },
+              "actions": {
+                "List_web_role": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "ListRecords",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "powerpagecomponents",
+                      "$select": "powerpagecomponentid",
+                      "$filter": "name eq '@{if(equals(triggerOutputs()?['body/chp_webrole'], 775000000), 'Full Access', if(equals(triggerOutputs()?['body/chp_webrole'], 775000001), 'Orders & Delivery', if(equals(triggerOutputs()?['body/chp_webrole'], 775000002), 'Finance & Documents', if(equals(triggerOutputs()?['body/chp_webrole'], 775000003), 'View Only', ''))))}' and powerpagecomponenttype eq 11 and _powerpagesiteid_value eq f44e98b4-3da3-4f8d-8f79-fbb244454741",
+                      "$top": 1
+                    }
+                  }
+                },
+                "Relate_web_role_to_contact": {
+                  "type": "OpenApiConnection",
+                  "runAfter": { "List_web_role": ["Succeeded"] },
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "operationId": "AssociateEntities",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                    },
+                    "parameters": {
+                      "entityName": "contacts",
+                      "recordId": "@first(outputs('List_contacts_by_email')?['body/value'])?['contactid']",
+                      "associationEntityRelationship": "powerpagecomponent_mspp_webrole_contact",
+                      "item/@odata.id": "@first(outputs('List_web_role')?['body/value'])?['@odata.id']"
+                    }
+                  }
+                },
+                "Role_granted_or_already_granted": {
+                  "type": "If",
+                  "runAfter": { "Relate_web_role_to_contact": ["Succeeded", "Failed"] },
+                  "expression": {
+                    "or": [
+                      { "equals": ["@actions('Relate_web_role_to_contact')?['status']", "Succeeded"] },
+                      { "contains": ["@toLower(string(outputs('Relate_web_role_to_contact')?['body']))", "already exists"] },
+                      { "contains": ["@toLower(string(outputs('Relate_web_role_to_contact')?['body']))", "duplicate key"] },
+                      { "contains": ["@toLower(string(outputs('Relate_web_role_to_contact')?['body']))", "0x80040237"] }
+                    ]
+                  },
+                  "actions": {
+                    "Set_status_Applied": {
+                      "type": "OpenApiConnection",
+                      "runAfter": {},
+                      "inputs": {
+                        "host": {
+                          "connectionName": "shared_commondataserviceforapps",
+                          "operationId": "UpdateOnlyRecord",
+                          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                        },
+                        "parameters": {
+                          "entityName": "chp_accessgrants",
+                          "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
+                          "item/chp_status": 775000001,
+                          "item/chp_Contact@odata.bind": "contacts(@{first(outputs('List_contacts_by_email')?['body/value'])?['contactid']})",
+                          "item/chp_appliedon": "@utcNow()"
+                        }
+                      }
+                    }
+                  },
+                  "else": {
+                    "actions": {
+                      "Fail_role_not_granted": {
+                        "type": "Terminate",
+                        "runAfter": {},
+                        "inputs": {
+                          "runStatus": "Failed",
+                          "runError": {
+                            "code": "RoleNotGranted",
+                            "message": "Could not add the web role to the contact (web role missing on the site, or relate failed). The grant stays unchanged."
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+              },
+              "else": {
+                "actions": {
+                  "Set_status_Customer_mismatch": {
+                    "type": "OpenApiConnection",
+                    "runAfter": {},
+                    "inputs": {
+                      "host": {
+                        "connectionName": "shared_commondataserviceforapps",
+                        "operationId": "UpdateOnlyRecord",
+                        "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                      },
+                      "parameters": {
+                        "entityName": "chp_accessgrants",
+                        "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
+                        "item/chp_status": 775000002
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+      },
+      "default": {
+        "actions": {
+          "Set_status_Duplicate_email": {
+            "type": "OpenApiConnection",
+            "runAfter": {},
+            "inputs": {
+              "host": {
+                "connectionName": "shared_commondataserviceforapps",
+                "operationId": "UpdateOnlyRecord",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+              },
+              "parameters": {
+                "entityName": "chp_accessgrants",
+                "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
+                "item/chp_status": 775000003
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}
