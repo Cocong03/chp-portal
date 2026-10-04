@@ -79,7 +79,9 @@ test('a failed Dataverse call becomes the same customer-safe error', () => {
 })
 
 test('uses no patterns the Power Pages validator rejects', () => {
-  for (const banned of [/\brequire\(/, /\bimport\b/, /\beval\(/, /setTimeout/, /\bdelete\b/, /prototype/, /Reflect\./, /console\.log/, /with\(/]) {
-    expect(source).not.toMatch(banned)
+  // The runtime (RTSL01) rejects these. `Function\s*\(` also matches an anonymous `function (x)` — seen on Dev 2026-10-04.
+  const banned = [/\brequire\(/, /\bimport\b/, /\beval\(/, /setTimeout/, /\bdelete\b/, /prototype/, /Reflect\./, /console\.log/, /with\(/, /Function\s*\(/i]
+  for (const pattern of banned) {
+    expect(source).not.toMatch(pattern)
   }
 })

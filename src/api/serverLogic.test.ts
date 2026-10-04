@@ -77,6 +77,23 @@ describe('on the deployed site', () => {
     expect(error.message).toBe('Not allowed')
   })
 
+  // Shape observed on the Dev site, 2026-10-04: lowercase keys (Microsoft Learn shows PascalCase).
+  test('unwraps the lowercase envelope the runtime actually returns', async () => {
+    stubFetch(new Response(JSON.stringify({ requestId: 'r-1', success: true, serverLogicName: 'me', data: JSON.stringify({ ok: 1 }) })))
+    expect(await serverLogic('me')).toEqual({ ok: 1 })
+  })
+
+  test('a lowercase failure envelope throws ApiError with its status', async () => {
+    stubFetch(
+      new Response(JSON.stringify({ requestId: 'r-1', success: false, serverLogicName: 'me', error: 'Exception occurred while processing this request' }), {
+        status: 400,
+      }),
+    )
+    const error = await caught(serverLogic('me'))
+    expect(error).toBeInstanceOf(ApiError)
+    expect(error.status).toBe(400)
+  })
+
   test('a non-JSON gateway page throws a generic ApiError instead of crashing', async () => {
     stubFetch(new Response('<html>Bad gateway</html>', { status: 502 }))
     const error = await caught(serverLogic('orders'))

@@ -19,11 +19,17 @@ export class ApiError extends Error {
   }
 }
 
-/** Power Pages wraps every Server Logic response: { RequestId, Success, Data, ExecutionTime, ServerLogicName, Error }. */
+/**
+ * Power Pages wraps every Server Logic response. Microsoft Learn documents PascalCase
+ * ({ Success, Data, Error }); the Dev runtime returns camelCase ({ success, data, error }). Accept both.
+ */
 interface Envelope {
   Success?: boolean
   Data?: unknown
   Error?: unknown
+  success?: boolean
+  data?: unknown
+  error?: unknown
 }
 
 /** The SPA's only Server Logic caller. On the dev server it answers from src/mocks. */
@@ -48,10 +54,10 @@ export async function serverLogic<T>(name: string, { method = 'GET', query, body
     body: body === undefined ? undefined : JSON.stringify(body),
   })
   const envelope = (await response.json().catch(() => undefined)) as Envelope | undefined
-  if (!response.ok || !envelope?.Success) {
-    throw new ApiError(response.status, messageOf(envelope?.Error) ?? GENERIC_ERROR)
+  if (!response.ok || !(envelope?.Success ?? envelope?.success)) {
+    throw new ApiError(response.status, messageOf(envelope?.Error ?? envelope?.error) ?? GENERIC_ERROR)
   }
-  return parseData(envelope.Data) as T
+  return parseData(envelope?.Data ?? envelope?.data) as T
 }
 
 function messageOf(error: unknown): string | undefined {

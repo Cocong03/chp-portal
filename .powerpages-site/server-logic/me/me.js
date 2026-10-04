@@ -19,13 +19,10 @@ function get() {
     // Roles may arrive as an array of names, an array of { Name } objects, or a comma-separated string.
     function roleNames(roles) {
         var list = Array.isArray(roles) ? roles : String(roles || "").split(",");
+        // Arrow callbacks only: the runtime validator (RTSL01) rejects anonymous function expressions, even in comments.
         return list
-            .map(function (role) {
-                return typeof role === "string" ? role.trim() : String((role && (role.Name || role.name)) || "").trim();
-            })
-            .filter(function (name) {
-                return name.length > 0;
-            });
+            .map((role) => (typeof role === "string" ? role.trim() : String((role && (role.Name || role.name)) || "").trim()))
+            .filter((name) => name.length > 0);
     }
 
     try {
