@@ -154,6 +154,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 - BC access goes through an **Entra app registration** (client credentials), registered **inside BC** with a permission set limited to the Concreat Hub API pages (read, plus Sales Order create). Do not reuse the "Monday CRM" app.
 - Client secret: **Azure Key Vault → Dataverse environment variable (secret type) → site setting**, read with `Server.SiteSetting`. Non-secret config (BC tenant, environment name, company IDs, API base path) goes in plain environment variables, so it differs per environment without code changes.
 - Tenant admins can **disable external calls from Server Logic** (a GA governance control). This must stay enabled for Concreat Hub's environment.
+- **Dev exception (2026-10-04):** the BC client secret is a plain-text environment variable with no default value, set by hand in Dev only. Key Vault is required before UAT (plan task S1-14).
 
 ---
 
