@@ -6,7 +6,20 @@
 
 /* Tokens from the wireframe (docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html),
    mapped onto the shadcn/ui variable names. */
-:root {
+/* [data-theme='light'] re-applies the light tokens inside a dark page (sign-in screens are fixed light). */
+:root,
+[data-theme='light'] {
+  /* Fixed brand palette for the sign-in screens (DESIGN.md §7); deliberately not redefined for dark. */
+  --brand-navy: #1b2e63;
+  --brand-navy-deep: #0c1633;
+  --brand-ink: #16255a;
+  --brand-blue: #3e63b8;
+  --brand-ring-navy: #142b63;
+  --brand-steel: #a7adb6;
+  --brand-sky: #9ad3ec;
+  --brand-soft: #eaf1fc;
+  --brand-field: #d7dce2;
+  --brand-divider: #eaedf1;
   --shadow: 0 1px 2px rgb(23 34 46 / 0.06), 0 4px 14px rgb(23 34 46 / 0.05);
   --scrim: rgb(23 34 46 / 0.4);
   --background: #f5f8fb;
@@ -99,6 +112,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-deep: var(--brand-navy-deep);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-field: var(--brand-field);
+  --color-brand-divider: var(--brand-divider);
 }
 
 @layer base {
