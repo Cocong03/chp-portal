@@ -1,23 +1,31 @@
-import { useEffect } from 'react'
-import { Routes, Route } from 'react-router-dom'
-
-// ponytail: placeholder until S1-01 brings the AppShell and module routes.
-function Home() {
-  useEffect(() => {
-    document.title = 'Concreat Hub'
-  }, [])
-  return (
-    <main className="mx-auto max-w-3xl p-8">
-      <h1 className="text-2xl font-semibold">Concreat Hub</h1>
-      <p className="mt-2 text-muted-foreground">Project scaffold is running.</p>
-    </main>
-  )
-}
+import { Navigate, Route, Routes } from 'react-router-dom'
+import { getPortalUser } from '@/auth/session'
+import { AppShell } from '@/layout/AppShell'
+import { SECTIONS } from '@/layout/sections'
+import { SectionRoute } from '@/layout/SectionRoute'
+import { Activate } from '@/modules/signin/Activate'
+import { SetPassword } from '@/modules/signin/SetPassword'
+import { SignIn } from '@/modules/signin/SignIn'
 
 export default function App() {
+  if (!getPortalUser()) {
+    return (
+      <Routes>
+        <Route path="/" element={<SignIn />} />
+        <Route path="/activate" element={<Activate />} />
+        <Route path="/activate/complete" element={<SetPassword />} />
+        <Route path="*" element={<Navigate to="/" replace />} />
+      </Routes>
+    )
+  }
   return (
     <Routes>
-      <Route path="*" element={<Home />} />
+      <Route element={<AppShell />}>
+        {SECTIONS.map((section) => (
+          <Route key={section.key} path={section.path} element={<SectionRoute section={section} />} />
+        ))}
+      </Route>
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }
