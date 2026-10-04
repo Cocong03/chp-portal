@@ -92,6 +92,7 @@
               "expression": {
                 "and": [
                   { "equals": ["@actions('Get_parent_account')?['status']", "Succeeded"] },
+                  { "not": { "empty": "@triggerOutputs()?['body/chp_bccustomerno']" } },
                   { "equals": ["@outputs('Get_parent_account')?['body/chp_bccustomerno']", "@triggerOutputs()?['body/chp_bccustomerno']"] }
                 ]
               },

@@ -7,7 +7,7 @@ function get() {
     // The connector may return the record, a JSON string, or a { StatusCode, Body } envelope.
     function asRecord(result) {
         var value = typeof result === "string" ? JSON.parse(result) : result;
-        if (value && value.IsSuccessStatusCode === false) {
+        if (value && (value.IsSuccessStatusCode === false || (typeof value.StatusCode === "number" && value.StatusCode >= 400))) {
             throw new Error("Dataverse " + value.StatusCode + " " + value.ReasonPhrase);
         }
         if (value && typeof value.Body === "string") {

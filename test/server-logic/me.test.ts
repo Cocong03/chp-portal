@@ -110,6 +110,17 @@ test('a failed Dataverse call becomes the same customer-safe error', () => {
   expect(() => load(server).get()).toThrow("We couldn't load your account details.")
 })
 
+// Final review B #2: an error envelope may carry only StatusCode (no IsSuccessStatusCode).
+test('an error envelope with only a 4xx/5xx StatusCode fails me instead of looking like "no account"', () => {
+  const { server } = fakeServer({ record: { StatusCode: 500, Body: JSON.stringify({ error: { message: 'boom' } }) } })
+  expect(() => load(server).get()).toThrow("We couldn't load your account details.")
+})
+
+test('a role read answered with only StatusCode 403 uses the fallback', () => {
+  const { server } = fakeServer({ user: { contactid: 'c-1', Roles: ['View Only'] }, record: contact(ACCOUNT), roleRecord: { StatusCode: 403, Body: JSON.stringify({ error: { message: 'denied' } }) } })
+  expect(JSON.parse(load(server).get()).roles).toEqual(['View Only'])
+})
+
 test('uses no patterns the Power Pages validator rejects', () => {
   // The runtime (RTSL01) rejects these. `Function\s*\(` also matches an anonymous `function (x)` — seen on Dev 2026-10-04.
   const banned = [/\brequire\(/, /\bimport\b/, /\beval\(/, /setTimeout/, /\bdelete\b/, /prototype/, /Reflect\./, /console\.log/, /with\(/, /Function\s*\(/i]
