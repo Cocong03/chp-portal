@@ -152,21 +152,47 @@ This file is rebuilt from the POC's Power Pages mechanics (Registration doc §4.
 - Card title "Sign in to Concreat Connect" and sub "Use the access details provided for your customer account."
 - Fields: "User ID or email" and "Password". The "Forgot password?" link goes to `/Account/Login/ForgotPassword`.
 - "Sign in" button, then "Activate your account" (→ `/activate`).
-- Activation note, legal line and support line. "Terms of Use" and "Data Privacy Policy" are plain text until targets exist.
-- React Hook Form + Zod with required fields only. A server error shows above the button, and the button is disabled while submitting.
+- Activation note, legal line and support line. "Terms of Use" and "Data Privacy Policy" link to `#` until the client supplies the pages.
+- React Hook Form + Zod with required fields only ("Enter your user ID or email." / "Enter your password."). A server error shows above the button, and the button reads "Signing in…" and is disabled while submitting.
 
 ### Activate (no wireframe; copy pending client review)
 
-- Title "Activate your account" and sub "For existing Concreat Holdings customers only."
-- One email field (Zod email) and a "Send activation link" button.
-- After submit the card always shows: *"If this email belongs to a registered customer contact, we've sent an activation link. Check your inbox."*
-- "Back to sign in" link.
+Same AuthLayout and card. The footer repeats the wireframe's activation note ("For existing Concreat Holdings customers only — new accounts are set up by your account manager.") and support line.
+
+| State | Copy |
+|---|---|
+| Title | **Activate your account** |
+| Sub | Enter the email address registered to your customer account. We'll email you a link to set your password. |
+| Field | Label "Email address", placeholder "name@company.com" |
+| Validation | "Enter your email address." · "Enter a valid email address." |
+| Button | "Send activation link" (submitting: "Sending…") |
+| Below button | "Already activated? Sign in" (→ `/`) |
+| Success title | **Check your email** |
+| Success body | If **{email}** is registered to a Concreat Holdings customer account, we've sent an activation link to it. The link can be used once and expires in 7 days. |
+| Success help | Didn't get it? Check your spam or junk folder, or contact the **Concreat Customer Service Center** at **(02) 8849-3600**. |
+| Success link | "Back to sign in" |
+| Send failed | We couldn't send the activation email right now. Please try again in a few minutes. |
+
+The success state is shown for every accepted email, whether or not it matches a customer and whether or not it was already activated. The screen never reveals which emails exist.
 
 ### SetPassword (no wireframe; copy pending client review)
 
-- Title "Set your password". Fields: email, password and confirm password.
-- Zod requires at least 8 characters and matching passwords; Power Pages enforces its own policy and those errors are shown.
-- Without `code`, the card shows "This activation link is invalid or has expired." and a link to `/activate`.
+Route `/activate/complete?code=`. Same AuthLayout and card.
+
+| State | Copy |
+|---|---|
+| Title | **Set your password** |
+| Sub | Create a password to finish activating your Concreat Connect account. |
+| Fields | "Email address" (hint: "The email address the activation link was sent to."), "Password", "Confirm password" |
+| Password hint | At least 8 characters, using three of these: uppercase letters, lowercase letters, numbers, symbols. |
+| Validation | "Enter your email address." · "Enter a valid email address." · "Enter a password." · "Use at least 8 characters." · "Use at least three of: uppercase letters, lowercase letters, numbers, symbols." · "Passwords don't match." |
+| Button | "Activate account" (submitting: "Activating…") |
+| Server errors | Shown above the button as Power Pages returns them |
+| Fallback error | We couldn't activate your account. Please try again, or contact the Concreat Customer Service Center at (02) 8849-3600. |
+| Missing or invalid code | Title **This link has expired**. Body: "This activation link is invalid, has already been used, or has expired." Button "Request a new link" (→ `/activate`) |
+
+- On success Power Pages signs the user in and redirects to `/`, which shows the Dashboard.
+- The Zod rules mirror Power Pages' default policy (`PasswordValidator/EnforcePasswordPolicy` = true, `RequiredLength` = 8; Microsoft Learn, "Local authentication, registration, and other settings"). If B changes those site settings, update the hint and the schema together.
 
 ### AppShell (DESIGN.md §4)
 
@@ -221,7 +247,7 @@ Vitest + RTL, colocated, `userEvent`, accessible queries.
   - a server error is shown
   - mock sign-in stores the session
 - `modules/signin/SetPassword.test.tsx`
-  - mismatched passwords
+  - password policy (length, three of four character types) and mismatched passwords
   - missing-code state
 
 **Handoff:** `npm test`, `npm run lint`, `npm run build`, then a manual `npm run dev` pass signing in as each mock role.
@@ -238,7 +264,7 @@ Until B ships `me`, the deployed site shows the `me` error state after sign-in. 
 
 ## Open items for the client
 
-- Activate and SetPassword copy (no wireframe)
-- Terms of Use / Data Privacy Policy link targets
+- Review the Activate and SetPassword copy above (no wireframe)
+- Terms of Use / Data Privacy Policy pages (links are `#` until supplied)
 - Q6 (Account section for all roles)
 - D4 (no-role page wording)
