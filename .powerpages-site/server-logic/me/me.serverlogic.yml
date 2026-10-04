@@ -1,0 +1,6 @@
+adx_serverlogic_adx_webrole:
+  - b2780841-e908-44f8-b7d8-dfd367bfeeb2
+description: 'Signed-in contact, active account and web roles for the SPA (S1-07)'
+display_name: 'Me (signed-in contact)'
+id: 6a41f0b5-d3ef-4beb-9bc8-ab1458c01114
+name: me
