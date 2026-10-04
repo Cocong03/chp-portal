@@ -22,7 +22,7 @@ Make sign-in real on the Dev site:
 | How it lands | **Build in Dev inside the `ConcreatHub` solution** using the Dataverse/Power Pages tooling. Site metadata (settings, header, roles, table permissions, Server Logic) lives as YAML/JS under `.powerpages-site/` in git. The Dataverse schema reaches UAT/Prod later by solution export/import |
 | Test users | Seeded through invitations: one sample Account and five Contacts with made-up `@example.com` emails; links handed over, nothing emailed |
 | `chp_accountlink` | Custom table with two lookups, not a native N:N |
-| Grants | `chp_accessgrant` looks up the real web role (`mspp_webrole`), with a status; applied by a Power Automate flow |
+| Grants | `chp_accessgrant` holds a **choice** of the four business roles (not a lookup: web roles are virtual records over `powerpagecomponent` in the enhanced data model, and a lookup would let ops pick Administrators), with a status; applied by a Power Automate flow that maps the choice to the role by name |
 | Contact with no account | `me` returns `account: null`; the app shows the "access being set up" page |
 | Changing Dev | Each environment change (schema, app, flow, deploy, test data) needs the user's approval when it happens; the site stays private |
 
@@ -58,7 +58,7 @@ All components are created in the `ConcreatHub` solution. Publisher prefix `chp_
 |---|---|---|
 | `chp_email` (primary) | Text (100), required | Matched against `contact.emailaddress1`, ignoring case |
 | `chp_bccustomerno` | Text (20), required | The grant applies only if the contact's account has this customer no. |
-| `chp_webrole` | Lookup → Web Role (`mspp_webrole`), required | Normally Full Access |
+| `chp_webrole` | Choice, required | Full Access (775000000) · Orders & Delivery (775000001) · Finance & Documents (775000002) · View Only (775000003). Normally Full Access |
 | `chp_status` | Choice, default Pending | Pending (775000000) · Applied (775000001) · Customer mismatch (775000002) · Duplicate email (775000003) |
 | `chp_contact` | Lookup → Contact | Set when applied |
 | `chp_appliedon` | Date and time | Set when applied |
@@ -188,7 +188,7 @@ One page for CHP ops:
      | one | read its parent account's `chp_bccustomerno` (step 3) |
 
   3. For one contact:
-     - if the customer no. equals the grant's → associate the contact with the grant's web role, then set **Applied**, `chp_contact` and `chp_appliedon`;
+     - if the customer no. equals the grant's → find the site's web role named like the grant's choice label and associate it with the contact (relationship `powerpagecomponent_mspp_webrole_contact`), then set **Applied**, `chp_contact` and `chp_appliedon`;
      - otherwise → set **Customer mismatch** and grant nothing.
 - **Revoking is out of the flow:** deleting a grant does not remove a role.
 
@@ -197,7 +197,7 @@ One page for CHP ops:
 - **App:** model-driven app **Concreat Connect Admin** in `ConcreatHub`. Its sitemap has one area, **Access grants**: the main form plus an "All grants" view (email, customer no., role, status, applied on, modified on).
 - **Security role "Concreat Connect Admin":**
   - organization-level create/read/write/delete on `chp_accessgrant`;
-  - read on `mspp_webrole` and `contact` (for lookups);
+  - read on `contact` (for the applied-contact lookup);
   - access to the app.
 - **Open item for Rene / CHP IT:** each CHP staff user needs a Power Apps license that covers custom Dataverse tables.
 
