@@ -67,6 +67,16 @@ test('accepts roles as a comma-separated string or as objects', () => {
   expect(JSON.parse(load(asObjects.server).get()).roles).toEqual(['View Only'])
 })
 
+// On Dev (2026-10-04) Server.User.Roles is a .NET string[]: String(roles) is "System.String[]",
+// Array.isArray is false, and it exposes Length plus an indexer.
+test('reads roles from a .NET string[] (Length + indexer) and from any iterable', () => {
+  const clrArray = { Length: 2, 0: 'Full Access', 1: 'Authenticated Users', toString: () => 'System.String[]' }
+  const asClr = fakeServer({ user: { contactid: 'c-1', Roles: clrArray }, record: contact(ACCOUNT) })
+  expect(JSON.parse(load(asClr.server).get()).roles).toEqual(['Full Access', 'Authenticated Users'])
+  const asIterable = fakeServer({ user: { contactid: 'c-1', Roles: new Set(['View Only']) }, record: contact(ACCOUNT) })
+  expect(JSON.parse(load(asIterable.server).get()).roles).toEqual(['View Only'])
+})
+
 test('an anonymous caller gets a customer-safe error and no Dataverse call', () => {
   const { server, calls } = fakeServer({ user: null })
   expect(() => load(server).get()).toThrow("We couldn't load your account details.")

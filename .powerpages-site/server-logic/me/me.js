@@ -16,9 +16,22 @@ function get() {
         return value;
     }
 
-    // Roles may arrive as an array of names, an array of { Name } objects, or a comma-separated string.
+    // Roles arrive as a .NET string[] on the Power Pages runtime (Length + indexer; String() gives "System.String[]").
+    // Also accept a JS array, any iterable, an array of { Name } objects, or a comma-separated string.
     function roleNames(roles) {
-        var list = Array.isArray(roles) ? roles : String(roles || "").split(",");
+        var list = [];
+        if (typeof roles === "string") {
+            list = roles.split(",");
+        } else if (roles) {
+            var count = typeof roles.length === "number" ? roles.length : roles.Length;
+            if (typeof count === "number") {
+                for (var i = 0; i < count; i++) {
+                    list.push(roles[i]);
+                }
+            } else if (typeof roles[Symbol.iterator] === "function") {
+                list = Array.from(roles);
+            }
+        }
         // Arrow callbacks only: the runtime validator (RTSL01) rejects anonymous function expressions, even in comments.
         return list
             .map((role) => (typeof role === "string" ? role.trim() : String((role && (role.Name || role.name)) || "").trim()))
