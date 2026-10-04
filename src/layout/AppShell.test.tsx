@@ -1,4 +1,4 @@
-import { act, screen, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '@/App'
 import { ApiError, serverLogic } from '@/api/serverLogic'
@@ -97,6 +97,48 @@ test('a failed background refresh keeps the current page on screen', async () =>
   expect(client.getQueryState(['me'])?.status).toBe('error')
   expect(screen.getByRole('heading', { level: 1, name: 'Dashboard' })).toBeInTheDocument()
   expect(screen.queryByText("We couldn't load your account details. Please try again.")).not.toBeInTheDocument()
+})
+
+test('the menu button opens a drawer with the role sections; picking one navigates and closes it', async () => {
+  const user = userEvent.setup()
+  signInAs('finance@test.ph')
+  await screen.findByRole('navigation', { name: 'Portal sections' }) // account loaded
+  await user.click(screen.getByRole('button', { name: 'Open menu' }))
+  const drawer = await screen.findByRole('dialog', { name: 'Concreat Connect' })
+  const menu = within(drawer).getByRole('navigation', { name: 'Menu' })
+  expect(within(menu).getAllByRole('link').map((link) => link.textContent)).toEqual([
+    'Dashboard',
+    'Customer Ledger',
+    'Document Center',
+    'Account and User Management',
+  ])
+  expect(within(menu).getByRole('link', { name: 'Dashboard' })).toHaveAttribute('aria-current', 'page')
+
+  await user.click(within(menu).getByRole('link', { name: 'Customer Ledger' }))
+
+  expect(await screen.findByRole('heading', { level: 1, name: 'Customer Ledger' })).toBeInTheDocument()
+  await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
+})
+
+test('the drawer shows the account and opens Help', async () => {
+  const user = userEvent.setup()
+  signInAs('full@test.ph')
+  await screen.findByRole('navigation', { name: 'Portal sections' }) // account loaded
+  await user.click(screen.getByRole('button', { name: 'Open menu' }))
+  const drawer = await screen.findByRole('dialog', { name: 'Concreat Connect' })
+  expect(within(drawer).getByRole('link', { name: /J\.D\. Santos Hardware & Construction Supply/ })).toHaveAttribute('href', '/account')
+
+  await user.click(within(drawer).getByRole('button', { name: 'Help' }))
+
+  expect(await screen.findByRole('dialog', { name: 'Getting around Concreat Connect' })).toBeInTheDocument()
+})
+
+test('the current section tab is scrolled into view on narrow screens', async () => {
+  const scrollIntoView = vi.spyOn(Element.prototype, 'scrollIntoView')
+  signInAs('full@test.ph', '/complaints')
+  await screen.findByRole('heading', { level: 1, name: 'Complaints & Feedback' })
+  const tab = within(screen.getByRole('navigation', { name: 'Portal sections' })).getByRole('link', { name: 'Complaints & Feedback' })
+  expect(scrollIntoView.mock.contexts).toContain(tab)
 })
 
 test('Help lists all eight section overviews whatever the role', async () => {

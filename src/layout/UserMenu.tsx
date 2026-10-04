@@ -4,7 +4,7 @@ import { Avatar, AvatarFallback } from '@/ui/avatar'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/ui/dropdown-menu'
 
 // Wireframe accountInitials(): first letters of the first two words that start with a letter.
-function initials(name: string) {
+export function initials(name: string) {
   return name
     .split(/\s+/)
     .filter((word) => /^\p{L}/u.test(word))
@@ -20,7 +20,7 @@ export function UserMenu({ name }: { name: string }) {
         <Avatar className="size-[26px]">
           <AvatarFallback className="bg-primary text-[11px] font-bold text-primary-foreground">{initials(name)}</AvatarFallback>
         </Avatar>
-        <span>{name}</span>
+        <span className="hidden lg:inline">{name}</span>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
         <DropdownMenuItem onSelect={() => signOut()}>

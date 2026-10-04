@@ -84,7 +84,7 @@ If an arbitrary size repeats in three or more places, add it as a `--text-*` tok
 
 **Spacing**
 
-- Page gutter: `px-[clamp(16px,4vw,40px)]`, `pt-5 pb-12`. Content max width **1180px** (`max-w-[1180px] mx-auto`).
+- Page gutter: `px-4` (16px) on phones, `lg:px-5` (20px) on laptops and up; `pt-5 pb-12`. Content max width **1200px** (`max-w-[1200px] mx-auto`).
 - Card padding 18px (`p-[18px]`); stat tile `px-5 py-[18px]`; dialog 22px.
 - Vertical rhythm between blocks: 14–24px (`gap-3.5` toolbar → table, `mb-4` panel head, `gap-5` card columns).
 - Form rows: label → control gap 5px, rows 14px apart (`gap-1.5`, `mb-3.5`).
@@ -185,7 +185,7 @@ Every form uses shadcn's form pattern (`Field` / `FieldLabel` / `FieldDescriptio
 | Destructive / irreversible confirm (cancel draft, remove site) | `AlertDialog`.                                   |
 | Toasts (submitted, saved, errors) | **Sonner** (`toast.success`, `toast.error`) — already mounted in `main.tsx`.       |
 | Inline hints on icons/badges | `Tooltip`.                                                                              |
-| Mobile nav / long side content | `Sheet` (only if the wireframe's layout calls for it on small screens).              |
+| Mobile nav (below `lg`)      | Hamburger → left `Sheet` (`layout/MobileMenu.tsx`): logo header, the role's sections with Lucide icons (active = `bg-accent text-accent-foreground`), Help, account row linking to Account and User Management. The section tabs become one sideways-scrolling row; Help and the "Viewing…" line move into the drawer. |
 | Loading                      | `Skeleton` rows in tables and tiles; `Spinner`/Lucide `Loader2 animate-spin` inside buttons while submitting (and disable the button). |
 
 ---
