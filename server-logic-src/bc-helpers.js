@@ -68,14 +68,13 @@ async function bcToken(cfg) {
     if (bcTokenCache) {
         return bcTokenCache;
     }
-    var form = [
-        ["grant_type", "client_credentials"],
-        ["client_id", cfg.clientId],
-        ["client_secret", cfg.clientSecret],
-        ["scope", "https://api.businesscentral.dynamics.com/.default"]
-    ]
-        .map((pair) => pair[0] + "=" + encodeURIComponent(pair[1]))
-        .join("&");
+    // The platform form-encodes a JSON object body itself; a raw "a=b&c=d" string is rejected as invalid JSON.
+    var form = JSON.stringify({
+        grant_type: "client_credentials",
+        client_id: cfg.clientId,
+        client_secret: cfg.clientSecret,
+        scope: "https://api.businesscentral.dynamics.com/.default"
+    });
     var response = parseResult(
         await Server.Connector.HttpClient.PostAsync(
             "https://login.microsoftonline.com/" + cfg.tenantId + "/oauth2/v2.0/token",
@@ -128,6 +127,7 @@ async function respond(work) {
         // Platform messages can echo a request; never let a secret or token reach the log.
         var detail = String(err.message)
             .replace(/client_secret=[^&\s"']*/gi, "client_secret=[removed]")
+            .replace(/client_secret"\s*:\s*"[^"]*"/gi, 'client_secret": "[removed]"')
             .replace(/Bearer\s+[^\s"']+/gi, "Bearer [removed]")
             .replace(/access_token["':=\s]+[^\s"',}]+/gi, "access_token=[removed]");
         Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + detail);

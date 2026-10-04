@@ -65,15 +65,20 @@ test("returns the signed-in customer's BC card in the wireframe's field names", 
   })
 })
 
-test('gets a client-credentials token with every form value URL-encoded', async () => {
+// Power Pages form-encodes a JSON object body itself; a raw "a=b&c=d" string fails with
+// "'g' is an invalid start of a value" (seen on Dev 2026-10-04; matches the Microsoft Learn Graph sample).
+test('gets a client-credentials token, passing the form fields as a JSON object for the platform to encode', async () => {
   const { server, http } = fakeServer()
   await load(server).get()
   const token = http[0]
   expect(token.url).toBe('https://login.microsoftonline.com/tenant-1/oauth2/v2.0/token')
   expect(token.contentType).toBe('application/x-www-form-urlencoded')
-  expect(token.body).toBe(
-    'grant_type=client_credentials&client_id=client-1&client_secret=s%26x%3D1&scope=https%3A%2F%2Fapi.businesscentral.dynamics.com%2F.default',
-  )
+  expect(JSON.parse(token.body!)).toEqual({
+    grant_type: 'client_credentials',
+    client_id: 'client-1',
+    client_secret: 's&x=1',
+    scope: 'https://api.businesscentral.dynamics.com/.default',
+  })
 })
 
 test("calls BC in the session's company with an escaped, encoded filter and the bearer token", async () => {
@@ -119,7 +124,8 @@ test('a call that gets no HTTP answer logs the failing step and the platform rea
   const { server, errors } = fakeServer({
     tokenResponse: {
       StatusCode: 0, IsSuccessStatusCode: false, ReasonPhrase: null, ServerError: true,
-      ServerErrorMessage: 'Request to login.microsoftonline.com failed: client_secret=s%26x%3D1 Authorization: Bearer abc.def.ghi',
+      ServerErrorMessage:
+        'Request to login.microsoftonline.com failed: client_secret=s%26x%3D1 {"client_secret": "s&x=1"} Authorization: Bearer abc.def.ghi',
     },
   })
   await expect(load(server).get()).rejects.toThrow(SAFE)
@@ -127,5 +133,6 @@ test('a call that gets no HTTP answer logs the failing step and the platform rea
   expect(errors[0]).toContain('token')
   expect(errors[0]).toContain('Request to login.microsoftonline.com failed')
   expect(errors[0]).not.toContain('s%26x%3D1')
+  expect(errors[0]).not.toContain('s&x=1')
   expect(errors[0]).not.toContain('abc.def.ghi')
 })
