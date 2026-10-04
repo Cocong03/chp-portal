@@ -136,3 +136,20 @@ test('a call that gets no HTTP answer logs the failing step and the platform rea
   expect(errors[0]).not.toContain('s&x=1')
   expect(errors[0]).not.toContain('abc.def.ghi')
 })
+
+// Seen on Dev 2026-10-04: "token 401 Unauthorized" alone doesn't say why Microsoft rejected the credentials.
+test("a rejected token request logs Microsoft's error code and description", async () => {
+  const { server, errors } = fakeServer({
+    tokenResponse: {
+      StatusCode: 401, IsSuccessStatusCode: false, ReasonPhrase: 'Unauthorized',
+      Body: JSON.stringify({
+        error: 'invalid_client',
+        error_description: 'AADSTS7000215: Invalid client secret provided. Ensure the secret being sent in the request is the client secret value, not the client secret ID.',
+      }),
+    },
+  })
+  await expect(load(server).get()).rejects.toThrow(SAFE)
+  expect(errors[0]).toContain('token 401 Unauthorized')
+  expect(errors[0]).toContain('invalid_client')
+  expect(errors[0]).toContain('AADSTS7000215')
+})

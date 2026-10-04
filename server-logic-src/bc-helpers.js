@@ -9,12 +9,24 @@ var bcTokenCache = null;
 function parseResult(result, step) {
     var value = typeof result === "string" ? JSON.parse(result) : result;
     if (value && (value.IsSuccessStatusCode === false || (typeof value.StatusCode === "number" && value.StatusCode >= 400))) {
-        throw new Error(step + " " + value.StatusCode + " " + (value.ReasonPhrase || "") + " " + (value.ServerErrorMessage || ""));
+        throw new Error(step + " " + value.StatusCode + " " + (value.ReasonPhrase || "") + " " + (value.ServerErrorMessage || "") + " " + errorDetail(value.Body));
     }
     if (value && typeof value.Body === "string") {
         value = value.Body ? JSON.parse(value.Body) : {};
     }
     return value;
+}
+
+// The error code and message from an error body: Entra { error, error_description }, BC/Dataverse { error: { code, message } }.
+function errorDetail(body) {
+    try {
+        var parsed = JSON.parse(body || "{}");
+        var error = parsed.error;
+        var text = typeof error === "string" ? error + ": " + (parsed.error_description || "") : error ? error.code + ": " + error.message : "";
+        return text.slice(0, 300);
+    } catch (parseErr) {
+        return String(body || "").slice(0, 300);
+    }
 }
 
 function bcConfig() {
