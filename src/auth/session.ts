@@ -20,7 +20,7 @@ declare global {
 /** sessionStorage key holding the signed-in mock email on the dev server. */
 export const MOCK_SESSION_KEY = 'concreat.mockSession'
 
-const SIGN_IN_FAILED = 'Invalid user ID or password. Please try again.'
+const SIGN_IN_FAILED = 'Incorrect email or password. Please try again.'
 const SERVICE_UNREACHABLE = "We couldn't reach the sign-in service. Please try again."
 const ACTIVATION_FAILED =
   "We couldn't activate your account. Please try again, or contact the Concreat Customer Service Center at (02) 8849-3600."
@@ -91,7 +91,10 @@ export async function signIn(email: string, password: string): Promise<void> {
     go('/') // full reload so Portal.User is populated
     return
   }
-  throw new Error(parseServerErrors(await response.text()).join(' ') || SIGN_IN_FAILED)
+  const errors = parseServerErrors(await response.text())
+  // Power Pages uses "Invalid sign-in attempt." for wrong password, unknown email and locked/deactivated contacts.
+  if (errors.length === 0 || errors.some((message) => /invalid sign-in attempt/i.test(message))) throw new Error(SIGN_IN_FAILED)
+  throw new Error(errors.join(' '))
 }
 
 /**

@@ -71,7 +71,8 @@ describe('on the deployed site', () => {
     expect(go).toHaveBeenCalledWith('/')
   })
 
-  test('signIn surfaces the Power Pages validation message', async () => {
+  // Power Pages answers every failed sign-in (wrong password, unknown email, locked) with "Invalid sign-in attempt."
+  test('signIn turns the Power Pages "Invalid sign-in attempt." into plain wording', async () => {
     vi.stubGlobal(
       'fetch',
       vi.fn(async (url: string) =>
@@ -83,7 +84,7 @@ describe('on the deployed site', () => {
             } as Response),
       ),
     )
-    await expect(signIn('jd@x.ph', 'wrong')).rejects.toThrow('Invalid sign-in attempt.')
+    await expect(signIn('jd@x.ph', 'wrong')).rejects.toThrow('Incorrect email or password. Please try again.')
     expect(go).not.toHaveBeenCalled()
   })
 

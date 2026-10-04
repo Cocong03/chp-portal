@@ -8,6 +8,7 @@ Customer-facing text follows the wireframe (`docs/Standard_Portal_Flow_v47_ForDe
 | Nav order: Dashboard, Delivery Sites, Orders, Customer Ledger, Document Center, Requests, Complaints & Feedback, Account and User Management | PP package, Navigation item | `src/layout/sections.ts` | ☐ |
 | "Account" → **Account and User Management** | PP package, Navigation item | `src/layout/sections.ts` | ☐ |
 | Sign-in field "User ID or email" → **Email**, placeholder `j.santos@sample-customer.ph` | Client request 2026-10-04 (differs from wireframe) | `src/modules/signin/SignIn.tsx` | ☐ |
+| Failed sign-in: Power Pages "Invalid sign-in attempt." → **Incorrect email or password. Please try again.** | Client request 2026-10-04 | `src/auth/session.ts` | ☐ |
 | Help overviews verbatim from the wireframe help modal | Wireframe `#help-modal` | `src/layout/sections.ts` (`help`) | ☐ |
 | Activate / Set password copy (no wireframe) | Spec 2026-10-04, pending client review | `src/modules/signin/Activate.tsx`, `SetPassword.tsx` | ☐ |
 | "+ New Multiple Order" | PP package | Orders (S3-13), not built yet | ☐ |
