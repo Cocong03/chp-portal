@@ -171,7 +171,7 @@ sequenceDiagram
 |---|---|
 | BC standard API `v2.0/customers`, SANDBOXUS, one company | BC team's Concreat Hub customer/contact API against **Solid Cement only** for now (see §7), with the company ID in an environment variable |
 | Match on `customer.email` | BC package rule: *Customer whose registered Contact has this email* |
-| Contact only | Also find/create the Dataverse **Account** (`cr_bccustomerno`, `cr_bccompanyid`, `cr_bccompanyname`), set `parentcustomerid`, create the **Account Link** row |
+| Contact only | Also find/create the Dataverse **Account** (`chp_bccustomerno`, `chp_bccompanyid`, `chp_bccompanyname`), set `parentcustomerid`, create the **Account Link** row |
 | No business role on activation | Per decision D4: CHP ops assigns a role (or auto-grant for the primary email) |
 | Email link hardcoded to `site-hdiqg.powerappsportals.com` | Site URL from an environment variable |
 | Sent from the developer mailbox | Shared mailbox (`noreply@…`) with Send As |
@@ -189,7 +189,7 @@ sequenceDiagram
 - The packages put both companies in Release 1 scope (*"separate login email per account, of either kind"*), but the project is starting with **Solid Cement only**. Confirm the APO Cement go-live timing with Rene and the BC team.
 - Keep the design **company-aware** so adding APO Cement later is configuration, not a rebuild:
   - the activation flow reads the BC company ID from an **environment variable** (`Solid Cement` company ID for now), not a hardcoded value;
-  - the Account record still stores `cr_bccompanyid` / `cr_bccompanyname`, and every Server Logic call takes the company from the Account.
+  - the Account record still stores `chp_bccompanyid` / `chp_bccompanyname`, and every Server Logic call takes the company from the Account.
 - **Enabling APO Cement later** (plan task S1-12): add its company ID, change the flow to search both companies, and apply the duplicate-email rule below.
 
 **Open question Q10: an email registered on more than one BC customer**

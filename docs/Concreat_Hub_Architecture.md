@@ -95,14 +95,14 @@ erDiagram
   ACCOUNT {
     guid accountid
     string name "BC Customer Name"
-    string cr_bccustomerno "BC Customer No."
-    string cr_bccompanyid "BC company GUID"
-    string cr_bccompanyname "Solid Cement | APO Cement"
+    string chp_bccustomerno "BC Customer No."
+    string chp_bccompanyid "BC company GUID"
+    string chp_bccompanyname "Solid Cement | APO Cement"
   }
   ACCOUNT_LINK {
-    guid cr_accountlinkid
-    lookup cr_contact
-    lookup cr_account
+    guid chp_accountlinkid
+    lookup chp_contact
+    lookup chp_account
   }
 ```
 
@@ -115,7 +115,7 @@ erDiagram
 Every Server Logic function starts the same way:
 
 1. `Server.User` → contact id (null means reject).
-2. Read the contact's active Account (`cr_bccustomerno`, `cr_bccompanyid`).
+2. Read the contact's active Account (`chp_bccustomerno`, `chp_bccompanyid`).
 3. Build the BC URL with that company and that customer filter. Any `customerNo`/`companyId` in the request is **ignored**.
 4. For detail calls (`?id=SO-…`), verify that the BC record's `sellToCustomerNo` equals the session customer before returning it.
 5. Escape every user-supplied value placed in an OData `$filter` (single-quote doubling, as the activation flow already does).
@@ -125,7 +125,7 @@ Every Server Logic function starts the same way:
 The POC flow already does BC lookup → Contact → single-use invitation → email, and it works end to end. Production changes:
 
 - Query the **BC team's customer/contact API** instead of the standard `v2.0/customers`. The BC package's match rule is "Customer whose registered Contact has this email". **Company scope: Solid Cement only for now** (decision Oct 1, 2026); APO Cement is added later by configuration (plan task S1-12). An email that matches more than one customer follows rule **Q10** (Registration doc §7).
-- Find or create the **Account** (by `cr_bccustomerno` + company), set `parentcustomerid`, and create the Account Link row.
+- Find or create the **Account** (by `chp_bccustomerno` + company), set `parentcustomerid`, and create the Account Link row.
 - **Role on activation (decision D4):** activation grants no business role by default. CHP ops assigns one of the four roles in Portal Management, per the "no in-portal user management" direction. Alternative: auto-grant `Full Access` when the email is the BC customer card's primary email.
 
 ---
@@ -282,20 +282,20 @@ The shared Postman collection is a **reused "Monday CRM Integration – DEV" col
 
 ## 9. Dataverse data model (portal-owned)
 
-Publisher prefix `cr_` is a placeholder; use the solution's actual prefix.
+Publisher **Concreat Holdings**, prefix `chp_`, solution `ConcreatHub` (created in Dev on 2026-10-01, S0-07).
 
 | Table | Key columns | Table permission |
 |---|---|---|
-| Account *(standard)* | `cr_bccustomerno`, `cr_bccompanyid`, `cr_bccompanyname` | read: Self/Account via contact (for `me`) |
+| Account *(standard)* | `chp_bccustomerno`, `chp_bccompanyid`, `chp_bccompanyname` | read: Self/Account via contact (for `me`) |
 | Contact *(standard)* | `parentcustomerid` = active account | Self read |
-| `cr_accountlink` | contact, account | Contact scope read (Phase 2 picker) |
-| `cr_orderdraft` | contact, account, name, `cr_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal) |
-| `cr_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
-| `cr_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
-| `cr_request` | account, submitted by, category, request type, assigned group, contact method/value/person, details, category fields, status, attachments | Account scope create/read |
-| `cr_complaint` | account, submitted by, category, complaint type, assigned group, incident date, delivery site, SO no., subject, description, consent, attachments, status | Account scope create/read |
-| `cr_requesttype` / `cr_complainttype` | category, type, assigned group, active, field config | Global read (ops edit in model-driven app, no redeploy) |
-| `cr_announcement` | title, message, active | Global read |
+| `chp_accountlink` | contact, account | Contact scope read (Phase 2 picker) |
+| `chp_orderdraft` | contact, account, name, `chp_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal) |
+| `chp_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
+| `chp_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
+| `chp_request` | account, submitted by, category, request type, assigned group, contact method/value/person, details, category fields, status, attachments | Account scope create/read |
+| `chp_complaint` | account, submitted by, category, complaint type, assigned group, incident date, delivery site, SO no., subject, description, consent, attachments, status | Account scope create/read |
+| `chp_requesttype` / `chp_complainttype` | category, type, assigned group, active, field config | Global read (ops edit in model-driven app, no redeploy) |
+| `chp_announcement` | title, message, active | Global read |
 
 Requests and Complaints reference BC data (SO no., ship-to code) as **plain text keys**, not lookups, because the BC data isn't in Dataverse.
 

@@ -46,8 +46,6 @@ see at docs\bc-api-collection.json
 
 - use this design system for branding and styles at DESIGN.md
 
-Use the components already provided by the Power Apps Code Apps starter.
-
 Prefer **shadcn/ui** components over custom recreations.
 
 Examples:
@@ -68,10 +66,10 @@ Examples:
 
 1. **BC is the only store of business data.** Never copy orders, ledger, prices, credit, ship-tos or documents into Dataverse. Read them live from BC.
 2. **The browser never calls BC.** All BC calls go through Server Logic (`/_api/serverlogics/<name>`) using the portal's app identity (client credentials).
-3. **Scope every BC call from the session, never from the request.** Every Server Logic function: `Server.User` → contact → active Account (`cr_bccustomerno`, `cr_bccompanyid`) → BC company + customer filter. Ignore any customer/company id sent by the client. Detail endpoints verify that the BC record belongs to the session customer.
+3. **Scope every BC call from the session, never from the request.** Every Server Logic function: `Server.User` → contact → active Account (`chp_bccustomerno`, `chp_bccompanyid`) → BC company + customer filter. Ignore any customer/company id sent by the client. Detail endpoints verify that the BC record belongs to the session customer.
 4. **Escape every user value placed in an OData `$filter`** (double single quotes).
 5. **No business math in the SPA.** Prices, freight, other charges and available credit come from BC. The SPA only sums for display. Order submit re-quotes and re-checks credit on the server and never trusts client totals.
-6. **Dataverse owns only portal data:** Contact/Account identity, `cr_accountlink`, web roles, drafts, requests, complaints, site requests, Excel uploads, taxonomy tables, announcement. Account stores only BC identity keys (customer no., name, company).
+6. **Dataverse owns only portal data:** Contact/Account identity, `chp_accountlink`, web roles, drafts, requests, complaints, site requests, Excel uploads, taxonomy tables, announcement. Account stores only BC identity keys (customer no., name, company).
 7. **Power Automate is never on a synchronous read path.** Use it for activation, routing submissions, notifications.
 8. **Security is server-side.** Web roles on every Server Logic record and table permissions (mostly Account scope via `parentcustomerid`). Client-side role checks are UX only.
 9. **Design for multiple linked accounts per contact** (Phase 2 switcher) even though Nov 15 ships one link per contact.
@@ -102,7 +100,8 @@ docs/               architecture, plan, registration docs
 - Order status mapping (confirmed 2026-09-14): BC Open → _Open_ · Pending Prepayment → _Pending Prepayment_ · Released → _Ready for Dispatch_ · archived + Completely Shipped → _Completely Shipped_ · Completely Shipped + Invoiced → _Invoiced_.
 - Customer-facing copy uses the wireframe's wording exactly (renames per the packages, e.g. "+ New Multiple Order", "Account and User Management"). Never show BC jargon (location codes, table names) or the name of CHP's internal service-center system.
 - Every page sets `document.title` as `"<Page> — Concreat Hub"`.
-- Publisher prefix `cr_` in the docs is a placeholder; use the solution's real prefix.
+- Publisher **Concreat Holdings**, prefix `chp_` (option-value prefix 77500), solution **`ConcreatHub`**. Create every Dataverse component in that solution.
+- Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCSolidCementCompanyId`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`. The BC client-secret variable is added when S0-03 delivers the Key Vault secret.
 
 ## Environments
 

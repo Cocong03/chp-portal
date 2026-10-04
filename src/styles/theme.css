@@ -7,7 +7,8 @@
 /* Tokens from the wireframe (docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html),
    mapped onto the shadcn/ui variable names. */
 :root {
-  --radius: 0.5rem;
+  --shadow: 0 1px 2px rgb(23 34 46 / 0.06), 0 4px 14px rgb(23 34 46 / 0.05);
+  --scrim: rgb(23 34 46 / 0.4);
   --background: #f5f8fb;
   --foreground: #17222e;
   --card: #ffffff;
@@ -59,15 +60,21 @@
   --border: #2b3948;
   --input: #2b3948;
   --ring: #6fa8dc;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.35);
+  --scrim: rgb(4 7 10 / 0.6);
 }
 
 @theme inline {
   --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  /* Wireframe radii (DESIGN.md §3): controls 6, notes 8, cards 10, dialogs 12. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --shadow-card: var(--shadow);
+  --color-scrim: var(--scrim);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
