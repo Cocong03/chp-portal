@@ -1,6 +1,6 @@
 import { MOCK_SESSION_KEY } from '@/auth/session'
 import { ApiError, GENERIC_ERROR, serverLogic } from './serverLogic'
-import type { MeDto } from './types'
+import type { CompanyDto, MeDto } from './types'
 
 const caught = async (promise: Promise<unknown>) => (await promise.catch((error: unknown) => error)) as ApiError
 
@@ -24,6 +24,11 @@ describe('on the dev server', () => {
   test('an unknown email falls back to Full Access', async () => {
     sessionStorage.setItem(MOCK_SESSION_KEY, 'someone@else.ph')
     expect((await serverLogic<MeDto>('me')).roles).toContain('Full Access')
+  })
+
+  test('serves the company fixture', async () => {
+    sessionStorage.setItem(MOCK_SESSION_KEY, 'full@test.ph')
+    expect((await serverLogic<CompanyDto>('company')).customerNo).toBe('10482')
   })
 
   test('an endpoint without a mock is a 404 ApiError', async () => {

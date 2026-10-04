@@ -1,4 +1,4 @@
-import type { MeDto } from '@/api/types'
+import type { CompanyDto, MeDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
 
 export interface MockRequest {
@@ -31,4 +31,13 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
       roles: ['Authenticated Users', ...(ROLES_BY_EMAIL.get(email) ?? ['Full Access'])],
     }
   },
+  // Wireframe ACCOUNTS[0]
+  company: (): CompanyDto => ({
+    customerNo: '10482',
+    customerName: 'J.D. Santos Hardware & Construction Supply',
+    address: 'Blk 12 Lot 4, National Highway, Brgy. San Isidro, Cabuyao, Laguna',
+    vatRegNumber: '123-456-789-000',
+    phone: '0917 552 6613',
+    email: 'jd.santos@sample-customer.ph',
+  }),
 }

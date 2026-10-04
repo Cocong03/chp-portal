@@ -6,3 +6,13 @@ export interface MeDto {
   /** Web role names, e.g. "Authenticated Users", "Full Access". */
   roles: string[]
 }
+
+/** GET /_api/serverlogics/company. Field names follow the wireframe's ACCOUNTS[]. */
+export interface CompanyDto {
+  customerNo: string
+  customerName: string
+  address: string
+  vatRegNumber: string
+  phone: string
+  email: string
+}
