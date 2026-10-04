@@ -58,7 +58,7 @@ export function MobileMenu({ sections, me, onHelp }: { sections: Section[]; me: 
           <CircleHelp className="size-5 shrink-0" aria-hidden="true" />
           Help
         </button>
-        {me && (
+        {me?.account && (
           <Link to="/account" onClick={close} className="mt-auto flex items-center gap-3 border-t px-5 py-4 hover:bg-muted">
             <Avatar className="size-9">
               <AvatarFallback className="bg-primary text-xs font-bold text-primary-foreground">{initials(me.contact.name)}</AvatarFallback>

@@ -14,6 +14,7 @@ const ROLES_BY_EMAIL = new Map<string, string[]>([
   ['finance@test.ph', ['Finance & Documents']],
   ['viewonly@test.ph', ['View Only']],
   ['norole@test.ph', []],
+  ['nolink@test.ph', ['Full Access']],
 ])
 
 /** Dev-server answers by Server Logic name. Each module adds its own fixture when it's built. */
@@ -22,8 +23,11 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
     const email = (getPortalUser()?.email ?? 'full@test.ph').trim().toLowerCase()
     return {
       contact: { name: 'J.D. Santos', email },
-      // Wireframe ACCOUNTS[0]
-      account: { customerNo: '10482', customerName: 'J.D. Santos Hardware & Construction Supply', company: 'Solid Cement' },
+      // Wireframe ACCOUNTS[0]; nolink@ simulates a contact that isn't linked to an account yet.
+      account:
+        email === 'nolink@test.ph'
+          ? null
+          : { customerNo: '10482', customerName: 'J.D. Santos Hardware & Construction Supply', company: 'Solid Cement' },
       roles: ['Authenticated Users', ...(ROLES_BY_EMAIL.get(email) ?? ['Full Access'])],
     }
   },

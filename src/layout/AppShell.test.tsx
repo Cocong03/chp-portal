@@ -141,6 +141,13 @@ test('the current section tab is scrolled into view on narrow screens', async ()
   expect(scrollIntoView.mock.contexts).toContain(tab)
 })
 
+test('a contact not linked to an account sees the access-pending page, without the Viewing line', async () => {
+  signInAs('nolink@test.ph')
+  expect(await screen.findByRole('heading', { level: 1, name: 'Your portal access is being set up' })).toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: 'Portal sections' })).not.toBeInTheDocument()
+  expect(screen.queryByText(/^Viewing/)).not.toBeInTheDocument()
+})
+
 test('Help lists all eight section overviews whatever the role', async () => {
   const user = userEvent.setup()
   signInAs('viewonly@test.ph')

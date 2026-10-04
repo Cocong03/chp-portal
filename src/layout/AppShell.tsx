@@ -21,7 +21,8 @@ const activePill =
 export function AppShell() {
   const me = useMe()
   const [helpOpen, setHelpOpen] = useState(false)
-  const roles = me.data?.roles ?? []
+  // No linked account means no business access yet, whatever the roles say.
+  const roles = me.data?.account ? me.data.roles : []
   const sections = SECTIONS.filter((section) => canSee(roles, section.key))
 
   // Below lg the tab strip scrolls sideways; keep the current section visible.
@@ -73,9 +74,11 @@ export function AppShell() {
           </Button>
           {me.data && (
             <>
-              <p className="hidden text-[13px] text-muted-foreground lg:block">
-                Viewing <strong className="text-foreground">{me.data.account.company}</strong> · {me.data.account.customerName}
-              </p>
+              {me.data.account && (
+                <p className="hidden text-[13px] text-muted-foreground lg:block">
+                  Viewing <strong className="text-foreground">{me.data.account.company}</strong> · {me.data.account.customerName}
+                </p>
+              )}
               <UserMenu name={me.data.contact.name} />
             </>
           )}
