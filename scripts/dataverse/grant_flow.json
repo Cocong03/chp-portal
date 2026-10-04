@@ -92,7 +92,7 @@
               "expression": {
                 "and": [
                   { "equals": ["@actions('Get_parent_account')?['status']", "Succeeded"] },
-                  { "not": { "empty": "@triggerOutputs()?['body/chp_bccustomerno']" } },
+                  { "equals": ["@empty(triggerOutputs()?['body/chp_bccustomerno'])", false] },
                   { "equals": ["@outputs('Get_parent_account')?['body/chp_bccustomerno']", "@triggerOutputs()?['body/chp_bccustomerno']"] }
                 ]
               },

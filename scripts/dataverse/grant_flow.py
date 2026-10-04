@@ -35,7 +35,12 @@ found = dv.get(f"workflows?$select=workflowid&$filter=name eq '{NAME}' and categ
 if found:
     wf = found[0]['workflowid']
     dv.patch(f'workflows({wf})', {'statecode': 0, 'statuscode': 1})  # a flow must be off to change its definition
-    dv.patch(f'workflows({wf})', {'clientdata': json.dumps(clientdata)})
+    try:
+        dv.patch(f'workflows({wf})', {'clientdata': json.dumps(clientdata)})
+    except SystemExit:
+        dv.patch(f'workflows({wf})', {'statecode': 1, 'statuscode': 2})  # never leave grants unprocessed
+        print('! definition rejected; flow turned back on with its previous definition')
+        raise
     print(f'= flow exists ({wf}), definition updated')
 else:
     entity = dv.post('workflows', {'name': NAME, 'category': 5, 'type': 1, 'primaryentity': 'none',

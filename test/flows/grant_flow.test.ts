@@ -18,5 +18,6 @@ function findAction(actions: Record<string, any>, name: string): any {
 
 test('a grant only applies when its customer no. is present (blank never matches blank)', () => {
   const conditions = JSON.stringify(findAction(definition.actions, 'Customer_matches').expression)
-  expect(conditions).toContain(`{"not":{"empty":"@triggerOutputs()?['body/chp_bccustomerno']"}}`)
+  // Logic Apps conditions have no "empty" operator: compare the @empty() function to false (Dev rejected the operator form).
+  expect(conditions).toContain(`{"equals":["@empty(triggerOutputs()?['body/chp_bccustomerno'])",false]}`)
 })
