@@ -10,7 +10,9 @@ from dv import Dataverse, odata_literal
 
 SITE_ID = 'f44e98b4-3da3-4f8d-8f79-fbb244454741'
 SITE_URL = 'https://chp-portal-dev.powerappsportals.com'
-CUSTOMER = {'no': '10482', 'name': 'J.D. Santos Hardware & Construction Supply', 'company': 'Solid Cement'}
+# Real BC DEV customer (its contacts use the developer's own address). 10482 was the wireframe sample.
+CUSTOMER = {'no': 'C00000009', 'name': 'BESTRADE COMMODITY SALES CORP.', 'company': 'Solid Cement'}
+RETIRED_TEST_CUSTOMERS = ['10482']
 USERS = [
     ('full@example.com', 'Test Full Access', 'Full Access'),
     ('orders@example.com', 'Test Orders', 'Orders & Delivery'),
@@ -38,6 +40,14 @@ key = f"chp_bccustomerno='{CUSTOMER['no']}',chp_bccompanyid='{odata_literal(comp
 dv.patch(f'accounts({key})', {'name': CUSTOMER['name'], 'chp_bccompanyname': CUSTOMER['company']})
 account_id = dv.get(f'accounts({key})?$select=accountid')['accountid']
 print(f"Account {CUSTOMER['no']} · {CUSTOMER['name']} ({account_id})")
+
+# Retire earlier test accounts: drop their links, deactivate them (chp_accountlink → account is Restrict on delete).
+for old_no in RETIRED_TEST_CUSTOMERS:
+    for old in dv.get(f"accounts?$select=accountid&$filter=chp_bccustomerno eq '{odata_literal(old_no)}' and statecode eq 0")['value']:
+        for link in dv.get(f"chp_accountlinks?$select=chp_accountlinkid&$filter=_chp_account_value eq {old['accountid']}")['value']:
+            dv.session.delete(dv.base + f"chp_accountlinks({link['chp_accountlinkid']})").raise_for_status()
+        dv.patch(f"accounts({old['accountid']})", {'statecode': 1, 'statuscode': 2})
+        print(f"retired test account {old_no} ({old['accountid']})")
 
 # CLAUDE.md warns of Business Required rpn_ columns on Contact from another project; send them empty only if they exist here.
 legacy_required = [c for c in ('rpn_quickbooksid', 'rpn_vendordisplayname')
