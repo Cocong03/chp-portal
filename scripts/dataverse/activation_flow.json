@@ -1,0 +1,1254 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "BC Tenant ID (chp_BCTenantId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCTenantId",
+        "description": "BC Tenant ID"
+      }
+    },
+    "BC Environment Name (chp_BCEnvironmentName)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCEnvironmentName",
+        "description": "BC Environment Name"
+      }
+    },
+    "BC API Base Path (chp_BCApiBasePath)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCApiBasePath",
+        "description": "BC API Base Path"
+      }
+    },
+    "BC Solid Cement Company ID (chp_BCSolidCementCompanyId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCSolidCementCompanyId",
+        "description": "BC Solid Cement Company ID"
+      }
+    },
+    "BC Client ID (chp_BCClientId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCClientId",
+        "description": "BC Client ID"
+      }
+    },
+    "BC Client Secret (chp_BCClientSecret)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCClientSecret",
+        "description": "BC Client Secret"
+      }
+    },
+    "Site URL (chp_SiteUrl)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_SiteUrl",
+        "description": "Site URL"
+      }
+    },
+    "Power Pages Site ID (chp_PowerPagesSiteId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_PowerPagesSiteId",
+        "description": "Power Pages Site ID"
+      }
+    },
+    "Sender Mailbox (chp_SenderMailbox)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_SenderMailbox",
+        "description": "Sender Mailbox"
+      }
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "PowerPages",
+      "inputs": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "title": "Email",
+              "type": "string",
+              "x-ms-dynamically-added": true,
+              "description": "Email the customer typed on the Activate page",
+              "x-ms-content-hint": "TEXT"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Init_AccountId": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "AccountId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      },
+      "runAfter": {}
+    },
+    "Init_ContactId": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "ContactId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      },
+      "runAfter": {
+        "Init_AccountId": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Init_ContactName": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "ContactName",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      },
+      "runAfter": {
+        "Init_ContactId": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Init_Username": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Username",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      },
+      "runAfter": {
+        "Init_ContactName": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Email": {
+      "type": "Compose",
+      "inputs": "@toLower(trim(coalesce(triggerBody()?['text'], '')))",
+      "runAfter": {
+        "Init_Username": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Email_literal": {
+      "type": "Compose",
+      "inputs": "@replace(outputs('Email'), '''', '''''')",
+      "runAfter": {
+        "Email": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Check_email": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@and(contains(outputs('Email'), '@'), not(contains(outputs('Email'), ' ')))",
+          true
+        ]
+      },
+      "actions": {},
+      "else": {
+        "actions": {
+          "Return_invalid_email": {
+            "type": "Response",
+            "kind": "PowerPages",
+            "inputs": {
+              "statusCode": 200,
+              "body": {
+                "status": "ok"
+              },
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "title": "status",
+                    "x-ms-dynamically-added": true,
+                    "type": "string"
+                  }
+                }
+              }
+            },
+            "runAfter": {}
+          },
+          "Stop_invalid_email": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Succeeded"
+            },
+            "runAfter": {
+              "Return_invalid_email": [
+                "Succeeded"
+              ]
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Email_literal": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Get_BC_token": {
+      "type": "Http",
+      "inputs": {
+        "method": "POST",
+        "uri": "https://login.microsoftonline.com/@{parameters('BC Tenant ID (chp_BCTenantId)')}/oauth2/v2.0/token",
+        "headers": {
+          "Content-Type": "application/x-www-form-urlencoded"
+        },
+        "body": "grant_type=client_credentials&client_id=@{encodeUriComponent(parameters('BC Client ID (chp_BCClientId)'))}&client_secret=@{encodeUriComponent(parameters('BC Client Secret (chp_BCClientSecret)'))}&scope=@{encodeUriComponent('https://api.businesscentral.dynamics.com/.default')}"
+      },
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": [
+            "inputs",
+            "outputs"
+          ]
+        }
+      },
+      "runAfter": {
+        "Check_email": [
+          "Succeeded"
+        ]
+      }
+    },
+    "BC_base_url": {
+      "type": "Compose",
+      "inputs": "https://api.businesscentral.dynamics.com/v2.0/@{parameters('BC Tenant ID (chp_BCTenantId)')}/@{parameters('BC Environment Name (chp_BCEnvironmentName)')}@{parameters('BC API Base Path (chp_BCApiBasePath)')}/companies(@{parameters('BC Solid Cement Company ID (chp_BCSolidCementCompanyId)')})/",
+      "runAfter": {
+        "Get_BC_token": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Get_BC_contacts": {
+      "type": "Http",
+      "inputs": {
+        "method": "GET",
+        "uri": "@{outputs('BC_base_url')}MCRMContacts",
+        "headers": {
+          "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
+          "Accept": "application/json"
+        },
+        "queries": {
+          "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}'",
+          "$select": "no,type,companyNo,name",
+          "$top": "20"
+        }
+      },
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": [
+            "inputs",
+            "outputs"
+          ]
+        }
+      },
+      "runAfter": {
+        "BC_base_url": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Company_no_list": {
+      "type": "Select",
+      "inputs": {
+        "from": "@body('Get_BC_contacts')?['value']",
+        "select": "@item()?['companyNo']"
+      },
+      "runAfter": {
+        "Get_BC_contacts": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Company_nos": {
+      "type": "Query",
+      "inputs": {
+        "from": "@union(body('Company_no_list'), body('Company_no_list'))",
+        "where": "@not(equals(coalesce(item(), ''), ''))"
+      },
+      "runAfter": {
+        "Company_no_list": [
+          "Succeeded"
+        ]
+      }
+    },
+    "No_BC_contact": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@equals(length(body('Company_nos')), 0)",
+          true
+        ]
+      },
+      "actions": {
+        "Return_no_match": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Stop_no_match": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Succeeded"
+          },
+          "runAfter": {
+            "Return_no_match": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "runAfter": {
+        "Company_nos": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Relation_filters": {
+      "type": "Select",
+      "inputs": {
+        "from": "@body('Company_nos')",
+        "select": "@concat('contactNo eq ''', replace(item(), '''', ''''''), '''')"
+      },
+      "runAfter": {
+        "No_BC_contact": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Get_BC_relations": {
+      "type": "Http",
+      "inputs": {
+        "method": "GET",
+        "uri": "@{outputs('BC_base_url')}mcrmBusinessRelation",
+        "headers": {
+          "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
+          "Accept": "application/json"
+        },
+        "queries": {
+          "$filter": "(@{join(body('Relation_filters'), ' or ')}) and linktoTable eq 'Customer'",
+          "$select": "contactNo,vendorNo"
+        }
+      },
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": [
+            "inputs",
+            "outputs"
+          ]
+        }
+      },
+      "runAfter": {
+        "Relation_filters": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Customer_no_list": {
+      "type": "Select",
+      "inputs": {
+        "from": "@body('Get_BC_relations')?['value']",
+        "select": "@item()?['vendorNo']"
+      },
+      "runAfter": {
+        "Get_BC_relations": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Customer_nos": {
+      "type": "Query",
+      "inputs": {
+        "from": "@union(body('Customer_no_list'), body('Customer_no_list'))",
+        "where": "@not(equals(coalesce(item(), ''), ''))"
+      },
+      "runAfter": {
+        "Customer_no_list": [
+          "Succeeded"
+        ]
+      }
+    },
+    "No_customer": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@equals(length(body('Customer_nos')), 0)",
+          true
+        ]
+      },
+      "actions": {
+        "Return_no_customer": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Stop_no_customer": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Succeeded"
+          },
+          "runAfter": {
+            "Return_no_customer": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "runAfter": {
+        "Customer_nos": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Several_customers": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@greater(length(body('Customer_nos')), 1)",
+          true
+        ]
+      },
+      "actions": {
+        "Ops_notice_several_customers": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "emailMessage/To": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
+              "emailMessage/Subject": "Concreat Connect: activation blocked — email on several customers",
+              "emailMessage/Body": "<p>An activation request was blocked: email on several customers.</p><p>Email: @{outputs('Email')}</p><p>Customer numbers: @{join(body('Customer_nos'), ', ')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
+              "emailMessage/Importance": "Normal"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        },
+        "Return_several_customers": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Ops_notice_several_customers": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Stop_several_customers": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Succeeded"
+          },
+          "runAfter": {
+            "Return_several_customers": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "runAfter": {
+        "No_customer": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Customer_no": {
+      "type": "Compose",
+      "inputs": "@first(body('Customer_nos'))",
+      "runAfter": {
+        "Several_customers": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Customer_literal": {
+      "type": "Compose",
+      "inputs": "@replace(outputs('Customer_no'), '''', '''''')",
+      "runAfter": {
+        "Customer_no": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Get_BC_customer": {
+      "type": "Http",
+      "inputs": {
+        "method": "GET",
+        "uri": "@{outputs('BC_base_url')}mcrmCustomers",
+        "headers": {
+          "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
+          "Accept": "application/json"
+        },
+        "queries": {
+          "$filter": "Customer_No eq '@{outputs('Customer_literal')}'",
+          "$select": "Customer_No,Name"
+        }
+      },
+      "runtimeConfiguration": {
+        "secureData": {
+          "properties": [
+            "inputs",
+            "outputs"
+          ]
+        }
+      },
+      "runAfter": {
+        "Customer_literal": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Customer_name": {
+      "type": "Compose",
+      "inputs": "@coalesce(first(body('Get_BC_customer')?['value'])?['Name'], outputs('Customer_no'))",
+      "runAfter": {
+        "Get_BC_customer": [
+          "Succeeded"
+        ]
+      }
+    },
+    "List_accounts": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "accounts",
+          "$select": "accountid",
+          "$filter": "chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_bccompanyid eq '@{parameters('BC Solid Cement Company ID (chp_BCSolidCementCompanyId)')}'",
+          "$top": 1
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Customer_name": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Account_exists": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@greater(length(outputs('List_accounts')?['body/value']), 0)",
+          true
+        ]
+      },
+      "actions": {
+        "Update_account_name": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "accounts",
+              "recordId": "@first(outputs('List_accounts')?['body/value'])?['accountid']",
+              "item/name": "@{outputs('Customer_name')}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        },
+        "Set_AccountId_existing": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "AccountId",
+            "value": "@{first(outputs('List_accounts')?['body/value'])?['accountid']}"
+          },
+          "runAfter": {
+            "Update_account_name": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "else": {
+        "actions": {
+          "Create_account": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_commondataserviceforapps",
+                "operationId": "CreateRecord",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+              },
+              "parameters": {
+                "entityName": "accounts",
+                "item/name": "@{outputs('Customer_name')}",
+                "item/chp_bccustomerno": "@{outputs('Customer_no')}",
+                "item/chp_bccompanyid": "@{parameters('BC Solid Cement Company ID (chp_BCSolidCementCompanyId)')}",
+                "item/chp_bccompanyname": "Solid Cement"
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          },
+          "Set_AccountId_new": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "AccountId",
+              "value": "@{outputs('Create_account')?['body/accountid']}"
+            },
+            "runAfter": {
+              "Create_account": [
+                "Succeeded"
+              ]
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "List_accounts": [
+          "Succeeded"
+        ]
+      }
+    },
+    "List_contacts": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "contacts",
+          "$select": "contactid,_parentcustomerid_value,adx_identity_username,fullname",
+          "$filter": "emailaddress1 eq '@{outputs('Email_literal')}' and statecode eq 0",
+          "$top": 2
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Account_exists": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Several_contacts": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@greater(length(outputs('List_contacts')?['body/value']), 1)",
+          true
+        ]
+      },
+      "actions": {
+        "Ops_notice_several_contacts": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "emailMessage/To": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
+              "emailMessage/Subject": "Concreat Connect: activation blocked — several portal contacts share this email",
+              "emailMessage/Body": "<p>An activation request was blocked: several portal contacts share this email.</p><p>Email: @{outputs('Email')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
+              "emailMessage/Importance": "Normal"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        },
+        "Return_several_contacts": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {
+            "Ops_notice_several_contacts": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Stop_several_contacts": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Succeeded"
+          },
+          "runAfter": {
+            "Return_several_contacts": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "runAfter": {
+        "List_contacts": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Contact_exists": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@equals(length(outputs('List_contacts')?['body/value']), 1)",
+          true
+        ]
+      },
+      "actions": {
+        "Linked_to_another_customer": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@and(not(equals(coalesce(first(outputs('List_contacts')?['body/value'])?['_parentcustomerid_value'], ''), '')), not(equals(coalesce(first(outputs('List_contacts')?['body/value'])?['_parentcustomerid_value'], ''), variables('AccountId'))))",
+              true
+            ]
+          },
+          "actions": {
+            "Ops_notice_linked_elsewhere": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/To": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
+                  "emailMessage/Subject": "Concreat Connect: activation blocked — contact already linked to another customer",
+                  "emailMessage/Body": "<p>An activation request was blocked: contact already linked to another customer.</p><p>Email: @{outputs('Email')}</p><p>Customer number requested: @{outputs('Customer_no')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
+                  "emailMessage/Importance": "Normal"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Return_linked_elsewhere": {
+              "type": "Response",
+              "kind": "PowerPages",
+              "inputs": {
+                "statusCode": 200,
+                "body": {
+                  "status": "ok"
+                },
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": {
+                      "title": "status",
+                      "x-ms-dynamically-added": true,
+                      "type": "string"
+                    }
+                  }
+                }
+              },
+              "runAfter": {
+                "Ops_notice_linked_elsewhere": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Stop_linked_elsewhere": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Succeeded"
+              },
+              "runAfter": {
+                "Return_linked_elsewhere": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Set_ContactId_existing": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "ContactId",
+            "value": "@{first(outputs('List_contacts')?['body/value'])?['contactid']}"
+          },
+          "runAfter": {
+            "Linked_to_another_customer": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Set_ContactName_existing": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "ContactName",
+            "value": "@{coalesce(first(outputs('List_contacts')?['body/value'])?['fullname'], outputs('Customer_name'))}"
+          },
+          "runAfter": {
+            "Set_ContactId_existing": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Set_Username": {
+          "type": "SetVariable",
+          "inputs": {
+            "name": "Username",
+            "value": "@{coalesce(first(outputs('List_contacts')?['body/value'])?['adx_identity_username'], '')}"
+          },
+          "runAfter": {
+            "Set_ContactName_existing": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Contact_unlinked": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@equals(coalesce(first(outputs('List_contacts')?['body/value'])?['_parentcustomerid_value'], ''), '')",
+              true
+            ]
+          },
+          "actions": {
+            "Link_contact_to_account": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "contacts",
+                  "recordId": "@variables('ContactId')",
+                  "item/parentcustomerid_account@odata.bind": "accounts(@{variables('AccountId')})"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            }
+          },
+          "runAfter": {
+            "Set_Username": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "else": {
+        "actions": {
+          "BC_person": {
+            "type": "Query",
+            "inputs": {
+              "from": "@body('Get_BC_contacts')?['value']",
+              "where": "@equals(item()?['type'], 'Person')"
+            },
+            "runAfter": {}
+          },
+          "Create_contact": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_commondataserviceforapps",
+                "operationId": "CreateRecord",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+              },
+              "parameters": {
+                "entityName": "contacts",
+                "item/lastname": "@{coalesce(first(body('BC_person'))?['name'], outputs('Customer_name'))}",
+                "item/emailaddress1": "@{outputs('Email')}",
+                "item/parentcustomerid_account@odata.bind": "accounts(@{variables('AccountId')})"
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {
+              "BC_person": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Set_ContactId_new": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "ContactId",
+              "value": "@{outputs('Create_contact')?['body/contactid']}"
+            },
+            "runAfter": {
+              "Create_contact": [
+                "Succeeded"
+              ]
+            }
+          },
+          "Set_ContactName_new": {
+            "type": "SetVariable",
+            "inputs": {
+              "name": "ContactName",
+              "value": "@{outputs('Create_contact')?['body/lastname']}"
+            },
+            "runAfter": {
+              "Set_ContactId_new": [
+                "Succeeded"
+              ]
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Several_contacts": [
+          "Succeeded"
+        ]
+      }
+    },
+    "List_account_links": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "chp_accountlinks",
+          "$select": "chp_accountlinkid",
+          "$filter": "_chp_contact_value eq @{variables('ContactId')} and _chp_account_value eq @{variables('AccountId')}",
+          "$top": 1
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Contact_exists": [
+          "Succeeded"
+        ]
+      }
+    },
+    "No_account_link": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@equals(length(outputs('List_account_links')?['body/value']), 0)",
+          true
+        ]
+      },
+      "actions": {
+        "Create_account_link": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "CreateRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "chp_accountlinks",
+              "item/chp_name": "@{outputs('Customer_no')} · @{variables('ContactName')}",
+              "item/chp_Contact@odata.bind": "contacts(@{variables('ContactId')})",
+              "item/chp_Account@odata.bind": "accounts(@{variables('AccountId')})"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        }
+      },
+      "runAfter": {
+        "List_account_links": [
+          "Succeeded"
+        ]
+      }
+    },
+    "List_pending_grants": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "chp_accessgrants",
+          "$select": "chp_accessgrantid,chp_bccustomerno",
+          "$filter": "chp_email eq '@{outputs('Email_literal')}' and chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_status eq 775000000"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "No_account_link": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Apply_pending_grants": {
+      "type": "Foreach",
+      "foreach": "@outputs('List_pending_grants')?['body/value']",
+      "actions": {
+        "Retrigger_grant": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "chp_accessgrants",
+              "recordId": "@items('Apply_pending_grants')?['chp_accessgrantid']",
+              "item/chp_bccustomerno": "@{items('Apply_pending_grants')?['chp_bccustomerno']}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        }
+      },
+      "runAfter": {
+        "List_pending_grants": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Already_activated": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@not(equals(variables('Username'), ''))",
+          true
+        ]
+      },
+      "actions": {
+        "Return_already_active": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          },
+          "runAfter": {}
+        },
+        "Stop_already_active": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Succeeded"
+          },
+          "runAfter": {
+            "Return_already_active": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "runAfter": {
+        "Apply_pending_grants": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Invitation_code": {
+      "type": "Compose",
+      "inputs": "@replace(guid(), '-', '')",
+      "runAfter": {
+        "Already_activated": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Create_invitation": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "CreateRecord",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "adx_invitations",
+          "item/adx_name": "Activation – @{outputs('Email')}",
+          "item/adx_type": 756150000,
+          "item/adx_invitationcode": "@{outputs('Invitation_code')}",
+          "item/adx_maximumredemptions": 1,
+          "item/adx_expirydate": "@{addDays(utcNow(), 7)}",
+          "item/adx_inviteContact@odata.bind": "/contacts(@{variables('ContactId')})",
+          "item/mspp_websiteid@odata.bind": "/powerpagesites(@{parameters('Power Pages Site ID (chp_PowerPagesSiteId)')})"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Invitation_code": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Send_activation_email": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_office365",
+          "operationId": "SendEmailV2",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+        },
+        "parameters": {
+          "emailMessage/To": "@{outputs('Email')}",
+          "emailMessage/Subject": "Activate your Concreat Connect account",
+          "emailMessage/Body": "<p>Hello @{variables('ContactName')},</p><p>Use the link below to set your password and finish activating your Concreat Connect account.</p><p><a href=\"@{parameters('Site URL (chp_SiteUrl)')}/activate/complete?code=@{outputs('Invitation_code')}\" style=\"display:inline-block;padding:10px 18px;background:#1d2b5f;color:#ffffff;text-decoration:none;border-radius:6px\">Activate your account</a></p><p>This link can be used once and expires in 7 days.</p><p>If you didn't ask for this, you can ignore this email.</p><p>Need assistance? Contact Concreat Customer Service Center at (02) 8849-3600.</p>",
+          "emailMessage/Importance": "Normal"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Create_invitation": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Return_sent": {
+      "type": "Response",
+      "kind": "PowerPages",
+      "inputs": {
+        "statusCode": 200,
+        "body": {
+          "status": "ok"
+        },
+        "schema": {
+          "type": "object",
+          "properties": {
+            "status": {
+              "title": "status",
+              "x-ms-dynamically-added": true,
+              "type": "string"
+            }
+          }
+        }
+      },
+      "runAfter": {
+        "Send_activation_email": [
+          "Succeeded"
+        ]
+      }
+    }
+  },
+  "outputs": {}
+}
