@@ -141,6 +141,7 @@ pac pages upload-code-site --rootPath .   # deploy to the confirmed environment
 - Contact has **Business Required custom columns from another project** (`rpn_quickbooksid`, `rpn_vendordisplayname`) in the Dev environment. Pass them empty when a flow creates contacts.
 - Power Pages local sign-in posts to `/SignIn` with **`PasswordValue`**. Registration is a Web Forms page (copy ViewState and control names).
 - `pac pages upload-code-site` wipes the **Header** web template. Keep redirect scripts in **Code-Site-Shell-Header**.
+- **Changing an environment variable value behind a site setting (e.g. `BC/ClientSecret`) needs a site restart** (Power Platform admin center → Power Pages sites → Restart); the site keeps the cached old value otherwise (seen 2026-10-05). Server Logic reads site settings with `Server.SiteSetting.Get` (Microsoft Learn; the plugin's `Server.Sitesetting` is wrong), and a form-urlencoded `HttpClient.PostAsync` body must be a JSON object string (the platform encodes it).
 - On Windows, the plugin's Node scripts call `az` without a shell (`az.cmd` fails); Git Bash also rewrites args that start with `/` (check `flowapiurl` in generated YAML).
 
 ## Don't
