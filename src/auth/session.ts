@@ -24,6 +24,7 @@ const SIGN_IN_FAILED = 'Incorrect email or password. Please try again.'
 const SERVICE_UNREACHABLE = "We couldn't reach the sign-in service. Please try again."
 const ACTIVATION_FAILED =
   "We couldn't activate your account. Please try again, or contact the Concreat Customer Service Center at (02) 8849-3600."
+const RESET_SEND_FAILED = "We couldn't send the reset email right now. Please try again in a few minutes."
 const ACTIVATION_SEND_FAILED = "We couldn't send the activation email right now. Please try again in a few minutes."
 
 export class InvalidInvitationError extends Error {
@@ -220,6 +221,8 @@ export async function requestPasswordReset(email: string): Promise<void> {
     body: new URLSearchParams({ __RequestVerificationToken: await fetchAntiForgeryToken(), Email: email }),
   })
   if (!response.ok) throw new Error(SERVICE_UNREACHABLE)
+  // Success redirects to the confirmation page; a failure re-renders the form with an error (seen on Dev 2026-10-06).
+  if (!response.redirected && parseServerErrors(await response.text()).length > 0) throw new Error(RESET_SEND_FAILED)
 }
 
 /** Completes a reset from the emailed link. Success redirects; failure re-renders the built-in form with errors. */

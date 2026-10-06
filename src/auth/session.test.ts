@@ -193,6 +193,19 @@ describe('on the deployed site', () => {
     expect(body.get('__RequestVerificationToken')).toBe('tok123')
   })
 
+  // Seen on Dev 2026-10-06: the built-in form answered 200 with "An unknown failure has occurred. Error ID # […]".
+  test('requestPasswordReset reports a failure the built-in form shows instead of claiming success', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/_layout/tokenhtml'
+        ? new Response(TOKEN_PAGE)
+        : ({
+            ok: true, redirected: false, url: 'https://s/Account/Login/ForgotPassword',
+            text: async () => '<div class="validation-summary-errors"><ul><li>An unknown failure has occurred. Error ID # [9a7e]</li></ul></div>',
+          } as Response),
+    ))
+    await expect(requestPasswordReset('jd@x.ph')).rejects.toThrow("We couldn't send the reset email right now. Please try again in a few minutes.")
+  })
+
   test('resetPassword posts UserId, Code and both passwords, and succeeds on the redirect', async () => {
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
       url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : ({ redirected: true, url: 'https://s/Account/Login/ResetPasswordConfirmation', text: async () => '' } as Response),
