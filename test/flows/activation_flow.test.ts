@@ -101,3 +101,14 @@ test('reads every environment-specific value from a ConcreatHub environment vari
   for (const p of Object.values(definition.parameters) as Action[]) if (p.metadata?.schemaName) expect(p.defaultValue).toBe('')
   expect(text).not.toMatch(/f44e98b4|d2e4496e|188fc244|chp-portal-dev|automations365/)
 })
+
+// Seen on Dev 2026-10-06: Power Pages treats an unconfirmed email as "user does not exist" for password resets.
+// Activation proves the address (the person signs in only through the link emailed to it), so mark it confirmed.
+test('marks the contact email confirmed for new and existing contacts', () => {
+  const [, create] = actions.find(([name]) => name === 'Create_contact')!
+  expect(create.inputs.parameters['item/adx_identity_emailaddress1confirmed']).toBe(true)
+  const [, confirm] = actions.find(([name]) => name === 'Confirm_contact_email')!
+  expect(confirm.inputs.parameters).toMatchObject({
+    entityName: 'contacts', recordId: "@variables('ContactId')", 'item/adx_identity_emailaddress1confirmed': true,
+  })
+})

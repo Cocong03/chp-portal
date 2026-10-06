@@ -916,6 +916,27 @@
             ]
           }
         },
+        "Confirm_contact_email": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Set_Username": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "contacts",
+              "recordId": "@variables('ContactId')",
+              "item/adx_identity_emailaddress1confirmed": true
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
         "Contact_unlinked": {
           "type": "If",
           "expression": {
@@ -944,7 +965,7 @@
             }
           },
           "runAfter": {
-            "Set_Username": [
+            "Confirm_contact_email": [
               "Succeeded"
             ]
           }
@@ -972,7 +993,8 @@
                 "entityName": "contacts",
                 "item/lastname": "@{coalesce(first(body('BC_person'))?['name'], outputs('Customer_name'))}",
                 "item/emailaddress1": "@{outputs('Email')}",
-                "item/parentcustomerid_account@odata.bind": "accounts(@{variables('AccountId')})"
+                "item/parentcustomerid_account@odata.bind": "accounts(@{variables('AccountId')})",
+                "item/adx_identity_emailaddress1confirmed": true
               },
               "authentication": "@parameters('$authentication')"
             },
