@@ -41,8 +41,10 @@ test('reads the site URL from its environment variable', () => {
 
 // Seen on Dev 2026-10-06: Power Pages writes the link as href='…' (single quotes). Cutting only at a double quote kept the
 // trailing HTML ("'>Reset…</a>") in the query, and Power Pages rejected the URL with a server error.
-test('cuts the reset query at the closing quote, single or double', () => {
+// The link appears twice: in href='…' and again as plain text ("Or you can copy the following URL…"), which has no
+// closing quote. Take the first occurrence (the href) and cut at its closing quote.
+test('takes the first reset link (the href) and cuts it at the closing quote, single or double', () => {
   expect(action('Reset_query').inputs).toBe(
-    "@replace(first(split(first(split(last(split(triggerOutputs()?['body/description'], 'ResetPassword?')), '''')), '\"')), '&amp;', '&')",
+    "@replace(first(split(first(split(split(triggerOutputs()?['body/description'], 'ResetPassword?')[1], '''')), '\"')), '&amp;', '&')",
   )
 })
