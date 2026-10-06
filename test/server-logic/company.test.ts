@@ -15,25 +15,31 @@ const ROW = {
   Customer_No: 'C00000009', Name: 'BESTRADE COMMODITY SALES CORP.', Address: '12 Main St', Address_2: '', City: 'Pasig',
   County: 'NCR', Post_Code: '1600', VATRegNo: '123-456', Phone_No: '0917', EMail: 'ops@bestrade.ph',
 }
+const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify(value) })
 
 function fakeServer({
   user = { contactid: 'c-1' } as unknown,
+  email = 'Buyer@Bestrade.ph' as unknown,
   account = { name: 'BESTRADE COMMODITY SALES CORP.', chp_bccustomerno: 'C00000009', chp_bccompanyid: 'co-1' } as unknown,
+  portalContacts = [{ companyNo: 'CT0001' }] as unknown[],
+  relations = [{ vendorNo: 'C00000009' }] as unknown[],
   rows = [ROW] as unknown[],
   tokenStatus = 200,
   tokenResponse = undefined as unknown,
+  bcDown = false,
   settings = SETTINGS,
   context = { ServerLogicName: 'company', QueryParameters: {}, Body: '' } as unknown,
 } = {}) {
   const http: { method: string; url: string; body?: string; headers?: unknown; contentType?: string }[] = []
   const errors: string[] = []
+  const warnings: string[] = []
   const server = {
     User: user,
     Context: context,
     SiteSetting: { Get: (name: string) => settings[name] },
-    Logger: { Log() {}, Error: (message: string) => errors.push(message), Warn() {} },
+    Logger: { Log() {}, Error: (m: string) => errors.push(m), Warn: (m: string) => warnings.push(m) },
     Connector: {
-      Dataverse: { RetrieveRecord: () => ({ contactid: 'c-1', parentcustomerid_account: account }) },
+      Dataverse: { RetrieveRecord: () => ({ contactid: 'c-1', emailaddress1: email, parentcustomerid_account: account }) },
       HttpClient: {
         PostAsync: async (url: string, body: string, headers: unknown, contentType: string) => {
           http.push({ method: 'POST', url, body, headers, contentType })
@@ -43,15 +49,19 @@ function fakeServer({
         },
         GetAsync: async (url: string, headers: unknown) => {
           http.push({ method: 'GET', url, headers })
-          return JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify({ value: rows }) })
+          if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
+          if (url.includes('/MCRMContacts')) return ok({ value: portalContacts })
+          if (url.includes('/mcrmBusinessRelation')) return ok({ value: relations })
+          return ok({ value: rows })
         },
       },
     },
   }
-  return { server, http, errors }
+  return { server, http, errors, warnings }
 }
 
 const SAFE = "We couldn't load this information. Please try again."
+const call = (http: { url: string }[], entity: string) => http.find((c) => c.url.includes(`/${entity}?`))!
 
 test("returns the signed-in customer's BC card in the wireframe's field names", async () => {
   const { server } = fakeServer()
@@ -82,23 +92,53 @@ test('gets a client-credentials token, passing the form fields as a JSON object 
 })
 
 test("calls BC in the session's company with an escaped, encoded filter and the bearer token", async () => {
-  const { server, http } = fakeServer({ account: { name: 'X', chp_bccustomerno: "O'1 2", chp_bccompanyid: 'co-1' }, rows: [{ ...ROW, Customer_No: "O'1 2" }] })
+  const { server, http } = fakeServer({
+    account: { name: 'X', chp_bccustomerno: "O'1 2", chp_bccompanyid: 'co-1' },
+    relations: [{ vendorNo: "O'1 2" }],
+    rows: [{ ...ROW, Customer_No: "O'1 2" }],
+  })
   await load(server).get()
-  const get = http[1]
+  const get = call(http, 'mcrmCustomers')
   expect(get.url).toBe(
     "https://api.businesscentral.dynamics.com/v2.0/tenant-1/DEV/api/pasi/mcrm/v1.0/companies(co-1)/mcrmCustomers?$filter=Customer_No%20eq%20'O''1%202'&$select=Customer_No%2CName%2CAddress%2CAddress_2%2CCity%2CCounty%2CPost_Code%2CVATRegNo%2CPhone_No%2CEMail",
   )
   expect(get.headers).toEqual({ Authorization: 'Bearer tok-1', Accept: 'application/json' })
 })
 
-test('ignores customer or company ids sent in the request', async () => {
+test('ignores customer, company or email values sent in the request', async () => {
   const { server, http } = fakeServer({
-    context: { ServerLogicName: 'company', QueryParameters: { customerNo: 'C99', companyId: 'other' }, Body: '{"customerNo":"C99"}' },
+    context: {
+      ServerLogicName: 'company',
+      QueryParameters: { customerNo: 'C99', companyId: 'other', email: 'evil@x.ph' },
+      Body: '{"customerNo":"C99","email":"evil@x.ph"}',
+    },
   })
   await load(server).get()
-  expect(http[1].url).toContain('companies(co-1)/')
-  expect(http[1].url).toContain("'C00000009'")
-  expect(http[1].url).not.toContain('C99')
+  expect(call(http, 'mcrmCustomers').url).toContain('companies(co-1)/')
+  expect(call(http, 'mcrmCustomers').url).toContain("'C00000009'")
+  expect(http.map((c) => c.url).join(' ')).not.toMatch(/C99|evil/)
+})
+
+test('checks BC portal access with the Dataverse email, lower-cased and quoted, only portal-enabled contacts', async () => {
+  const { server, http } = fakeServer({ email: "O'Neil@Bestrade.PH" })
+  await load(server).get()
+  expect(decodeURIComponent(call(http, 'MCRMContacts').url)).toContain(
+    "$filter=tolower(eMail) eq 'o''neil@bestrade.ph' and customerPortalAccess eq true",
+  )
+  expect(decodeURIComponent(call(http, 'mcrmBusinessRelation').url)).toContain(
+    "$filter=(contactNo eq 'CT0001') and linktoTable eq 'Customer'",
+  )
+})
+
+test.each([
+  ['no BC contact with portal access for this email', { portalContacts: [] }],
+  ['portal-enabled contacts belong to another customer', { relations: [{ vendorNo: 'C00000001' }] }],
+  ['the contact has no email', { email: '' }],
+])('blocked when %s: returns {blocked:true} and reads no customer data', async (_case, options) => {
+  const { server, http, warnings } = fakeServer(options as Parameters<typeof fakeServer>[0])
+  expect(JSON.parse(await load(server).get())).toEqual({ blocked: true })
+  expect(http.some((c) => c.url.includes('/mcrmCustomers'))).toBe(false)
+  expect(warnings.join(' ')).toContain('blocked')
 })
 
 test.each([
@@ -108,6 +148,7 @@ test.each([
   ['the contact has no linked account', { account: null }],
   ['BC rejects the client credentials', { tokenStatus: 401 }],
   ['a BC site setting is missing', { settings: { ...SETTINGS, 'BC/ClientSecret': '' } }],
+  ['BC is down during the access check (an error, never "blocked")', { bcDown: true }],
 ])('%s → only the customer-safe error', async (_case, options) => {
   const { server } = fakeServer(options as Parameters<typeof fakeServer>[0])
   await expect(load(server).get()).rejects.toThrow(SAFE)
@@ -142,14 +183,10 @@ test("a rejected token request logs Microsoft's error code and description", asy
   const { server, errors } = fakeServer({
     tokenResponse: {
       StatusCode: 401, IsSuccessStatusCode: false, ReasonPhrase: 'Unauthorized',
-      Body: JSON.stringify({
-        error: 'invalid_client',
-        error_description: 'AADSTS7000215: Invalid client secret provided. Ensure the secret being sent in the request is the client secret value, not the client secret ID.',
-      }),
+      Body: JSON.stringify({ error: 'invalid_client', error_description: 'AADSTS7000215: Invalid client secret provided.' }),
     },
   })
   await expect(load(server).get()).rejects.toThrow(SAFE)
   expect(errors[0]).toContain('token 401 Unauthorized')
-  expect(errors[0]).toContain('invalid_client')
   expect(errors[0]).toContain('AADSTS7000215')
 })

@@ -42,8 +42,9 @@ function bcConfig() {
     return cfg;
 }
 
-// Customer and company come only from the signed-in contact's Account (architecture rule 3).
-function sessionScope() {
+// Customer and company come only from the signed-in contact's Account (architecture rule 3), and BC must still
+// let this contact into the portal (customerPortalAccess, decided 2026-10-06).
+async function sessionScope() {
     var user = Server.User;
     if (!user || !user.contactid) {
         throw new Error("not-signed-in");
@@ -52,7 +53,7 @@ function sessionScope() {
         Server.Connector.Dataverse.RetrieveRecord(
             "contacts",
             user.contactid,
-            "$select=contactid&$expand=parentcustomerid_account($select=name,chp_bccustomerno,chp_bccompanyid)"
+            "$select=contactid,emailaddress1&$expand=parentcustomerid_account($select=name,chp_bccustomerno,chp_bccompanyid)"
         ),
         "dataverse"
     );
@@ -60,7 +61,45 @@ function sessionScope() {
     if (!account || !account.chp_bccustomerno || !account.chp_bccompanyid) {
         throw new Error("no-account");
     }
-    return { contactId: user.contactid, customerNo: account.chp_bccustomerno, companyId: account.chp_bccompanyid, customerName: account.name || "" };
+    var scope = { contactId: user.contactid, customerNo: account.chp_bccustomerno, companyId: account.chp_bccompanyid, customerName: account.name || "" };
+    if (!(await hasPortalAccess(scope, contact.emailaddress1))) {
+        throw blockedError();
+    }
+    return scope;
+}
+
+// True while BC has a contact with this email, customerPortalAccess = true, linked to the session's customer.
+// The email comes from Dataverse, never from the request. A BC failure throws (an error, not a block).
+// ponytail: two BC calls per request; add a short-lived cache if Dev timings show it matters.
+async function hasPortalAccess(scope, email) {
+    var address = String(email || "").trim().toLowerCase();
+    if (!address) {
+        return false;
+    }
+    var contacts = await bcGet(
+        scope,
+        "MCRMContacts",
+        odataQuery({ $filter: "tolower(eMail) eq " + odataLiteral(address) + " and customerPortalAccess eq true", $select: "companyNo", $top: "20" })
+    );
+    var companies = ((contacts && contacts.value) || []).map((row) => row.companyNo).filter((no) => no);
+    if (companies.length === 0) {
+        return false;
+    }
+    var relations = await bcGet(
+        scope,
+        "mcrmBusinessRelation",
+        odataQuery({
+            $filter: "(" + companies.map((no) => "contactNo eq " + odataLiteral(no)).join(" or ") + ") and linktoTable eq 'Customer'",
+            $select: "vendorNo"
+        })
+    );
+    return ((relations && relations.value) || []).some((row) => row.vendorNo === scope.customerNo);
+}
+
+function blockedError() {
+    var err = new Error("blocked: BC customerPortalAccess is off");
+    err.blocked = true;
+    return err;
 }
 
 // OData string literal with single quotes doubled (architecture rule 4).
@@ -136,6 +175,11 @@ async function respond(work) {
     try {
         return JSON.stringify(await work());
     } catch (err) {
+        // A blocked caller gets a normal reply with no data: thrown messages never reach the browser.
+        if (err && err.blocked) {
+            Server.Logger.Warn(Server.Context.ServerLogicName + " " + err.message);
+            return JSON.stringify({ blocked: true });
+        }
         // Platform messages can echo a request; never let a secret or token reach the log.
         // Patterns are RegExp strings: quotes inside regex literals break the plugin validator's brace scan.
         var detail = String(err.message);
