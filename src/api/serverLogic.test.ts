@@ -1,5 +1,5 @@
 import { MOCK_SESSION_KEY } from '@/auth/session'
-import { ApiError, GENERIC_ERROR, serverLogic } from './serverLogic'
+import { ApiError, BlockedError, GENERIC_ERROR, serverLogic } from './serverLogic'
 import type { CompanyDto, MeDto } from './types'
 
 const caught = async (promise: Promise<unknown>) => (await promise.catch((error: unknown) => error)) as ApiError
@@ -35,6 +35,10 @@ describe('on the dev server', () => {
     const error = await caught(serverLogic('nope'))
     expect(error).toBeInstanceOf(ApiError)
     expect(error.status).toBe(404)
+  })
+  test('a blocked answer becomes a BlockedError', async () => {
+    sessionStorage.setItem(MOCK_SESSION_KEY, 'blocked@test.ph')
+    await expect(serverLogic('me')).rejects.toBeInstanceOf(BlockedError)
   })
 })
 
@@ -105,5 +109,15 @@ describe('on the deployed site', () => {
     expect(error).toBeInstanceOf(ApiError)
     expect(error.status).toBe(502)
     expect(error.message).toBe(GENERIC_ERROR)
+  })
+  test('a {blocked:true} reply from the server becomes a BlockedError', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/_layout/tokenhtml'
+        ? new Response('<input name="__RequestVerificationToken" value="t" />')
+        : new Response(JSON.stringify({ success: true, data: '{"blocked":true}' })),
+    ))
+    const error = await serverLogic('company').catch((e: unknown) => e)
+    expect(error).toBeInstanceOf(BlockedError)
+    expect((error as BlockedError).status).toBe(403)
   })
 })

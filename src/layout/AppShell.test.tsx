@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import App from '@/App'
-import { ApiError, serverLogic } from '@/api/serverLogic'
+import { ApiError, BlockedError, serverLogic } from '@/api/serverLogic'
 import { MOCK_SESSION_KEY } from '@/auth/session'
 import { go } from '@/lib/go'
 import { renderApp } from '@/test/render'
@@ -163,4 +163,22 @@ test('Sign out ends the session', async () => {
   await user.click(await screen.findByRole('menuitem', { name: 'Sign out' }))
   expect(sessionStorage.getItem(MOCK_SESSION_KEY)).toBeNull()
   expect(go).toHaveBeenCalledWith('/')
+})
+
+test('a contact BC has switched off sees only the access-turned-off card', async () => {
+  signInAs('blocked@test.ph')
+  expect(await screen.findByRole('heading', { name: 'Your access has been turned off' })).toBeInTheDocument()
+  expect(screen.getByText(/Please contact the Concreat Customer Service Center at \(02\) 8849-3600\./)).toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: 'Portal sections' })).not.toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Sign out' })).toBeInTheDocument()
+  expect(document.title).toBe('Access turned off — Concreat Connect')
+})
+
+test('cached account data plus a blocked refetch shows the card, not the old nav', async () => {
+  const { client } = signInAs('full@test.ph')
+  await navLabels()
+  vi.mocked(serverLogic).mockRejectedValueOnce(new BlockedError())
+  await act(() => client.invalidateQueries({ queryKey: ['me'] }))
+  expect(await screen.findByRole('heading', { name: 'Your access has been turned off' })).toBeInTheDocument()
+  expect(screen.queryByRole('navigation', { name: 'Portal sections' })).not.toBeInTheDocument()
 })

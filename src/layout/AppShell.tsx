@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation } from 'react-router-dom'
+import { BlockedError } from '@/api/serverLogic'
 import { canSee, hasBusinessRole } from '@/auth/access'
 import { useMe } from '@/auth/useMe'
 import { SECTIONS } from '@/layout/sections'
@@ -7,6 +8,7 @@ import { cn } from '@/lib/utils'
 import { Button } from '@/ui/button'
 import { Logo } from '@/ui/Logo'
 import { Skeleton } from '@/ui/skeleton'
+import { AccessBlocked } from './AccessBlocked'
 import { HelpDialog } from './HelpDialog'
 import { MobileMenu } from './MobileMenu'
 import { NoAccess } from './NoAccess'
@@ -21,8 +23,9 @@ const activePill =
 export function AppShell() {
   const me = useMe()
   const [helpOpen, setHelpOpen] = useState(false)
-  // No linked account means no business access yet, whatever the roles say.
-  const roles = me.data?.account ? me.data.roles : []
+  // Blocked in BC wins over any cached account data; no linked account means no business access yet.
+  const blocked = me.error instanceof BlockedError
+  const roles = !blocked && me.data?.account ? me.data.roles : []
   const sections = SECTIONS.filter((section) => canSee(roles, section.key))
 
   // Below lg the tab strip scrolls sideways; keep the current section visible.
@@ -33,7 +36,9 @@ export function AppShell() {
   }, [pathname, sections.length])
 
   let content
-  if (me.isPending) {
+  if (blocked) {
+    content = <AccessBlocked />
+  } else if (me.isPending) {
     content = (
       <div role="status" className="flex flex-col gap-3">
         <span className="sr-only">Loading your account…</span>
@@ -74,7 +79,7 @@ export function AppShell() {
           </Button>
           {me.data && (
             <>
-              {me.data.account && (
+              {!blocked && me.data.account && (
                 <p className="hidden text-[13px] text-muted-foreground lg:block">
                   Viewing <strong className="text-foreground">{me.data.account.company}</strong> · {me.data.account.customerName}
                 </p>

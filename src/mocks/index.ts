@@ -15,12 +15,14 @@ const ROLES_BY_EMAIL = new Map<string, string[]>([
   ['viewonly@test.ph', ['View Only']],
   ['norole@test.ph', []],
   ['nolink@test.ph', ['Full Access']],
+  ['blocked@test.ph', ['Full Access']],
 ])
 
 /** Dev-server answers by Server Logic name. Each module adds its own fixture when it's built. */
 export const mocks: Record<string, ((request: MockRequest) => unknown) | undefined> = {
   me: (): MeDto => {
     const email = (getPortalUser()?.email ?? 'full@test.ph').trim().toLowerCase()
+    if (email === 'blocked@test.ph') return { contact: { name: 'J.D. Santos', email }, account: null, roles: [], blocked: true }
     return {
       contact: { name: 'J.D. Santos', email },
       // Wireframe ACCOUNTS[0]; nolink@ simulates a contact that isn't linked to an account yet.

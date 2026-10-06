@@ -19,6 +19,18 @@ export class ApiError extends Error {
   }
 }
 
+export const BLOCKED_MESSAGE = 'Your access to Concreat Connect has been turned off.'
+
+/** BC switched this contact's portal access off. Server Logic answers {"blocked":true} (thrown messages never reach the browser). */
+export class BlockedError extends ApiError {
+  constructor() {
+    super(403, BLOCKED_MESSAGE)
+    this.name = 'BlockedError'
+  }
+}
+
+const isBlocked = (data: unknown) => typeof data === 'object' && data !== null && (data as { blocked?: unknown }).blocked === true
+
 /**
  * Power Pages wraps every Server Logic response. Microsoft Learn documents PascalCase
  * ({ Success, Data, Error }); the Dev runtime returns camelCase ({ success, data, error }). Accept both.
@@ -38,7 +50,9 @@ export async function serverLogic<T>(name: string, { method = 'GET', query, body
     const mock = mocks[name]
     if (!mock) throw new ApiError(404, `No mock for Server Logic "${name}"`)
     await new Promise((resolve) => setTimeout(resolve, 150))
-    return mock({ method, query, body }) as T
+    const data = mock({ method, query, body })
+    if (isBlocked(data)) throw new BlockedError()
+    return data as T
   }
 
   const search = query ? `?${new URLSearchParams(query)}` : ''
@@ -57,7 +71,9 @@ export async function serverLogic<T>(name: string, { method = 'GET', query, body
   if (!response.ok || !(envelope?.Success ?? envelope?.success)) {
     throw new ApiError(response.status, messageOf(envelope?.Error ?? envelope?.error) ?? GENERIC_ERROR)
   }
-  return parseData(envelope?.Data ?? envelope?.data) as T
+  const data = parseData(envelope?.Data ?? envelope?.data)
+  if (isBlocked(data)) throw new BlockedError()
+  return data as T
 }
 
 function messageOf(error: unknown): string | undefined {

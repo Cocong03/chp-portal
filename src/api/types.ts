@@ -5,6 +5,8 @@ export interface MeDto {
   account: { customerNo: string; customerName: string; company: string } | null
   /** Web role names, e.g. "Authenticated Users", "Full Access". */
   roles: string[]
+  /** BC switched this contact's portal access off (customerPortalAccess = false). */
+  blocked?: boolean
 }
 
 /** GET /_api/serverlogics/company. Field names follow the wireframe's ACCOUNTS[]. */
