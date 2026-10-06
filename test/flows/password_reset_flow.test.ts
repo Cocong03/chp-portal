@@ -14,7 +14,9 @@ test('runs when Dataverse adds a password reset email', () => {
   expect(trigger.inputs.parameters).toMatchObject({
     'subscriptionRequest/message': 1,
     'subscriptionRequest/entityname': 'email',
-    'subscriptionRequest/filterexpression': "contains(subject,'Password Reset')",
+    // Final review D: only outgoing emails tied to a record (Power Pages' reset is regarding the contact), so tracked
+    // inbound mail or other apps' "Password Reset" emails in the same environment are never re-sent as Concreat email.
+    'subscriptionRequest/filterexpression': "contains(subject,'Password Reset') and directioncode eq true and _regardingobjectid_value ne null",
   })
 })
 
