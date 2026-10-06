@@ -3,9 +3,12 @@ import {
   checkActivationLink,
   getPortalUser,
   InvalidInvitationError,
+  InvalidResetLinkError,
   MOCK_SESSION_KEY,
   redeemInvitation,
   requestActivation,
+  requestPasswordReset,
+  resetPassword,
   signIn,
   signOut,
 } from './session'
@@ -177,5 +180,37 @@ describe('on the deployed site', () => {
     vi.stubEnv('VITE_CHECK_LINK_FLOW_ID', 'flow-2')
     vi.stubGlobal('fetch', vi.fn(async (url: string) => (url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response('', { status: 502 }))))
     await expect(checkActivationLink('abc')).rejects.toThrow()
+  })
+
+  test('requestPasswordReset posts the email to the built-in ForgotPassword form', async () => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) => (url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response('')))
+    vi.stubGlobal('fetch', fetchMock)
+    await requestPasswordReset('jd@x.ph')
+    const [url, init] = fetchMock.mock.calls[1]
+    expect(url).toBe('/Account/Login/ForgotPassword')
+    const body = init!.body as URLSearchParams
+    expect(body.get('Email')).toBe('jd@x.ph')
+    expect(body.get('__RequestVerificationToken')).toBe('tok123')
+  })
+
+  test('resetPassword posts UserId, Code and both passwords, and succeeds on the redirect', async () => {
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : ({ redirected: true, url: 'https://s/Account/Login/ResetPasswordConfirmation', text: async () => '' } as Response),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    await resetPassword('u-1', 'c+1', 'Abcdefg1', 'Abcdefg1')
+    const [url, init] = fetchMock.mock.calls[1]
+    expect(url).toBe('/Account/Login/ResetPassword')
+    const body = init!.body as URLSearchParams
+    expect([body.get('UserId'), body.get('Code'), body.get('Password'), body.get('ConfirmPassword')]).toEqual(['u-1', 'c+1', 'Abcdefg1', 'Abcdefg1'])
+  })
+
+  test('resetPassword maps "Invalid token." to InvalidResetLinkError', async () => {
+    vi.stubGlobal('fetch', vi.fn(async (url: string) =>
+      url === '/_layout/tokenhtml'
+        ? new Response(TOKEN_PAGE)
+        : ({ redirected: false, url: 'https://s/Account/Login/ResetPassword', text: async () => '<div class="validation-summary-errors"><ul><li>Invalid token.</li></ul></div>' } as Response),
+    ))
+    await expect(resetPassword('u', 'c', 'Abcdefg1', 'Abcdefg1')).rejects.toBeInstanceOf(InvalidResetLinkError)
   })
 })

@@ -21,7 +21,7 @@ test('shows the wireframe copy and sets the title', () => {
   renderApp(<SignIn />)
   expect(screen.getByRole('heading', { name: 'Sign in to Concreat Connect' })).toBeInTheDocument()
   expect(screen.getByRole('heading', { level: 1, name: 'Concreat Connect' })).toBeInTheDocument()
-  expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/Account/Login/ForgotPassword')
+  expect(screen.getByRole('link', { name: 'Forgot password?' })).toHaveAttribute('href', '/forgot-password')
   expect(screen.getByRole('link', { name: 'Activate your account' })).toHaveAttribute('href', '/activate')
   expect(screen.getByRole('link', { name: 'Terms of Use' })).toHaveAttribute('href', '#')
   expect(screen.getByRole('link', { name: 'Data Privacy Policy' })).toHaveAttribute('href', '#')

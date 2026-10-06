@@ -12,20 +12,12 @@ import { Field, FieldDescription, FieldError, FieldGroup, FieldLabel } from '@/u
 import { Input } from '@/ui/input'
 import { PasswordInput } from '@/ui/PasswordInput'
 import { AuthCardHeader, AuthLayout, brandButton, FormAlert, inputClass, labelClass, SupportLine } from './AuthLayout'
-
-// Mirrors Power Pages' default policy (PasswordValidator/EnforcePasswordPolicy = true, RequiredLength = 8).
-// If sub-project B changes those site settings, change this schema and the hint together.
-const KINDS = [/\p{Lu}/u, /\p{Ll}/u, /\p{Nd}/u, /[^\p{L}\p{N}]/u]
-const hasThreeKinds = (password: string) => KINDS.filter((kind) => kind.test(password)).length >= 3
+import { PASSWORD_HINT, passwordField } from './passwordPolicy'
 
 const schema = z
   .object({
     email: z.string().trim().min(1, 'Enter your email address.').email('Enter a valid email address.'),
-    password: z
-      .string()
-      .min(1, 'Enter a password.')
-      .min(8, 'Use at least 8 characters.')
-      .refine(hasThreeKinds, 'Use at least three of: uppercase letters, lowercase letters, numbers, symbols.'),
+    password: passwordField,
     confirm: z.string(),
   })
   .refine((values) => values.confirm === values.password, { message: "Passwords don't match.", path: ['confirm'] })
@@ -109,7 +101,7 @@ export function SetPassword() {
               aria-invalid={!!errors.password}
               {...register('password')}
             />
-            <FieldDescription>At least 8 characters, using three of these: uppercase letters, lowercase letters, numbers, symbols.</FieldDescription>
+            <FieldDescription>{PASSWORD_HINT}</FieldDescription>
             <FieldError errors={[errors.password]} />
           </Field>
           <Field data-invalid={errors.confirm ? true : undefined}>

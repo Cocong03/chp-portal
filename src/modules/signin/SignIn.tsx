@@ -61,9 +61,9 @@ export function SignIn() {
               <FieldLabel htmlFor="signin-password" className={labelClass}>
                 Password
               </FieldLabel>
-              <a href="/Account/Login/ForgotPassword" className="text-[12.5px] font-semibold text-primary">
+              <Link to="/forgot-password" className="text-[12.5px] font-semibold text-primary">
                 Forgot password?
-              </a>
+              </Link>
             </div>
             <PasswordInput
               id="signin-password"

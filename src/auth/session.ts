@@ -200,6 +200,52 @@ export async function checkActivationLink(code: string): Promise<'valid' | 'inva
   return (await triggerFlow(import.meta.env.VITE_CHECK_LINK_FLOW_ID, { Code: code })) === 'valid' ? 'valid' : 'invalid'
 }
 
+export class InvalidResetLinkError extends Error {
+  constructor() {
+    super('This reset link is invalid or has expired.')
+    this.name = 'InvalidResetLinkError'
+  }
+}
+
+/** Starts Power Pages' password reset. The reply is neutral whether or not the email has an account. */
+export async function requestPasswordReset(email: string): Promise<void> {
+  if (import.meta.env.DEV) {
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    return
+  }
+  const response = await send('/Account/Login/ForgotPassword', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    credentials: 'same-origin',
+    body: new URLSearchParams({ __RequestVerificationToken: await fetchAntiForgeryToken(), Email: email }),
+  })
+  if (!response.ok) throw new Error(SERVICE_UNREACHABLE)
+}
+
+/** Completes a reset from the emailed link. Success redirects; failure re-renders the built-in form with errors. */
+export async function resetPassword(userId: string, code: string, password: string, confirmPassword: string): Promise<void> {
+  if (import.meta.env.DEV) {
+    if (code === 'expired') throw new InvalidResetLinkError()
+    return
+  }
+  const response = await send('/Account/Login/ResetPassword', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+    credentials: 'same-origin',
+    body: new URLSearchParams({
+      __RequestVerificationToken: await fetchAntiForgeryToken(),
+      UserId: userId,
+      Code: code,
+      Password: password,
+      ConfirmPassword: confirmPassword,
+    }),
+  })
+  if (response.redirected) return
+  const errors = parseServerErrors(await response.text())
+  if (errors.length === 0 || errors.some((message) => /token/i.test(message))) throw new InvalidResetLinkError()
+  throw new Error(errors.join(' '))
+}
+
 export function signOut(): void {
   if (import.meta.env.DEV) {
     sessionStorage.removeItem(MOCK_SESSION_KEY)
