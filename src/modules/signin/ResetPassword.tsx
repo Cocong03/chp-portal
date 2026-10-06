@@ -21,9 +21,11 @@ type Values = z.infer<typeof schema>
 export function ResetPassword() {
   usePageTitle('Set a new password')
   const [params] = useSearchParams()
-  // Power Pages' reset link uses UserId and Code; the flow appends our email.
-  const userId = params.get('UserId')
-  const code = params.get('Code')
+  // Power Pages' reset link names these userId and code (its form fields are UserId and Code); read either case.
+  // The flow appends our email.
+  const param = (name: string) => [...params].find(([key]) => key.toLowerCase() === name)?.[1] ?? null
+  const userId = param('userid')
+  const code = param('code')
   const email = params.get('email') ?? ''
   const [state, setState] = useState<'form' | 'done' | 'expired'>(userId && code ? 'form' : 'expired')
   const [serverError, setServerError] = useState<string>()

@@ -49,3 +49,11 @@ test('a link without UserId or Code shows the expired card straight away', () =>
   renderApp(<ResetPassword />, { route: '/reset-password' })
   expect(screen.getByText('This reset link is invalid or has expired.')).toBeInTheDocument()
 })
+
+// Seen on Dev 2026-10-06: Power Pages' reset link uses lower-case userId and code.
+test('accepts the lower-case userId and code that Power Pages puts in its reset link', async () => {
+  vi.mocked(resetPassword).mockResolvedValue()
+  renderApp(<ResetPassword />, { route: '/reset-password?userId=u-1&code=c%2B1&email=jd%40x.ph' })
+  await fill('Abcdefg1')
+  await waitFor(() => expect(resetPassword).toHaveBeenCalledWith('u-1', 'c+1', 'Abcdefg1', 'Abcdefg1'))
+})

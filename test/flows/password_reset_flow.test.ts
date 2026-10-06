@@ -38,3 +38,11 @@ test('reads the site URL from its environment variable', () => {
   expect(Object.values(definition.parameters).map((p) => (p as Action).metadata?.schemaName).filter(Boolean)).toEqual(['chp_SiteUrl'])
   expect(text).not.toMatch(/f44e98b4|chp-portal-dev|automations365/)
 })
+
+// Seen on Dev 2026-10-06: Power Pages writes the link as href='…' (single quotes). Cutting only at a double quote kept the
+// trailing HTML ("'>Reset…</a>") in the query, and Power Pages rejected the URL with a server error.
+test('cuts the reset query at the closing quote, single or double', () => {
+  expect(action('Reset_query').inputs).toBe(
+    "@replace(first(split(first(split(last(split(triggerOutputs()?['body/description'], 'ResetPassword?')), '''')), '\"')), '&amp;', '&')",
+  )
+})
