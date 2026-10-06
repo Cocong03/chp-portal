@@ -158,17 +158,11 @@ export async function redeemInvitation(code: string, email: string, password: st
   throw new Error(errors.join(' ') || ACTIVATION_FAILED)
 }
 
-/**
- * Triggers the "Request activation" cloud flow. The flow answers 200 whether or not the email
- * matches a customer, so this can't be used to discover which emails exist.
- */
-export async function requestActivation(email: string): Promise<void> {
-  if (import.meta.env.DEV) {
-    await new Promise((resolve) => setTimeout(resolve, 600))
-    return
-  }
-  // Set in sub-project C (S1-03) once the flow exists in the ConcreatHub solution.
-  const flowId: string | undefined = import.meta.env.VITE_ACTIVATION_FLOW_ID
+export type ActivationStatus = 'ok' | 'needs_help' | 'already_active'
+const ACTIVATION_STATUSES: ActivationStatus[] = ['ok', 'needs_help', 'already_active']
+
+/** Posts one input to a Power Pages cloud flow and returns its reply's `status` (undefined if absent). */
+async function triggerFlow(flowId: string | undefined, input: Record<string, string>): Promise<string | undefined> {
   if (!flowId) throw new Error(ACTIVATION_SEND_FAILED)
   const response = await send(`/_api/cloudflow/v1.0/trigger/${flowId}`, {
     method: 'POST',
@@ -179,9 +173,31 @@ export async function requestActivation(email: string): Promise<void> {
     },
     credentials: 'same-origin',
     // The eventData key must equal the flow trigger input's title.
-    body: JSON.stringify({ eventData: JSON.stringify({ Email: email }) }),
+    body: JSON.stringify({ eventData: JSON.stringify(input) }),
   })
   if (!response.ok) throw new Error(ACTIVATION_SEND_FAILED)
+  const reply = (await response.json().catch(() => undefined)) as { status?: unknown } | undefined
+  return typeof reply?.status === 'string' ? reply.status : undefined
+}
+
+/**
+ * Triggers the "Request activation" cloud flow. Unknown emails get "ok" like a sent invitation, so the
+ * page can't be used to discover which emails belong to a customer (spec D "middle ground").
+ */
+export async function requestActivation(email: string): Promise<ActivationStatus> {
+  if (import.meta.env.DEV) {
+    await new Promise((resolve) => setTimeout(resolve, 600))
+    const address = email.trim().toLowerCase()
+    return address === 'multi@test.ph' ? 'needs_help' : address === 'active@test.ph' ? 'already_active' : 'ok'
+  }
+  const status = await triggerFlow(import.meta.env.VITE_ACTIVATION_FLOW_ID, { Email: email })
+  return ACTIVATION_STATUSES.includes(status as ActivationStatus) ? (status as ActivationStatus) : 'ok'
+}
+
+/** Asks the "Check activation link" flow whether an activation code can still be used. */
+export async function checkActivationLink(code: string): Promise<'valid' | 'invalid'> {
+  if (import.meta.env.DEV) return code === 'expired' ? 'invalid' : 'valid'
+  return (await triggerFlow(import.meta.env.VITE_CHECK_LINK_FLOW_ID, { Code: code })) === 'valid' ? 'valid' : 'invalid'
 }
 
 export function signOut(): void {

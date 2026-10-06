@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
+import { useQuery } from '@tanstack/react-query'
 import { Link, useSearchParams } from 'react-router-dom'
 import { z } from 'zod'
-import { InvalidInvitationError, redeemInvitation } from '@/auth/session'
+import { checkActivationLink, InvalidInvitationError, redeemInvitation } from '@/auth/session'
 import { cn } from '@/lib/utils'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { Button } from '@/ui/button'
@@ -36,13 +37,17 @@ export function SetPassword() {
   usePageTitle('Set your password')
   const [params] = useSearchParams()
   const code = params.get('code')
+  const linkEmail = params.get('email') ?? ''
+  // Opening a used, expired or cancelled link shows only the expired card (spec D). If the check itself
+  // fails, the form shows and Power Pages still rejects a used code on submit.
+  const link = useQuery({ queryKey: ['activation-link', code], queryFn: () => checkActivationLink(code!), enabled: !!code, retry: false })
   const [expired, setExpired] = useState(!code)
   const [serverError, setServerError] = useState<string>()
   const {
     register,
     handleSubmit,
     formState: { errors, isSubmitting },
-  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: '', password: '', confirm: '' } })
+  } = useForm<Values>({ resolver: zodResolver(schema), defaultValues: { email: linkEmail, password: '', confirm: '' } })
 
   const onSubmit = handleSubmit(async ({ email, password, confirm }) => {
     if (!code) return
@@ -55,7 +60,7 @@ export function SetPassword() {
     }
   })
 
-  if (expired) {
+  if (expired || link.data === 'invalid') {
     return (
       <AuthLayout>
         <AuthCardHeader title="This link has expired" />
@@ -70,6 +75,16 @@ export function SetPassword() {
     )
   }
 
+  if (link.isPending) {
+    return (
+      <AuthLayout>
+        <p role="status" className="text-center text-[13px] text-muted-foreground">
+          Checking your link…
+        </p>
+      </AuthLayout>
+    )
+  }
+
   return (
     <AuthLayout>
       <AuthCardHeader title="Set your password" sub="Create a password to finish activating your Concreat Connect account." />
@@ -79,7 +94,7 @@ export function SetPassword() {
             <FieldLabel htmlFor="setpw-email" className={labelClass}>
               Email address
             </FieldLabel>
-            <Input id="setpw-email" type="email" autoComplete="email" className={inputClass} aria-invalid={!!errors.email} {...register('email')} />
+            <Input id="setpw-email" type="email" autoComplete="email" readOnly={!!linkEmail} className={inputClass} aria-invalid={!!errors.email} {...register('email')} />
             <FieldDescription>The email address the activation link was sent to.</FieldDescription>
             <FieldError errors={[errors.email]} />
           </Field>

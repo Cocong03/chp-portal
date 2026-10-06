@@ -1,5 +1,6 @@
 import { go } from '@/lib/go'
 import {
+  checkActivationLink,
   getPortalUser,
   InvalidInvitationError,
   MOCK_SESSION_KEY,
@@ -34,6 +35,12 @@ describe('on the dev server (mock session)', () => {
 
   test('redeemInvitation with the "expired" code simulates a rejected link', async () => {
     await expect(redeemInvitation('expired', 'jd@x.ph', 'Abcdefg1', 'Abcdefg1')).rejects.toBeInstanceOf(InvalidInvitationError)
+  })
+
+  test('requestActivation simulates each outcome by email', async () => {
+    expect(await requestActivation('multi@test.ph')).toBe('needs_help')
+    expect(await requestActivation('active@test.ph')).toBe('already_active')
+    expect(await requestActivation('jd@x.ph')).toBe('ok')
   })
 })
 
@@ -132,14 +139,14 @@ describe('on the deployed site', () => {
     await expect(requestActivation('jd@x.ph')).rejects.toThrow("We couldn't send the activation email right now.")
   })
 
-  test('requestActivation posts the email to the flow trigger with CSRF headers', async () => {
+  test('requestActivation posts the email to the flow trigger with CSRF headers and returns its status', async () => {
     vi.stubEnv('VITE_ACTIVATION_FLOW_ID', 'flow-1')
     const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
-      url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response('{}'),
+      url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response('{"status":"already_active"}'),
     )
     vi.stubGlobal('fetch', fetchMock)
 
-    await requestActivation('jd@x.ph')
+    expect(await requestActivation('jd@x.ph')).toBe('already_active')
 
     const [url, init] = fetchMock.mock.calls[1]
     expect(url).toBe('/_api/cloudflow/v1.0/trigger/flow-1')
@@ -147,5 +154,28 @@ describe('on the deployed site', () => {
     const headers = new Headers(init!.headers)
     expect(headers.get('__RequestVerificationToken')).toBe('tok123')
     expect(headers.get('X-Requested-With')).toBe('XMLHttpRequest')
+  })
+
+  test.each([['{}'], ['{"status":"something-new"}'], ['not json']])('an unknown reply %s counts as ok', async (reply) => {
+    vi.stubEnv('VITE_ACTIVATION_FLOW_ID', 'flow-1')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response(reply))))
+    expect(await requestActivation('jd@x.ph')).toBe('ok')
+  })
+
+  test('checkActivationLink posts the code and returns valid or invalid', async () => {
+    vi.stubEnv('VITE_CHECK_LINK_FLOW_ID', 'flow-2')
+    const fetchMock = vi.fn(async (url: string, _init?: RequestInit) =>
+      url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response('{"status":"invalid"}'),
+    )
+    vi.stubGlobal('fetch', fetchMock)
+    expect(await checkActivationLink('abc')).toBe('invalid')
+    expect(fetchMock.mock.calls[1][0]).toBe('/_api/cloudflow/v1.0/trigger/flow-2')
+    expect(JSON.parse(fetchMock.mock.calls[1][1]!.body as string)).toEqual({ eventData: JSON.stringify({ Code: 'abc' }) })
+  })
+
+  test('checkActivationLink fails when the check flow is unavailable', async () => {
+    vi.stubEnv('VITE_CHECK_LINK_FLOW_ID', 'flow-2')
+    vi.stubGlobal('fetch', vi.fn(async (url: string) => (url === '/_layout/tokenhtml' ? new Response(TOKEN_PAGE) : new Response('', { status: 502 }))))
+    await expect(checkActivationLink('abc')).rejects.toThrow()
   })
 })
