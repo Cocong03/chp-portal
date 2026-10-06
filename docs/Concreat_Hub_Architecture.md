@@ -73,6 +73,8 @@ flowchart LR
 | **Power Automate** | Activation email, routing submissions to the service center/Credit, notifications | Sit on any synchronous read path (too slow; licensing per run) |
 | **Business Central** | Customers, ship-tos, items, prices, orders, blanket orders, ledger, documents/PDFs, credit, freight, trip IDs, statuses | — |
 
+**Exception to the Power Automate rule (2026-10-06):** the *Check activation link* flow answers the Set password page on load (valid | invalid). Server Logic would need anonymous read access to `adx_invitation`, which holds secret codes; the flow's one-bit answer about a 128-bit random code reveals nothing useful.
+
 ---
 
 ## 3. Identity, tenancy and account scoping
