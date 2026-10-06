@@ -45,10 +45,36 @@ test('resolves customers through business relations linked to Customer', () => {
   expect(text).toContain("concat('contactNo eq ''', replace(item(), '''', ''''''), '''')")
 })
 
-test('every Power Pages response returns status ok, and there is one per business outcome', () => {
-  const responses = actions.filter(([, a]) => a.type === 'Response' && a.kind === 'PowerPages')
-  expect(responses.length).toBeGreaterThanOrEqual(3)
-  for (const [, a] of responses) expect(a.inputs.body).toEqual({ status: 'ok' })
+test('each business outcome returns its status to Power Pages', () => {
+  const statusOf = (name: string) => actions.find(([n]) => n === name)![1].inputs.body
+  for (const name of ['Return_invalid_email', 'Return_no_match', 'Return_no_customer', 'Return_sent']) {
+    expect(statusOf(name), name).toEqual({ status: 'ok' })
+  }
+  for (const name of ['Return_several_customers', 'Return_several_contacts', 'Return_linked_elsewhere']) {
+    expect(statusOf(name), name).toEqual({ status: 'needs_help' })
+  }
+  expect(statusOf('Return_already_active')).toEqual({ status: 'already_active' })
+})
+
+test('a new request cancels the contact\'s earlier unused links before creating one that lasts 24 hours', () => {
+  const [, list] = actions.find(([n]) => n === 'List_open_invitations')!
+  expect(list.inputs.parameters.$filter).toBe(
+    "_adx_invitecontact_value eq @{variables('ContactId')} and statecode eq 0 and (adx_redemptions eq null or adx_redemptions eq 0)",
+  )
+  const [, cancel] = actions.find(([n]) => n === 'Cancel_invitation')!
+  expect(cancel.inputs.parameters).toMatchObject({ entityName: 'adx_invitations', 'item/statecode': 1, 'item/statuscode': 2 })
+  const [, code] = actions.find(([n]) => n === 'Invitation_code')!
+  expect(code.runAfter).toEqual({ Cancel_earlier_invitations: ['Succeeded'] })
+  const [, create] = actions.find(([n]) => n === 'Create_invitation')!
+  expect(create.runAfter).toEqual({ Invitation_code: ['Succeeded'] })
+  expect(create.inputs.parameters['item/adx_expirydate']).toBe('@{addHours(utcNow(), 24)}')
+})
+
+test('the email links to Set password with the code and the email, and says 24 hours', () => {
+  const [, mail] = actions.find(([n]) => n === 'Send_activation_email')!
+  const body = mail.inputs.parameters['emailMessage/Body']
+  expect(body).toContain("/activate/complete?code=@{outputs('Invitation_code')}&amp;email=@{encodeUriComponent(outputs('Email'))}")
+  expect(body).toContain('This link can be used once and expires in 24 hours.')
 })
 
 test('actions that handle the client secret or the token hide their inputs and outputs', () => {
@@ -60,7 +86,7 @@ test('actions that handle the client secret or the token hide their inputs and o
 })
 
 test('creates a single-use invitation linked to the site from the environment variable', () => {
-  const [, invite] = actions.find(([, a]) => a.inputs?.parameters?.entityName === 'adx_invitations')!
+  const [, invite] = actions.find(([name]) => name === 'Create_invitation')!
   expect(invite.inputs.parameters['item/adx_maximumredemptions']).toBe(1)
   expect(invite.inputs.parameters['item/mspp_websiteid@odata.bind']).toContain('chp_PowerPagesSiteId')
 })

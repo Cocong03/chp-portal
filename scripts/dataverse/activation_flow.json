@@ -519,7 +519,7 @@
           "inputs": {
             "statusCode": 200,
             "body": {
-              "status": "ok"
+              "status": "needs_help"
             },
             "schema": {
               "type": "object",
@@ -768,7 +768,7 @@
           "inputs": {
             "statusCode": 200,
             "body": {
-              "status": "ok"
+              "status": "needs_help"
             },
             "schema": {
               "type": "object",
@@ -847,7 +847,7 @@
               "inputs": {
                 "statusCode": 200,
                 "body": {
-                  "status": "ok"
+                  "status": "needs_help"
                 },
                 "schema": {
                   "type": "object",
@@ -1134,7 +1134,7 @@
           "inputs": {
             "statusCode": 200,
             "body": {
-              "status": "ok"
+              "status": "already_active"
             },
             "schema": {
               "type": "object",
@@ -1167,11 +1167,61 @@
         ]
       }
     },
+    "List_open_invitations": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Already_activated": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "adx_invitations",
+          "$select": "adx_invitationid",
+          "$filter": "_adx_invitecontact_value eq @{variables('ContactId')} and statecode eq 0 and (adx_redemptions eq null or adx_redemptions eq 0)"
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Cancel_earlier_invitations": {
+      "type": "Foreach",
+      "runAfter": {
+        "List_open_invitations": [
+          "Succeeded"
+        ]
+      },
+      "foreach": "@outputs('List_open_invitations')?['body/value']",
+      "actions": {
+        "Cancel_invitation": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "adx_invitations",
+              "recordId": "@items('Cancel_earlier_invitations')?['adx_invitationid']",
+              "item/statecode": 1,
+              "item/statuscode": 2
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    },
     "Invitation_code": {
       "type": "Compose",
       "inputs": "@replace(guid(), '-', '')",
       "runAfter": {
-        "Already_activated": [
+        "Cancel_earlier_invitations": [
           "Succeeded"
         ]
       }
@@ -1190,7 +1240,7 @@
           "item/adx_type": 756150000,
           "item/adx_invitationcode": "@{outputs('Invitation_code')}",
           "item/adx_maximumredemptions": 1,
-          "item/adx_expirydate": "@{addDays(utcNow(), 7)}",
+          "item/adx_expirydate": "@{addHours(utcNow(), 24)}",
           "item/adx_inviteContact@odata.bind": "/contacts(@{variables('ContactId')})",
           "item/mspp_websiteid@odata.bind": "/powerpagesites(@{parameters('Power Pages Site ID (chp_PowerPagesSiteId)')})"
         },
@@ -1213,7 +1263,7 @@
         "parameters": {
           "emailMessage/To": "@{outputs('Email')}",
           "emailMessage/Subject": "Activate your Concreat Connect account",
-          "emailMessage/Body": "<p>Hello @{variables('ContactName')},</p><p>Use the link below to set your password and finish activating your Concreat Connect account.</p><p><a href=\"@{parameters('Site URL (chp_SiteUrl)')}/activate/complete?code=@{outputs('Invitation_code')}\" style=\"display:inline-block;padding:10px 18px;background:#1d2b5f;color:#ffffff;text-decoration:none;border-radius:6px\">Activate your account</a></p><p>This link can be used once and expires in 7 days.</p><p>If you didn't ask for this, you can ignore this email.</p><p>Need assistance? Contact Concreat Customer Service Center at (02) 8849-3600.</p>",
+          "emailMessage/Body": "<p>Hello @{variables('ContactName')},</p><p>Use the link below to set your password and finish activating your Concreat Connect account.</p><p><a href=\"@{parameters('Site URL (chp_SiteUrl)')}/activate/complete?code=@{outputs('Invitation_code')}&amp;email=@{encodeUriComponent(outputs('Email'))}\" style=\"display:inline-block;padding:10px 18px;background:#1d2b5f;color:#ffffff;text-decoration:none;border-radius:6px\">Activate your account</a></p><p>This link can be used once and expires in 24 hours.</p><p>If you didn't ask for this, you can ignore this email.</p><p>Need assistance? Contact Concreat Customer Service Center at (02) 8849-3600.</p>",
           "emailMessage/Importance": "Normal"
         },
         "authentication": "@parameters('$authentication')"
