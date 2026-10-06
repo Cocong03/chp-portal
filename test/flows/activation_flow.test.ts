@@ -29,6 +29,15 @@ test('matches BC contacts by lower-cased email, with quotes doubled', () => {
   expect(text).toContain("replace(outputs('Email'), '''', '''''')")
 })
 
+// Decided 2026-10-06: BC's customerPortalAccess flag decides who may activate, and only those contacts count
+// towards the Q10 several-customers rule (customers come only from the filtered contacts' companies).
+test('only BC contacts with customer portal access can activate or count towards Q10', () => {
+  const [, contacts] = actions.find(([name]) => name === 'Get_BC_contacts')!
+  expect(contacts.inputs.queries.$filter).toBe("tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true")
+  const [, companies] = actions.find(([name]) => name === 'Company_no_list')!
+  expect(companies.inputs.from).toBe("@body('Get_BC_contacts')?['value']")
+})
+
 test('resolves customers through business relations linked to Customer', () => {
   expect(text).toContain('mcrmBusinessRelation')
   expect(text).toContain("linktoTable eq 'Customer'")

@@ -283,8 +283,8 @@
           "Accept": "application/json"
         },
         "queries": {
-          "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}'",
-          "$select": "no,type,companyNo,name",
+          "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true",
+          "$select": "no,type,companyNo,name,customerPortalAccess",
           "$top": "20"
         }
       },

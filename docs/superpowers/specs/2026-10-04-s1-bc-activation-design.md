@@ -123,7 +123,7 @@ HttpClient and connector results can arrive as JSON strings or `{ StatusCode, Bo
 1. `email` = the trigger's **Email** input, trimmed and lower-cased. If it contains no `@` or a space → return OK.
 2. Read the environment variables (tenant, environment, base path, Solid Cement company ID, client ID, client secret, site URL, site ID, sender). The client-secret and token steps use **secure inputs/outputs**.
 3. **Token:** HTTP POST to `login.microsoftonline.com/{tenant}/oauth2/v2.0/token`, form-encoded client credentials.
-4. **Contacts:** GET `MCRMContacts` with `$filter=tolower(eMail) eq '<email, ' doubled>'`, `$select=no,type,companyNo,name`, `$top=20`, with the query encoded properly.
+4. **Contacts:** GET `MCRMContacts` with `$filter=tolower(eMail) eq '<email, ' doubled>' and customerPortalAccess eq true`, `$select=no,type,companyNo,name,customerPortalAccess`, `$top=20`, with the query encoded properly. **Decided 2026-10-06:** only BC contacts with `customerPortalAccess = true` can activate, and only they count towards the Q10 rule; a matching contact with the flag off gets the same neutral OK and no invitation.
 5. **Customers:** for each distinct `companyNo`, GET `mcrmBusinessRelation` with `$filter=contactNo eq '<companyNo>' and linktoTable eq 'Customer'`, `$select=vendorNo`. Collect the distinct `vendorNo` values.
 6. **Branch on the number of distinct customers:**
    - **0** → return OK.
