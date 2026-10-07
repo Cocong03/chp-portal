@@ -104,7 +104,7 @@ docs/               architecture, plan, registration docs
 - Customer-facing copy uses the wireframe's wording exactly (renames per the packages, e.g. "+ New Multiple Order", "Account and User Management"). Never show BC jargon (location codes, table names) or the name of CHP's internal service-center system.
 - Every page sets `document.title` as `"<Page> — Concreat Connect"`.
 - Publisher **Concreat Holdings**, prefix `chp_` (option-value prefix 77500), solution **`ConcreatHub`**. Create every Dataverse component in that solution.
-- Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCSolidCementCompanyId`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`, `chp_PowerPagesSiteId`, `chp_BCClientId`, `chp_BCClientSecret` (see the Dev exception above). Server Logic reads the BC ones through the `BC/*` site settings.
+- Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCSolidCementCompanyId`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`, `chp_PowerPagesSiteId`, `chp_BCClientId`, `chp_BCClientSecret` (see the Dev exception above), `chp_EmailLogoUrl` (public PNG for emails; mail clients can't read the private portal). Server Logic reads the BC ones through the `BC/*` site settings.
 
 ## Environments
 

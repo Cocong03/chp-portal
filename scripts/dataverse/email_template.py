@@ -3,8 +3,9 @@
 Usage (from the repo root): python scripts/dataverse/email_template.py
 Then deploy: python scripts/dataverse/portal_flows.py
 
-Email-safe HTML: tables + inline styles (Outlook, Gmail, mobile). The logo is a PNG served by the portal at
-{chp_SiteUrl}/concreat-logo-email.png; while the site is private, clients show the alt text "CONCREAT" instead.
+Email-safe HTML: tables + inline styles (Outlook, Gmail, mobile). The logo comes from the env var chp_EmailLogoUrl:
+email clients fetch it anonymously, so it must be a public HTTPS PNG/JPG even while the portal is private
+(Dev: a public image host; at go-live it can be {chp_SiteUrl}/concreat-logo-email.png). Alt text "CONCREAT" if it fails.
 """
 import io
 import json
@@ -12,6 +13,8 @@ import os
 
 HERE = os.path.dirname(__file__)
 SITE = "@{parameters('Site URL (chp_SiteUrl)')}"
+LOGO_PARAM = 'Email Logo URL (chp_EmailLogoUrl)'
+LOGO = f"@{{parameters('{LOGO_PARAM}')}}"
 NAVY, INK, TEXT, MUTED, LINK = '#1b2e63', '#0c1633', '#2b3445', '#6b7385', '#2560a8'
 
 
@@ -27,7 +30,7 @@ def render(heading, name, intro, button, link, expiry):
         # Header: white so the black wordmark stays readable; navy accent stripe below.
         '<tr><td style="padding:22px 32px 18px">'
         '<table role="presentation" cellpadding="0" cellspacing="0"><tr>'
-        f'<td style="vertical-align:middle;padding-right:14px"><img src="{SITE}/concreat-logo-email.png" width="66" height="48" '
+        f'<td style="vertical-align:middle;padding-right:14px"><img src="{LOGO}" width="66" height="48" '
         f'alt="CONCREAT" style="display:block;border:0;width:66px;height:48px;font:700 18px Arial,sans-serif;'
         f'letter-spacing:2px;color:{NAVY}"></td>'
         f'<td style="vertical-align:middle;padding-left:14px;border-left:1px solid #e3e7ef">'
@@ -99,6 +102,8 @@ if __name__ == '__main__':
         path = os.path.join(HERE, file)
         definition = json.load(open(path, encoding='utf-8'))
         find(definition['actions'], action)['inputs']['parameters']['emailMessage/Body'] = html
+        definition['parameters'][LOGO_PARAM] = {'defaultValue': '', 'type': 'String',
+                                                'metadata': {'schemaName': 'chp_EmailLogoUrl', 'description': 'Email Logo URL'}}
         with io.open(path, 'w', encoding='utf-8', newline='\n') as f:
             json.dump(definition, f, indent=2, ensure_ascii=False)
             f.write('\n')

@@ -96,7 +96,7 @@ test('reads every environment-specific value from a ConcreatHub environment vari
     .map((p) => (p as Action).metadata?.schemaName)
     .filter(Boolean)
   expect(schemaNames.sort()).toEqual(
-    ['chp_BCApiBasePath', 'chp_BCClientId', 'chp_BCClientSecret', 'chp_BCEnvironmentName', 'chp_BCSolidCementCompanyId', 'chp_BCTenantId', 'chp_PowerPagesSiteId', 'chp_SenderMailbox', 'chp_SiteUrl'],
+    ['chp_BCApiBasePath', 'chp_BCClientId', 'chp_BCClientSecret', 'chp_BCEnvironmentName', 'chp_BCSolidCementCompanyId', 'chp_BCTenantId', 'chp_EmailLogoUrl', 'chp_PowerPagesSiteId', 'chp_SenderMailbox', 'chp_SiteUrl'],
   )
   for (const p of Object.values(definition.parameters) as Action[]) if (p.metadata?.schemaName) expect(p.defaultValue).toBe('')
   expect(text).not.toMatch(/f44e98b4|d2e4496e|188fc244|chp-portal-dev|automations365/)

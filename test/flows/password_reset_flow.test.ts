@@ -36,8 +36,8 @@ test('cancels the Dataverse email so nothing sends it again', () => {
   expect(action('Cancel_dataverse_email').inputs.parameters).toMatchObject({ entityName: 'emails', 'item/statecode': 2, 'item/statuscode': 5 })
 })
 
-test('reads the site URL from its environment variable', () => {
-  expect(Object.values(definition.parameters).map((p) => (p as Action).metadata?.schemaName).filter(Boolean)).toEqual(['chp_SiteUrl'])
+test('reads the site URL and logo URL from their environment variables', () => {
+  expect(Object.values(definition.parameters).map((p) => (p as Action).metadata?.schemaName).filter(Boolean).sort()).toEqual(['chp_EmailLogoUrl', 'chp_SiteUrl'])
   expect(text).not.toMatch(/f44e98b4|chp-portal-dev|automations365/)
 })
 

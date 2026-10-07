@@ -14,12 +14,14 @@ const body = (file: string, action: string) => {
 const activation = body('activation_flow.json', 'Send_activation_email')
 const reset = body('password_reset_flow.json', 'Send_reset_email')
 const SITE = "@{parameters('Site URL (chp_SiteUrl)')}"
+// The logo must be public even while the site is private (email clients fetch it anonymously): its own env var.
+const LOGO = "@{parameters('Email Logo URL (chp_EmailLogoUrl)')}"
 
 test.each([
   ['activation', activation, 'Activate your account', 'This link can be used once and expires in 24 hours.'],
   ['reset', reset, 'Reset your password', 'This link expires in 1 hour.'],
 ])('the %s email uses the branded layout', (_name, html, heading, expiry) => {
-  expect(html).toContain(`<img src="${SITE}/concreat-logo-email.png"`)
+  expect(html).toContain(`<img src="${LOGO}"`)
   expect(html).toContain('alt="CONCREAT"')
   expect(html).toContain('Concreat Connect')
   expect(html).toContain(`>${heading}</h1>`)

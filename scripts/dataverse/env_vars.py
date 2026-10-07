@@ -25,12 +25,15 @@ VALUES = {
     'chp_BCSolidCementCompanyId': 'd2e4496e-be79-f111-8070-6045bd2058e3',
     'chp_SenderMailbox': args.sender,
     'chp_PowerPagesSiteId': 'f44e98b4-3da3-4f8d-8f79-fbb244454741',
+    # Public PNG for emails (the private portal can't serve it to mail clients). Dev: public image host (2026-10-07).
+    'chp_EmailLogoUrl': 'https://i.ibb.co/hFmK4Hd3/concreat-logo-email.png',
 }
 # New definitions: (schema name, display name). Values: only chp_PowerPagesSiteId above; the two BC ones by hand.
 NEW = [
     ('chp_BCClientId', 'BC Client ID'),
     ('chp_BCClientSecret', 'BC Client Secret (Dev: plain text, no default; Key Vault before UAT, S1-14)'),
     ('chp_PowerPagesSiteId', 'Power Pages Site ID'),
+    ('chp_EmailLogoUrl', 'Email Logo URL'),
 ]
 
 
