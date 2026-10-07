@@ -170,6 +170,21 @@ async function bcPost(scope, entity, body) {
     );
 }
 
+// Error text that is safe to log: platform messages can echo a request, so remove secrets and tokens.
+// Patterns are RegExp strings: quotes inside regex literals break the plugin validator's brace scan.
+function safeDetail(err) {
+    var detail = String((err && err.message) || err);
+    [
+        ["client_secret=[^&\\s\"']*", "client_secret=[removed]"],
+        ["client_secret\"\\s*:\\s*\"[^\"]*\"", "client_secret\": \"[removed]\""],
+        ["Bearer\\s+[^\\s\"']+", "Bearer [removed]"],
+        ["access_token[\"':=\\s]+[^\\s\"',}]+", "access_token=[removed]"]
+    ].forEach((rule) => {
+        detail = detail.replace(new RegExp(rule[0], "gi"), rule[1]);
+    });
+    return detail;
+}
+
 // Runs the endpoint body; customers only ever see a safe message, the detail goes to the log.
 async function respond(work) {
     try {
@@ -180,18 +195,7 @@ async function respond(work) {
             Server.Logger.Warn(Server.Context.ServerLogicName + " " + err.message);
             return JSON.stringify({ blocked: true });
         }
-        // Platform messages can echo a request; never let a secret or token reach the log.
-        // Patterns are RegExp strings: quotes inside regex literals break the plugin validator's brace scan.
-        var detail = String(err.message);
-        [
-            ["client_secret=[^&\\s\"']*", "client_secret=[removed]"],
-            ["client_secret\"\\s*:\\s*\"[^\"]*\"", "client_secret\": \"[removed]\""],
-            ["Bearer\\s+[^\\s\"']+", "Bearer [removed]"],
-            ["access_token[\"':=\\s]+[^\\s\"',}]+", "access_token=[removed]"]
-        ].forEach((rule) => {
-            detail = detail.replace(new RegExp(rule[0], "gi"), rule[1]);
-        });
-        Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + detail);
+        Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + safeDetail(err));
         throw new Error("We couldn't load this information. Please try again.");
     }
 }

@@ -24,17 +24,20 @@ function fakeServer({
   portalContacts = [{ companyNo: 'CT1' }] as unknown[],
   relations = [{ vendorNo: '10482' }] as unknown[],
   bcDown = false,
+  bcFailure = undefined as unknown,
 } = {}) {
   const calls: unknown[][] = []
   const http: string[] = []
+  const errors: string[] = []
   return {
     calls,
     http,
+    errors,
     server: {
       User: user,
       Context: { ServerLogicName: 'me' },
       SiteSetting: { Get: (name: string) => SETTINGS[name] },
-      Logger: { Log() {}, Error() {}, Warn() {} },
+      Logger: { Log() {}, Error: (m: string) => errors.push(m), Warn() {} },
       Connector: {
         Dataverse: {
           RetrieveRecord: (...args: unknown[]) => {
@@ -46,6 +49,7 @@ function fakeServer({
           PostAsync: async () => ok({ access_token: 'tok' }),
           GetAsync: async (url: string) => {
             http.push(url)
+            if (bcFailure) return JSON.stringify(bcFailure)
             if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, Body: '' })
             return ok({ value: url.includes('/MCRMContacts') ? portalContacts : relations })
           },
@@ -157,4 +161,19 @@ test('a role read answered with only StatusCode 403 uses the fallback', async ()
 test('uses no patterns the Power Pages validator rejects', () => {
   const banned = [/\brequire\(/, /\bimport\b/, /\beval\(/, /setTimeout/, /\bdelete\b/, /prototype/, /Reflect\./, /console\.log/, /with\(/, /Function\s*\(/i]
   for (const pattern of banned) expect(source).not.toMatch(pattern)
+})
+
+// Full-branch review: me logged err.message raw; a platform error can echo the request (secret, token).
+test('a failure logs no client secret or token', async () => {
+  const { server, errors } = fakeServer({
+    record: contact(ACCOUNT),
+    bcFailure: {
+      StatusCode: 0, IsSuccessStatusCode: false, ServerError: true,
+      ServerErrorMessage: 'echo client_secret=s%26x {"client_secret": "secret"} Authorization: Bearer abc.def.ghi',
+    },
+  })
+  await expect(load(server).get()).rejects.toThrow(SAFE)
+  expect(errors).toHaveLength(1)
+  expect(errors[0]).toContain('me GET failed')
+  expect(errors[0]).not.toMatch(/s%26x|"secret"|abc\.def\.ghi/)
 })

@@ -178,6 +178,21 @@ async function get() {
         );
     }
 
+    // Error text that is safe to log: platform messages can echo a request, so remove secrets and tokens.
+    // Patterns are RegExp strings: quotes inside regex literals break the plugin validator's brace scan.
+    function safeDetail(err) {
+        var detail = String((err && err.message) || err);
+        [
+            ["client_secret=[^&\\s\"']*", "client_secret=[removed]"],
+            ["client_secret\"\\s*:\\s*\"[^\"]*\"", "client_secret\": \"[removed]\""],
+            ["Bearer\\s+[^\\s\"']+", "Bearer [removed]"],
+            ["access_token[\"':=\\s]+[^\\s\"',}]+", "access_token=[removed]"]
+        ].forEach((rule) => {
+            detail = detail.replace(new RegExp(rule[0], "gi"), rule[1]);
+        });
+        return detail;
+    }
+
     // Runs the endpoint body; customers only ever see a safe message, the detail goes to the log.
     async function respond(work) {
         try {
@@ -188,18 +203,7 @@ async function get() {
                 Server.Logger.Warn(Server.Context.ServerLogicName + " " + err.message);
                 return JSON.stringify({ blocked: true });
             }
-            // Platform messages can echo a request; never let a secret or token reach the log.
-            // Patterns are RegExp strings: quotes inside regex literals break the plugin validator's brace scan.
-            var detail = String(err.message);
-            [
-                ["client_secret=[^&\\s\"']*", "client_secret=[removed]"],
-                ["client_secret\"\\s*:\\s*\"[^\"]*\"", "client_secret\": \"[removed]\""],
-                ["Bearer\\s+[^\\s\"']+", "Bearer [removed]"],
-                ["access_token[\"':=\\s]+[^\\s\"',}]+", "access_token=[removed]"]
-            ].forEach((rule) => {
-                detail = detail.replace(new RegExp(rule[0], "gi"), rule[1]);
-            });
-            Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + detail);
+            Server.Logger.Error(Server.Context.ServerLogicName + " failed: " + safeDetail(err));
             throw new Error("We couldn't load this information. Please try again.");
         }
     }
@@ -267,7 +271,7 @@ async function get() {
             );
             roles = roleNames(withRoles.powerpagecomponent_mspp_webrole_contact || []);
         } catch (roleErr) {
-            Server.Logger.Warn("me: web role read failed, using Server.User.Roles: " + roleErr.message);
+            Server.Logger.Warn("me: web role read failed, using Server.User.Roles: " + safeDetail(roleErr));
             roles = roleNames(user.Roles);
         }
 
@@ -279,7 +283,7 @@ async function get() {
             roles: roles
         });
     } catch (err) {
-        Server.Logger.Error("me GET failed: " + err.message);
+        Server.Logger.Error("me GET failed: " + safeDetail(err));
         // Customers see this text; internal details stay in the log.
         throw new Error("We couldn't load your account details.");
     }
