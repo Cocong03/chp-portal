@@ -18,6 +18,7 @@ Make activation and sign-in tell customers what is going on, without letting a s
 | 6 | "Already activated" message | Flow returns `already_active`; page offers Sign in / Reset password |
 | 7 | Block sign-in when BC `customerPortalAccess = false` | Live BC check on every request in `sessionScope` and `me` (option A); full-page "access turned off" card |
 | — | Activation link lifetime | **24 hours** (was 7 days) |
+| — | Email later added to a second customer (decided 2026-10-07) | **Sign-in stays allowed** for the customer the user was activated for (the access check only needs a portal-enabled contact linked to *their* customer). Q10 applies at activation only: a new activation request shows `needs_help` and notifies ops. The Phase 2 account switcher covers one login across several customers |
 | — | Account enumeration ("middle ground") | Specific messages for several-customers, already-active and blocked; an email on **no** portal-enabled BC contact keeps the neutral "Check your email", so the page can't tell a stranger whether an address is a customer |
 
 ## 1. Activation (items 1, 2, 3, 6)
