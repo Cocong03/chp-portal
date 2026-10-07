@@ -1204,16 +1204,76 @@
         },
         "parameters": {
           "entityName": "adx_invitations",
-          "$select": "adx_invitationid",
+          "$select": "adx_invitationid,createdon",
           "$filter": "_adx_invitecontact_value eq @{variables('ContactId')} and statecode eq 0 and (adx_redemptions eq null or adx_redemptions eq 0)"
         },
         "authentication": "@parameters('$authentication')"
       }
     },
+    "Recent_invitations": {
+      "type": "Query",
+      "runAfter": {
+        "List_open_invitations": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "from": "@outputs('List_open_invitations')?['body/value']",
+        "where": "@greater(ticks(item()?['createdon']), ticks(addMinutes(utcNow(), -10)))"
+      }
+    },
+    "Cooldown": {
+      "type": "If",
+      "runAfter": {
+        "Recent_invitations": [
+          "Succeeded"
+        ]
+      },
+      "expression": {
+        "equals": [
+          "@greater(length(body('Recent_invitations')), 0)",
+          true
+        ]
+      },
+      "actions": {
+        "Return_cooldown": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "runAfter": {},
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "ok"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          }
+        },
+        "Stop_cooldown": {
+          "type": "Terminate",
+          "runAfter": {
+            "Return_cooldown": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "runStatus": "Succeeded"
+          }
+        }
+      }
+    },
     "Cancel_earlier_invitations": {
       "type": "Foreach",
       "runAfter": {
-        "List_open_invitations": [
+        "Cooldown": [
           "Succeeded"
         ]
       },

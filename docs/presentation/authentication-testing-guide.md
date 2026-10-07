@@ -89,7 +89,7 @@ Open `/activate`, enter an email, and click **Send activation link**.
 
 | # | Steps | Expected |
 |---|---|---|
-| 4.1 | Request activation **twice**, a minute apart | Two activation emails arrive |
+| 4.1 | Request activation, wait **more than 10 minutes**, then request again | Two activation emails arrive. A second request **within 10 minutes** sends nothing new (spam cooldown; the page still says "Check your email") |
 | 4.2 | Open the **older** email's link | "Checking your link…", then **This link has expired**: "This activation link is invalid, has already been used, or has expired." **No password form** |
 | 4.3 | Open the **newer** email's link | **Set your password**, with the **email pre-filled and read-only** |
 | 4.4 | Try a weak password (e.g. `Ab1!`) | **Use at least 8 characters.** |

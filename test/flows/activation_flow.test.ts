@@ -112,3 +112,18 @@ test('marks the contact email confirmed for new and existing contacts', () => {
     entityName: 'contacts', recordId: "@variables('ContactId')", 'item/adx_identity_emailaddress1confirmed': true,
   })
 })
+
+// Full-branch review 2026-10-07: anonymous requests could flood a customer's inbox and keep cancelling their link.
+// Cooldown: an unused invitation newer than 10 minutes means no new email; the page still says "Check your email".
+test('an unused invitation from the last 10 minutes ends the run with ok and sends nothing new', () => {
+  const [, list] = actions.find(([n]) => n === 'List_open_invitations')!
+  expect(list.inputs.parameters.$select).toBe('adx_invitationid,createdon')
+  const [, recent] = actions.find(([n]) => n === 'Recent_invitations')!
+  expect(recent.inputs.where).toBe("@greater(ticks(item()?['createdon']), ticks(addMinutes(utcNow(), -10)))")
+  const [, cooldown] = actions.find(([n]) => n === 'Cooldown')!
+  expect(cooldown.runAfter).toEqual({ Recent_invitations: ['Succeeded'] })
+  expect(cooldown.actions.Return_cooldown.inputs.body).toEqual({ status: 'ok' })
+  expect(cooldown.actions.Stop_cooldown).toMatchObject({ type: 'Terminate', inputs: { runStatus: 'Succeeded' } })
+  const [, cancel] = actions.find(([n]) => n === 'Cancel_earlier_invitations')!
+  expect(cancel.runAfter).toEqual({ Cooldown: ['Succeeded'] })
+})
