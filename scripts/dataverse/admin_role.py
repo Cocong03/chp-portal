@@ -8,12 +8,13 @@ ROLE = 'Concreat Connect Admin'
 # (privilege name, depth). Global = organization level.
 PRIVILEGES = [
     ('prvCreatechp_accessgrant', 'Global'), ('prvReadchp_accessgrant', 'Global'),
-    ('prvWritechp_accessgrant', 'Global'), ('prvDeletechp_accessgrant', 'Global'),
+    ('prvWritechp_accessgrant', 'Global'),
     ('prvAppendchp_accessgrant', 'Global'), ('prvAppendTochp_accessgrant', 'Global'),
     ('prvReadContact', 'Global'), ('prvAppendToContact', 'Global'),
     ('prvCreatechp_announcement', 'Global'), ('prvReadchp_announcement', 'Global'),
     ('prvWritechp_announcement', 'Global'), ('prvDeletechp_announcement', 'Global'),
 ]
+REMOVED_PRIVILEGES = ['prvDeletechp_accessgrant']
 
 dv = Dataverse()
 root_bu = dv.get('businessunits?$select=businessunitid&$filter=_parentbusinessunitid_value eq null')['value'][0]['businessunitid']
@@ -35,6 +36,17 @@ for name, depth in PRIVILEGES:
     privs.append({'PrivilegeId': found[0]['privilegeid'], 'BusinessUnitId': root_bu, 'Depth': depth})
 dv.post(f'roles({role_id})/Microsoft.Dynamics.CRM.AddPrivilegesRole', {'Privileges': privs})
 print(f'= {len(privs)} privileges set')
+
+# Grants are the source of truth for portal roles: ops deactivate a grant to revoke access, never delete it
+# (a deleted grant can't tell the flow whose roles to remove). Decided 2026-10-08.
+for name in REMOVED_PRIVILEGES:
+    found = dv.get(f"privileges?$select=privilegeid&$filter=name eq '{name}'")['value']
+    held = dv.get(f"roles({role_id})/roleprivileges_association?$select=name&$filter=name eq '{name}'")['value']
+    if found and held:
+        dv.post(f'roles({role_id})/Microsoft.Dynamics.CRM.RemovePrivilegeRole', {'Privilege': {'@odata.type': 'Microsoft.Dynamics.CRM.privilege', 'privilegeid': found[0]['privilegeid']}})
+        print(f'- {name} removed')
+    else:
+        print(f'= {name} not held')
 
 dv.post('AddSolutionComponent', {'ComponentId': role_id, 'ComponentType': 20, 'SolutionUniqueName': SOLUTION,
                                  'AddRequiredComponents': False, 'DoNotIncludeSubcomponents': False})

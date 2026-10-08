@@ -11,33 +11,38 @@ Who can sign in to Concreat Connect, and what they see, is managed in Dataverse 
 | Finance & Documents | Dashboard, Customer Ledger, Document Center, Account and User Management |
 | View Only | Dashboard, Account and User Management |
 
-Activating a portal account gives **no** role (decision D4 default). Until a role is given, the contact sees "Your portal access is being set up".
+Activating a portal account gives **no** role unless an access grant exists for that email and customer (decision D4 default). Until a role is given, the contact sees "Your portal access is being set up".
 
-## Give or change a role for someone who has activated
+## Give, change or remove a role — only in Concreat Connect Admin
 
-1. Open **Portal Management** → **Contacts** → find the person by email.
-2. **Related** → **Web Roles** → **Add Existing Web Role** → pick one of the four roles above → **Add**.
-3. To change a role, remove the old role from the same list.
-4. The change applies on the person's next page load.
+The **access grant is the source of truth** for each person's portal role (decided 2026-10-08). Don't add or remove web roles in Portal Management: the next change to the grant overwrites them.
 
-## Pre-grant a role (before or after the person activates)
+**Give a role** (before or after the person activates)
 
-1. Open **Concreat Connect Admin** → **Access grants** → **New**.
+1. Open **Concreat Connect Admin** → **Access Grants** → **New**.
 2. Enter the **email**, the BC **customer no.** and the **role**, then **Save**.
-3. Status:
-   - **Applied** — the person already had a portal account on that customer; the role is now theirs.
-   - **Pending** — no portal account with that email yet; it is applied when they activate.
-   - **Customer mismatch** — a portal account with that email exists on a different customer. Nothing was granted; check the email and customer no.
-   - **Duplicate email** — two contacts share the email; they can't sign in until one is fixed. Ask the portal team.
+
+**Change a role:** open the grant, pick the new **Role**, **Save**. The old role is removed and the new one applied.
+
+**Remove access** (for example, someone left the company): open the grant and click **Deactivate**. All their portal roles are removed and Status becomes **Revoked**. They can still sign in but see "Your portal access is being set up". To restore access, open the grant from the **Inactive Access Grants** view and click **Activate**.
+
+Grants can't be deleted (a deleted grant can't tell the portal whose role to remove). Deactivate instead; the grant stays as a record of who had access.
+
+Changes apply within about a minute, on the person's next page load.
+
+**Status**
+
+- **Applied:** the person has a portal account on that customer and now has exactly this role.
+- **Pending:** no portal account with that email yet; the role is applied when they activate.
+- **Revoked:** the grant was deactivated; the person has no portal role.
+- **Customer mismatch:** a portal account with that email exists on a different customer. Nothing was changed; check the email and customer no.
+- **Duplicate email:** two contacts share the email; they can't sign in until one is fixed. Ask the portal team.
+
+To stop someone signing in at all, deactivate their **Contact** as well (Portal Management, portal team).
 
 ## Who can use Concreat Connect Admin
 
 CHP IT gives the staff member the **Basic User** and **Concreat Connect Admin** security roles and a Power Apps license.
-
-## Remove access
-
-- Remove the web role (as above), or **deactivate** the Contact to stop sign-in entirely.
-- Deleting an access grant does **not** remove a role that was already applied.
 
 ## Dashboard announcement
 

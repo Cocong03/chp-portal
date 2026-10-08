@@ -78,7 +78,7 @@ Examples:
 
 ## Web roles
 
-`Full Access` · `Orders & Delivery` · `Finance & Documents` · `View Only`. The page matrix is in Architecture §4. Activation does not grant a business role (decision D4 pending); CHP ops assigns roles in Portal Management.
+`Full Access` · `Orders & Delivery` · `Finance & Documents` · `View Only`. The page matrix is in Architecture §4. Activation does not grant a business role (decision D4 pending). **Access grants in Concreat Connect Admin are the source of truth for roles** (decided 2026-10-08): a grant adds or replaces the contact's business role, Deactivate revokes, Activate restores; grants can't be deleted. Don't assign roles in Portal Management.
 
 ## Repository conventions
 

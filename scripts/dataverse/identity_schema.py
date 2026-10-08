@@ -65,6 +65,18 @@ def ensure_lookup(referencing, lookup_schema, display, referenced, relationship,
     print(f'  + lookup {referencing}.{lookup_schema.lower()} ({relationship})')
 
 
+def ensure_option(table, column, value, text):
+    """Adds an option to an existing local choice column (ensure_attribute skips columns that already exist)."""
+    attr = dv.get(f"EntityDefinitions(LogicalName='{table}')/Attributes(LogicalName='{column}')"
+                  "/Microsoft.Dynamics.CRM.PicklistAttributeMetadata?$select=LogicalName&$expand=OptionSet($select=Options)")
+    if any(o['Value'] == value for o in attr['OptionSet']['Options']):
+        print(f'  = {table}.{column} option {value} exists')
+        return
+    dv.post('InsertOptionValue', {'EntityLogicalName': table, 'AttributeLogicalName': column, 'Value': value,
+                                  'Label': label(text), 'SolutionUniqueName': 'ConcreatHub'})
+    print(f'  + {table}.{column} option {value} {text}')
+
+
 def ensure_key(table, schema, display, columns):
     existing = dv.get(f"EntityDefinitions(LogicalName='{table}')/Keys?$select=SchemaName")
     if any(k['SchemaName'].lower() == schema.lower() for k in existing['value']):
@@ -100,7 +112,9 @@ def main():
         (775000002, 'Finance & Documents'), (775000003, 'View Only')], is_required=True))
     ensure_attribute('chp_accessgrant', choice('chp_Status', 'Status', [
         (775000000, 'Pending'), (775000001, 'Applied'),
-        (775000002, 'Customer mismatch'), (775000003, 'Duplicate email')], default=775000000))
+        (775000002, 'Customer mismatch'), (775000003, 'Duplicate email'), (775000004, 'Revoked')], default=775000000))
+    # Deactivating a grant revokes its role (decided 2026-10-08); existing environments get the option here.
+    ensure_option('chp_accessgrant', 'chp_status', 775000004, 'Revoked')
     ensure_attribute('chp_accessgrant', {
         '@odata.type': 'Microsoft.Dynamics.CRM.DateTimeAttributeMetadata', 'SchemaName': 'chp_AppliedOn',
         'DisplayName': label('Applied on'), 'RequiredLevel': required(False), 'Format': 'DateAndTime'})
