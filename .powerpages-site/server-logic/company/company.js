@@ -1,5 +1,5 @@
-// Server Logic: company (S1-06 proof of the BC helpers; extended by S2-19)
-// Purpose: the signed-in contact's own BC customer card.
+// Server Logic: company (S1-06; contacts S2-19)
+// Purpose: the signed-in contact's own BC customer card and its contacts with portal access.
 // API URL: https://<site>/_api/serverlogics/company
 // Customer and company come only from the session's Account; nothing is read from the request.
 
@@ -60,7 +60,7 @@ async function get() {
             Server.Connector.Dataverse.RetrieveRecord(
                 "contacts",
                 user.contactid,
-                "$select=contactid,emailaddress1&$expand=parentcustomerid_account($select=name,chp_bccustomerno,chp_bccompanyid)"
+                "$select=contactid,emailaddress1&$expand=parentcustomerid_account($select=accountid,name,chp_bccustomerno,chp_bccompanyid)"
             ),
             "dataverse"
         );
@@ -68,7 +68,14 @@ async function get() {
         if (!account || !account.chp_bccustomerno || !account.chp_bccompanyid) {
             throw new Error("no-account");
         }
-        var scope = { contactId: user.contactid, customerNo: account.chp_bccustomerno, companyId: account.chp_bccompanyid, customerName: account.name || "" };
+        var scope = {
+            contactId: user.contactid,
+            accountId: account.accountid,
+            email: String(contact.emailaddress1 || "").trim().toLowerCase(),
+            customerNo: account.chp_bccustomerno,
+            companyId: account.chp_bccompanyid,
+            customerName: account.name || ""
+        };
         if (!(await hasPortalAccess(scope, contact.emailaddress1))) {
             throw blockedError();
         }
@@ -208,9 +215,16 @@ async function get() {
     }
     // #endregion bc-helpers
 
-    Server.Logger.Log("company GET called");
-    return respond(async () => {
-        var scope = await sessionScope();
+    // Highest first; the Permissions column shows one role.
+    var BUSINESS_ROLES = ["Full Access", "Orders & Delivery", "Finance & Documents", "View Only"];
+    // BC DEV field names (probed 2026-10-08, see the S2-A spec). MCRMContacts has no job title field yet (S2-18).
+    var CONTACT_FIELDS = "no,companyNo,type,name,phoneNo,mobilePhoneNo,eMail,customerPortalAccess,privacyBlocked";
+
+    function lower(value) {
+        return String(value || "").trim().toLowerCase();
+    }
+
+    async function customerCard(scope) {
         var result = await bcGet(
             scope,
             "mcrmCustomers",
@@ -231,9 +245,81 @@ async function get() {
             address: [row.Address, row.Address_2, row.City, row.County, row.Post_Code]
                 .filter((part) => part && String(part).trim())
                 .join(", "),
+            // mcrmCustomers has no website field yet (S2-18).
+            website: "",
             vatRegNumber: row.VATRegNo || "",
             phone: row.Phone_No || "",
             email: row.EMail || ""
         };
+    }
+
+    // The customer's BC person contacts: its company contacts (business relation), then their people.
+    async function bcPeople(scope) {
+        var relations = await bcGet(
+            scope,
+            "mcrmBusinessRelation",
+            odataQuery({ $filter: "vendorNo eq " + odataLiteral(scope.customerNo) + " and linktoTable eq 'Customer'", $select: "contactNo,vendorNo" })
+        );
+        var companyNos = ((relations && relations.value) || [])
+            .filter((row) => row.vendorNo === scope.customerNo && row.contactNo)
+            .map((row) => row.contactNo);
+        if (companyNos.length === 0) {
+            return [];
+        }
+        var people = await bcGet(
+            scope,
+            "MCRMContacts",
+            odataQuery({
+                $filter: "(" + companyNos.map((no) => "companyNo eq " + odataLiteral(no)).join(" or ") + ") and type eq 'Person'",
+                $select: CONTACT_FIELDS,
+                $top: "200"
+            })
+        );
+        return ((people && people.value) || []).filter((row) => companyNos.indexOf(row.companyNo) >= 0 && !row.privacyBlocked);
+    }
+
+    // Portal contacts on the session's Account and their web roles (table permission "Contact - same account (read)").
+    function portalContacts(scope) {
+        var result = parseResult(
+            Server.Connector.Dataverse.RetrieveMultipleRecords(
+                "contacts",
+                "$select=emailaddress1&$filter=_parentcustomerid_value eq " + scope.accountId +
+                    "&$expand=powerpagecomponent_mspp_webrole_contact($select=name)"
+            ),
+            "dataverse"
+        );
+        return ((result && result.value) || []).map((row) => ({
+            email: lower(row.emailaddress1),
+            roles: (row.powerpagecomponent_mspp_webrole_contact || []).map((role) => role.name)
+        }));
+    }
+
+    // Portal access = activated on this account + a business web role + BC customerPortalAccess (S2-A decision 1).
+    function contactRow(person, portal, you) {
+        var email = lower(person.eMail);
+        var match = email ? portal.find((p) => p.email === email) : undefined;
+        var role = match ? BUSINESS_ROLES.find((name) => match.roles.indexOf(name) >= 0) || "" : "";
+        var access = role !== "" && person.customerPortalAccess === true;
+        return {
+            name: person.name || "",
+            title: "",
+            phone: person.phoneNo || person.mobilePhoneNo || "",
+            email: String(person.eMail || "").trim(),
+            portalAccess: access,
+            portalRole: access ? role : "",
+            isYou: email !== "" && email === you
+        };
+    }
+
+    Server.Logger.Log("company GET called");
+    return respond(async () => {
+        var scope = await sessionScope();
+        var results = await Promise.all([customerCard(scope), bcPeople(scope)]);
+        var portal = portalContacts(scope);
+        var card = results[0];
+        card.contacts = results[1]
+            .map((person) => contactRow(person, portal, scope.email))
+            .sort((a, b) => (a.isYou !== b.isYou ? (a.isYou ? -1 : 1) : a.name.localeCompare(b.name)));
+        return card;
     });
 }

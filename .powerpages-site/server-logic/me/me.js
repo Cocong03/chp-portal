@@ -61,7 +61,7 @@ async function get() {
             Server.Connector.Dataverse.RetrieveRecord(
                 "contacts",
                 user.contactid,
-                "$select=contactid,emailaddress1&$expand=parentcustomerid_account($select=name,chp_bccustomerno,chp_bccompanyid)"
+                "$select=contactid,emailaddress1&$expand=parentcustomerid_account($select=accountid,name,chp_bccustomerno,chp_bccompanyid)"
             ),
             "dataverse"
         );
@@ -69,7 +69,14 @@ async function get() {
         if (!account || !account.chp_bccustomerno || !account.chp_bccompanyid) {
             throw new Error("no-account");
         }
-        var scope = { contactId: user.contactid, customerNo: account.chp_bccustomerno, companyId: account.chp_bccompanyid, customerName: account.name || "" };
+        var scope = {
+            contactId: user.contactid,
+            accountId: account.accountid,
+            email: String(contact.emailaddress1 || "").trim().toLowerCase(),
+            customerNo: account.chp_bccustomerno,
+            companyId: account.chp_bccompanyid,
+            customerName: account.name || ""
+        };
         if (!(await hasPortalAccess(scope, contact.emailaddress1))) {
             throw blockedError();
         }

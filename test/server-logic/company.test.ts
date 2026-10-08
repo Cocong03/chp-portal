@@ -17,12 +17,24 @@ const ROW = {
 }
 const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify(value) })
 
+// BC DEV MCRMContacts fields (probed 2026-10-08): no job title; phoneNo, else mobilePhoneNo.
+const PERSON = {
+  no: 'P0001', companyNo: 'CT0001', type: 'Person', name: 'Buyer One', phoneNo: '0917 000 0001', mobilePhoneNo: '0918 000 0001',
+  eMail: 'Buyer@Bestrade.ph', customerPortalAccess: true, privacyBlocked: false,
+}
+const PORTAL = { emailaddress1: 'buyer@bestrade.ph', powerpagecomponent_mspp_webrole_contact: [{ name: 'Authenticated Users' }, { name: 'Full Access' }] }
+
 function fakeServer({
   user = { contactid: 'c-1' } as unknown,
   email = 'Buyer@Bestrade.ph' as unknown,
-  account = { name: 'BESTRADE COMMODITY SALES CORP.', chp_bccustomerno: 'C00000009', chp_bccompanyid: 'co-1' } as unknown,
+  account = { accountid: 'acc-1', name: 'BESTRADE COMMODITY SALES CORP.', chp_bccustomerno: 'C00000009', chp_bccompanyid: 'co-1' } as unknown,
   portalContacts = [{ companyNo: 'CT0001' }] as unknown[],
   relations = [{ vendorNo: 'C00000009' }] as unknown[],
+  customerRelations = [{ contactNo: 'CT0001', vendorNo: 'C00000009' }] as unknown[],
+  people = [PERSON] as unknown[],
+  dvContacts = [PORTAL] as unknown[],
+  dataverseDown = false,
+  peopleDown = false,
   rows = [ROW] as unknown[],
   tokenStatus = 200,
   tokenResponse = undefined as unknown,
@@ -31,6 +43,7 @@ function fakeServer({
   context = { ServerLogicName: 'company', QueryParameters: {}, Body: '' } as unknown,
 } = {}) {
   const http: { method: string; url: string; body?: string; headers?: unknown; contentType?: string }[] = []
+  const dataverse: { op: string; args: unknown[] }[] = []
   const errors: string[] = []
   const warnings: string[] = []
   const server = {
@@ -39,7 +52,17 @@ function fakeServer({
     SiteSetting: { Get: (name: string) => settings[name] },
     Logger: { Log() {}, Error: (m: string) => errors.push(m), Warn: (m: string) => warnings.push(m) },
     Connector: {
-      Dataverse: { RetrieveRecord: () => ({ contactid: 'c-1', emailaddress1: email, parentcustomerid_account: account }) },
+      Dataverse: {
+        RetrieveRecord: (...args: unknown[]) => {
+          dataverse.push({ op: 'RetrieveRecord', args })
+          return { contactid: 'c-1', emailaddress1: email, parentcustomerid_account: account }
+        },
+        RetrieveMultipleRecords: (...args: unknown[]) => {
+          dataverse.push({ op: 'RetrieveMultipleRecords', args })
+          if (dataverseDown) throw new Error('dataverse 403 Forbidden')
+          return JSON.stringify({ value: dvContacts })
+        },
+      },
       HttpClient: {
         PostAsync: async (url: string, body: string, headers: unknown, contentType: string) => {
           http.push({ method: 'POST', url, body, headers, contentType })
@@ -49,15 +72,21 @@ function fakeServer({
         },
         GetAsync: async (url: string, headers: unknown) => {
           http.push({ method: 'GET', url, headers })
+          const plain = decodeURIComponent(url)
           if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
-          if (url.includes('/MCRMContacts')) return ok({ value: portalContacts })
-          if (url.includes('/mcrmBusinessRelation')) return ok({ value: relations })
+          if (plain.includes('/MCRMContacts') && plain.includes('tolower(eMail)')) return ok({ value: portalContacts })
+          if (plain.includes('/MCRMContacts')) {
+            if (peopleDown) return JSON.stringify({ StatusCode: 500, IsSuccessStatusCode: false, ReasonPhrase: 'Error', Body: '' })
+            return ok({ value: people })
+          }
+          if (plain.includes('/mcrmBusinessRelation') && plain.includes('vendorNo eq')) return ok({ value: customerRelations })
+          if (plain.includes('/mcrmBusinessRelation')) return ok({ value: relations })
           return ok({ value: rows })
         },
       },
     },
   }
-  return { server, http, errors, warnings }
+  return { server, http, dataverse, errors, warnings }
 }
 
 const SAFE = "We couldn't load this information. Please try again."
@@ -69,9 +98,13 @@ test("returns the signed-in customer's BC card in the wireframe's field names", 
     customerNo: 'C00000009',
     customerName: 'BESTRADE COMMODITY SALES CORP.',
     address: '12 Main St, Pasig, NCR, 1600',
+    website: '',
     vatRegNumber: '123-456',
     phone: '0917',
     email: 'ops@bestrade.ph',
+    contacts: [
+      { name: 'Buyer One', title: '', phone: '0917 000 0001', email: 'Buyer@Bestrade.ph', portalAccess: true, portalRole: 'Full Access', isYou: true },
+    ],
   })
 })
 
@@ -189,4 +222,100 @@ test("a rejected token request logs Microsoft's error code and description", asy
   await expect(load(server).get()).rejects.toThrow(SAFE)
   expect(errors[0]).toContain('token 401 Unauthorized')
   expect(errors[0]).toContain('AADSTS7000215')
+})
+
+const contactsOf = async (options: Parameters<typeof fakeServer>[0]) =>
+  JSON.parse(await load(fakeServer(options).server).get()).contacts as {
+    name: string; phone: string; email: string; portalAccess: boolean; portalRole: string; isYou: boolean
+  }[]
+
+test('reads the session account id and lists the portal contacts on that account with their web roles', async () => {
+  const { server, dataverse } = fakeServer()
+  await load(server).get()
+  expect(dataverse[0].args[2]).toContain('parentcustomerid_account($select=accountid,name,chp_bccustomerno,chp_bccompanyid)')
+  const list = dataverse.find((d) => d.op === 'RetrieveMultipleRecords')!
+  expect(list.args[0]).toBe('contacts')
+  expect(list.args[1]).toBe(
+    '$select=emailaddress1&$filter=_parentcustomerid_value eq acc-1&$expand=powerpagecomponent_mspp_webrole_contact($select=name)',
+  )
+})
+
+test("lists the customer's BC person contacts through the business relation, quotes doubled", async () => {
+  const { server, http } = fakeServer({
+    account: { accountid: 'acc-1', name: 'X', chp_bccustomerno: "O'1", chp_bccompanyid: 'co-1' },
+    relations: [{ vendorNo: "O'1" }],
+    customerRelations: [{ contactNo: "CT'7", vendorNo: "O'1" }],
+    people: [{ ...PERSON, companyNo: "CT'7" }],
+    rows: [{ ...ROW, Customer_No: "O'1" }],
+  })
+  await load(server).get()
+  const urls = http.map((c) => decodeURIComponent(c.url))
+  expect(urls.some((u) => u.includes("mcrmBusinessRelation?$filter=vendorNo eq 'O''1' and linktoTable eq 'Customer'"))).toBe(true)
+  expect(urls.some((u) => u.includes("MCRMContacts?$filter=(companyNo eq 'CT''7') and type eq 'Person'"))).toBe(true)
+})
+
+test.each([
+  ['activated, business role and BC flag on → Yes', {}, true, 'Full Access'],
+  ['BC customerPortalAccess off → No', { people: [{ ...PERSON, customerPortalAccess: false }] }, false, ''],
+  ['not activated (no portal contact) → No', { dvContacts: [] }, false, ''],
+  ['activated without a business role → No', { dvContacts: [{ ...PORTAL, powerpagecomponent_mspp_webrole_contact: [{ name: 'Authenticated Users' }] }] }, false, ''],
+])('portal access: %s', async (_case, options, access, role) => {
+  const [contact] = await contactsOf(options as Parameters<typeof fakeServer>[0])
+  expect(contact.portalAccess).toBe(access)
+  expect(contact.portalRole).toBe(role)
+})
+
+test('shows the highest business role', async () => {
+  const roles = [{ name: 'View Only' }, { name: 'Authenticated Users' }, { name: 'Orders & Delivery' }]
+  const [contact] = await contactsOf({ dvContacts: [{ ...PORTAL, powerpagecomponent_mspp_webrole_contact: roles }] })
+  expect(contact.portalRole).toBe('Orders & Delivery')
+})
+
+test('matches BC and portal emails ignoring case and spaces', async () => {
+  const [contact] = await contactsOf({
+    people: [{ ...PERSON, eMail: ' BUYER@bestrade.PH ' }],
+    dvContacts: [{ ...PORTAL, emailaddress1: 'Buyer@Bestrade.ph ' }],
+  })
+  expect(contact.portalAccess).toBe(true)
+  expect(contact.isYou).toBe(true)
+})
+
+test('a BC contact without an email is never matched or marked as you', async () => {
+  // A portal contact with a blank email exists too: blank must not match blank.
+  const [contact] = await contactsOf({ people: [{ ...PERSON, eMail: '' }], dvContacts: [PORTAL, { ...PORTAL, emailaddress1: '' }] })
+  expect(contact.portalAccess).toBe(false)
+  expect(contact.isYou).toBe(false)
+})
+
+test('phone falls back to the mobile number', async () => {
+  const [contact] = await contactsOf({ people: [{ ...PERSON, phoneNo: '' }] })
+  expect(contact.phone).toBe('0918 000 0001')
+})
+
+test('marks only the signed-in contact as you and lists them first', async () => {
+  const contacts = await contactsOf({
+    people: [{ ...PERSON, name: 'Ana Cruz', eMail: 'ana@bestrade.ph' }, PERSON],
+    dvContacts: [PORTAL],
+  })
+  expect(contacts.map((c) => [c.name, c.isYou])).toEqual([['Buyer One', true], ['Ana Cruz', false]])
+})
+
+test('skips privacy-blocked BC contacts and portal contacts that are not in BC', async () => {
+  const contacts = await contactsOf({
+    people: [PERSON, { ...PERSON, name: 'Hidden', eMail: 'hidden@bestrade.ph', privacyBlocked: true }],
+    dvContacts: [PORTAL, { ...PORTAL, emailaddress1: 'portal-only@bestrade.ph' }],
+  })
+  expect(contacts.map((c) => c.name)).toEqual(['Buyer One'])
+})
+
+test('no contacts when the customer has no linked company contact', async () => {
+  expect(await contactsOf({ customerRelations: [] })).toEqual([])
+})
+
+test.each([
+  ['the Dataverse contact read fails', { dataverseDown: true }],
+  ['the BC contacts read fails', { peopleDown: true }],
+])('%s → the whole call fails with the customer-safe error', async (_case, options) => {
+  const { server } = fakeServer(options)
+  await expect(load(server).get()).rejects.toThrow(SAFE)
 })
