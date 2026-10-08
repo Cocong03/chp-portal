@@ -75,41 +75,46 @@ def ensure_key(table, schema, display, columns):
     print(f'  + key {schema} on {table}({", ".join(columns)})')
 
 
-print('Account columns')
-ensure_attribute('account', text('chp_BCCustomerNo', 'BC Customer No.', 20))
-ensure_attribute('account', text('chp_BCCompanyId', 'BC Company ID', 36))
-ensure_attribute('account', text('chp_BCCompanyName', 'BC Company', 100))
-ensure_key('account', 'chp_bccustomer', 'BC customer', ['chp_bccustomerno', 'chp_bccompanyid'])
+def main():
+    print('Account columns')
+    ensure_attribute('account', text('chp_BCCustomerNo', 'BC Customer No.', 20))
+    ensure_attribute('account', text('chp_BCCompanyId', 'BC Company ID', 36))
+    ensure_attribute('account', text('chp_BCCompanyName', 'BC Company', 100))
+    ensure_key('account', 'chp_bccustomer', 'BC customer', ['chp_bccustomerno', 'chp_bccompanyid'])
 
-print('Account Link')
-ensure_table('chp_AccountLink', 'Account Link', 'Account Links',
-             'Contact ↔ Account links (one per contact for Nov 15; Phase 2 switcher adds more).',
-             text('chp_Name', 'Name', 200, is_required=True, primary=True))
-ensure_lookup('chp_accountlink', 'chp_Contact', 'Contact', 'contact', 'chp_contact_chp_accountlink', True, 'Cascade')
-ensure_lookup('chp_accountlink', 'chp_Account', 'Account', 'account', 'chp_account_chp_accountlink', True, 'Restrict')  # one parental (cascade) relationship per table: contact has it
-ensure_key('chp_accountlink', 'chp_contact_account', 'Contact and account', ['chp_contact', 'chp_account'])
+    print('Account Link')
+    ensure_table('chp_AccountLink', 'Account Link', 'Account Links',
+                 'Contact ↔ Account links (one per contact for Nov 15; Phase 2 switcher adds more).',
+                 text('chp_Name', 'Name', 200, is_required=True, primary=True))
+    ensure_lookup('chp_accountlink', 'chp_Contact', 'Contact', 'contact', 'chp_contact_chp_accountlink', True, 'Cascade')
+    ensure_lookup('chp_accountlink', 'chp_Account', 'Account', 'account', 'chp_account_chp_accountlink', True, 'Restrict')  # one parental (cascade) relationship per table: contact has it
+    ensure_key('chp_accountlink', 'chp_contact_account', 'Contact and account', ['chp_contact', 'chp_account'])
 
-print('Access Grant')
-ensure_table('chp_AccessGrant', 'Access Grant', 'Access Grants',
-             'Pre-granted portal roles by email (S1-13). Applied by the "Concreat Connect – Apply access grant" flow.',
-             text('chp_Email', 'Email', 100, is_required=True, primary=True))
-ensure_attribute('chp_accessgrant', text('chp_BCCustomerNo', 'BC Customer No.', 20, is_required=True))
-ensure_attribute('chp_accessgrant', choice('chp_WebRole', 'Role', [
-    (775000000, 'Full Access'), (775000001, 'Orders & Delivery'),
-    (775000002, 'Finance & Documents'), (775000003, 'View Only')], is_required=True))
-ensure_attribute('chp_accessgrant', choice('chp_Status', 'Status', [
-    (775000000, 'Pending'), (775000001, 'Applied'),
-    (775000002, 'Customer mismatch'), (775000003, 'Duplicate email')], default=775000000))
-ensure_attribute('chp_accessgrant', {
-    '@odata.type': 'Microsoft.Dynamics.CRM.DateTimeAttributeMetadata', 'SchemaName': 'chp_AppliedOn',
-    'DisplayName': label('Applied on'), 'RequiredLevel': required(False), 'Format': 'DateAndTime'})
-ensure_attribute('chp_accessgrant', {
-    '@odata.type': 'Microsoft.Dynamics.CRM.MemoAttributeMetadata', 'SchemaName': 'chp_Note',
-    'DisplayName': label('Note'), 'RequiredLevel': required(False), 'MaxLength': 2000})
-ensure_lookup('chp_accessgrant', 'chp_Contact', 'Applied to contact', 'contact', 'chp_contact_chp_accessgrant', False, 'RemoveLink')
+    print('Access Grant')
+    ensure_table('chp_AccessGrant', 'Access Grant', 'Access Grants',
+                 'Pre-granted portal roles by email (S1-13). Applied by the "Concreat Connect – Apply access grant" flow.',
+                 text('chp_Email', 'Email', 100, is_required=True, primary=True))
+    ensure_attribute('chp_accessgrant', text('chp_BCCustomerNo', 'BC Customer No.', 20, is_required=True))
+    ensure_attribute('chp_accessgrant', choice('chp_WebRole', 'Role', [
+        (775000000, 'Full Access'), (775000001, 'Orders & Delivery'),
+        (775000002, 'Finance & Documents'), (775000003, 'View Only')], is_required=True))
+    ensure_attribute('chp_accessgrant', choice('chp_Status', 'Status', [
+        (775000000, 'Pending'), (775000001, 'Applied'),
+        (775000002, 'Customer mismatch'), (775000003, 'Duplicate email')], default=775000000))
+    ensure_attribute('chp_accessgrant', {
+        '@odata.type': 'Microsoft.Dynamics.CRM.DateTimeAttributeMetadata', 'SchemaName': 'chp_AppliedOn',
+        'DisplayName': label('Applied on'), 'RequiredLevel': required(False), 'Format': 'DateAndTime'})
+    ensure_attribute('chp_accessgrant', {
+        '@odata.type': 'Microsoft.Dynamics.CRM.MemoAttributeMetadata', 'SchemaName': 'chp_Note',
+        'DisplayName': label('Note'), 'RequiredLevel': required(False), 'MaxLength': 2000})
+    ensure_lookup('chp_accessgrant', 'chp_Contact', 'Applied to contact', 'contact', 'chp_contact_chp_accessgrant', False, 'RemoveLink')
 
-print('Publishing')
-dv.post('PublishXml', {'ParameterXml': '<importexportxml><entities><entity>account</entity>'
-                                        '<entity>chp_accountlink</entity><entity>chp_accessgrant</entity>'
-                                        '</entities></importexportxml>'})
-print('Done.')
+    print('Publishing')
+    dv.post('PublishXml', {'ParameterXml': '<importexportxml><entities><entity>account</entity>'
+                                            '<entity>chp_accountlink</entity><entity>chp_accessgrant</entity>'
+                                            '</entities></importexportxml>'})
+    print('Done.')
+
+
+if __name__ == '__main__':
+    main()

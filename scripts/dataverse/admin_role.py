@@ -11,6 +11,8 @@ PRIVILEGES = [
     ('prvWritechp_accessgrant', 'Global'), ('prvDeletechp_accessgrant', 'Global'),
     ('prvAppendchp_accessgrant', 'Global'), ('prvAppendTochp_accessgrant', 'Global'),
     ('prvReadContact', 'Global'), ('prvAppendToContact', 'Global'),
+    ('prvCreatechp_announcement', 'Global'), ('prvReadchp_announcement', 'Global'),
+    ('prvWritechp_announcement', 'Global'), ('prvDeletechp_announcement', 'Global'),
 ]
 
 dv = Dataverse()

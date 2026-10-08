@@ -1,0 +1,4 @@
+description: "S2-14: announcement columns the SPA reads (modifiedon for ordering)"
+id: 4ef37e67-9209-42f5-9f8f-f26db4a97d8e
+name: Webapi/chp_announcement/fields
+value: "chp_title,chp_message,chp_active,modifiedon"
