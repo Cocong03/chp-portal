@@ -69,6 +69,7 @@ solutions/*.zip
 .powerpages-site/web-files/SignagePage-*/
 .powerpages-site/web-files/ea7-logo-*/
 .powerpages-site/web-files/index.html/
+.powerpages-site/web-files/*.js/
 .powerpages-site/web-pages/home/content-pages/en-US/Home.webpage.copy.html
 
 # Solution export artifacts
