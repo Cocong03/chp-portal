@@ -13,3 +13,7 @@ Customer-facing text follows the wireframe (`docs/Standard_Portal_Flow_v47_ForDe
 | Activate / Set password copy (no wireframe) | Spec 2026-10-04, pending client review | `src/modules/signin/Activate.tsx`, `SetPassword.tsx` | ☐ |
 | "+ New Multiple Order" | PP package | Orders (S3-13), not built yet | ☐ |
 | No BC jargon (location codes, table names) and no internal service-center system name | CLAUDE.md | All screens | ☐ |
+| Delivery Sites: "Active Delivery Sites", search placeholder *Search site name, code, or city*, "Showing N delivery sites.", *No delivery sites match your search.* | Mockup v2 `#panel-sites` | `src/modules/sites/SitesPage.tsx` | ☐ |
+| New copy (not in the mockup), **for Rene to confirm**: *No delivery sites are registered on your account yet.* · *No contacts are registered on your account yet.* · load error *We couldn't load this information. Please try again.* + **Try again** | S2-A spec 2026-10-08 | `SitesPage.tsx`, `AccountPage.tsx`, `src/ui/QueryError.tsx` | ☐ |
+| Account and User Management: "Company Information", "Contacts & Portal Access", columns Name · Title · Phone · Email · Portal access · Permissions · Actions, "You" pill, *Can see: …* hint | Mockup v2 `#panel-account` | `src/modules/account/AccountPage.tsx` | ☐ |
+| Dashboard announcement eyebrow "Announcement"; no greeting (removed in mockup v2, 2026-09-29) | Mockup v2 `#dash-announcement` | `src/modules/dashboard/` | ☐ |

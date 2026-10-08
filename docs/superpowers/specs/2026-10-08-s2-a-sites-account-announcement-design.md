@@ -1,6 +1,6 @@
 # S2 sub-project A — Shared list kit, Delivery Sites, Account and User Management, Announcement (design)
 
-**Date:** 2026-10-08 · **Status:** Approved in chat (sections 1–4) · **Source:** `PLANS.md` (S2, mockup `docs/Mockup-chp-v2.html`) · **Plan tasks:** S2-02, S2-14, S2-19
+**Date:** 2026-10-08 · **Status:** Approved in chat (sections 1–4); implemented 2026-10-08 (deployed to Dev) · **Source:** `PLANS.md` (S2, mockup `docs/Mockup-chp-v2.html`) · **Plan tasks:** S2-02, S2-14, S2-19
 
 ## Goal
 
@@ -51,7 +51,7 @@ Field names for `mcrmShipToAddress`, the contact title/phone fields and the cust
 - Web roles: **Full Access** (`56b29291-…`) and **Orders & Delivery** (`11bb7218-…`) only.
 - `sessionScope()`, then `bcGet(scope, "mcrmShipToAddress", odataQuery({ $filter: "<customer no. field> eq " + odataLiteral(scope.customerNo), $select: …, $top: "500" }))`. Nothing is read from the request.
 - Drops any row whose customer no. isn't `scope.customerNo` (defence in depth).
-- Default: one extra `mcrmCustomers` read for the Ship-to Code (in parallel with the ship-to read) if the probe finds the field.
+- Default: the probe found no Ship-to Code on `mcrmCustomers`, so there is no second read; `isDefault` is `false` and `email` is `""` until S2-01 adds them. The filter is `documentNo eq '<customer no.>'`.
 - Returns `SiteDto[]` sorted by `code`:
 
 ```ts
@@ -114,14 +114,14 @@ export interface PortalContactDto {
 
 - New table **`chp_announcement`** in `ConcreatHub`: `chp_title` (primary name, text 200), `chp_message` (multiline text 2000), `chp_active` (yes/no, default No). Added to the **Concreat Connect Admin** app (form + view) so ops edit it without a deploy.
 - Table permission **Announcement – read (global)**: Global scope, read only, **Authenticated Users**.
-- Site settings: `Webapi/chp_announcement/enabled` = `true`, `Webapi/chp_announcement/fields` = `chp_title,chp_message,chp_active`.
+- Site settings: `Webapi/chp_announcement/enabled` = `true`, `Webapi/chp_announcement/fields` = `chp_title,chp_message,chp_active,modifiedon` (`modifiedon` for the newest-first order).
 - The SPA reads `GET /_api/chp_announcements?$select=chp_title,chp_message&$filter=chp_active eq true&$orderby=modifiedon desc&$top=1`. The newest active row wins; no active row means no banner.
 
 ## 2. Screens
 
 ### Shared kit (`src/ui/`, DESIGN.md §5–6)
 
-- shadcn components added: `card`, `table`, `badge`, `tooltip`, `alert`.
+- shadcn components added: `card`, `table`, `tooltip`, `alert` (`StatusPill` is its own small component; no `badge`).
 - **`DataTable`**: TanStack Table + shadcn `Table` in `rounded-xl border bg-card shadow-card overflow-x-auto`; mockup header style (11.5px uppercase faint on `bg-muted`); column meta for numeric/mono cells; `loading` renders skeleton rows; an empty list renders one centred row with the given message.
 - **`StatusPill`**: `Badge` variants `good · warn · bad · neutral · progress` with the 6px dot.
 - **`SearchField`**: `Input` with a leading Lucide `Search` icon and an `aria-label`.
@@ -160,7 +160,7 @@ export interface PortalContactDto {
 ## 3. Loading, errors, empty states
 
 - **Loading:** skeleton rows in tables, skeleton values in Company Information; the banner renders nothing until loaded.
-- **Errors:** Sites and Account show `QueryError` in the card. Server Logic already returns only *"We couldn't load this information. Please try again."*; details stay in the log. A blocked contact is handled by the existing QueryClient (re-checks `me`, shows the access-turned-off card). An announcement failure hides the banner and nothing else.
+- **Errors:** Sites shows `QueryError` in its card; Account shows one `QueryError` in place of both cards (one call feeds both). Server Logic already returns only *"We couldn't load this information. Please try again."*; details stay in the log. A blocked contact is handled by the existing QueryClient (re-checks `me`, shows the access-turned-off card). An announcement failure hides the banner and nothing else.
 - **Empty:** see each screen above.
 - **Caching:** 5-minute `staleTime` for `sites`, `company` and the announcement (Architecture §6 allows minutes for ship-tos; none of this is live-critical).
 
