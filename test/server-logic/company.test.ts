@@ -241,6 +241,7 @@ test('reads the session account id and lists only active, activated portal conta
     '$select=emailaddress1&$filter=_parentcustomerid_value eq acc-1 and statecode eq 0 and adx_identity_username ne null' +
       '&$expand=powerpagecomponent_mspp_webrole_contact($select=name)',
   )
+  expect(list.args[2]).toBe(true) // skipCache: roles changed in Portal Management must show at once
 })
 
 test("lists the customer's BC person contacts through the business relation, quotes doubled", async () => {

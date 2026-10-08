@@ -286,7 +286,9 @@ async function get() {
                 "contacts",
                 "$select=emailaddress1&$filter=_parentcustomerid_value eq " + scope.accountId +
                     " and statecode eq 0 and adx_identity_username ne null" +
-                    "&$expand=powerpagecomponent_mspp_webrole_contact($select=name)"
+                    "&$expand=powerpagecomponent_mspp_webrole_contact($select=name)",
+                // skipCache: roles and activations changed outside the site must show at once, not up to 15 min later.
+                true
             ),
             "dataverse"
         );

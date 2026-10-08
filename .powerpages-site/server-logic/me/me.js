@@ -272,7 +272,9 @@ async function get() {
                 Server.Connector.Dataverse.RetrieveRecord(
                     "contacts",
                     user.contactid,
-                    "$select=contactid&$expand=powerpagecomponent_mspp_webrole_contact($select=name)"
+                    "$select=contactid&$expand=powerpagecomponent_mspp_webrole_contact($select=name)",
+                    // skipCache: the Power Pages data cache keeps a role changed in Portal Management stale for up to 15 min.
+                    true
                 ),
                 "dataverse"
             );

@@ -69,9 +69,11 @@ test('returns the contact, the linked account and the web roles read from Datave
     account: { customerNo: '10482', customerName: 'J.D. Santos Hardware & Construction Supply', company: 'Solid Cement' },
     roles: ['Full Access'],
   })
+  // Roles skip the Power Pages data cache: a role changed in Portal Management otherwise shows up to 15 minutes late
+  // (seen on Dev 2026-10-08: Full Access added, nav stayed Finance-only).
   expect(calls).toEqual([
     ['contacts', 'c-1', CONTACT_OPTIONS],
-    ['contacts', 'c-1', ROLE_OPTIONS],
+    ['contacts', 'c-1', ROLE_OPTIONS, true],
   ])
 })
 
