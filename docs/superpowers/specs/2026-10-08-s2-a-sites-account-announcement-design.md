@@ -108,7 +108,7 @@ export interface PortalContactDto {
 ### Permissions
 
 - New table permission **Contact – same account (read)**: table `contact`, **Account** scope through `parentcustomerid`, read only, for the four business roles. Server Logic's Dataverse reads are governed by table permissions (Microsoft Learn, *Interact with Dataverse tables using server logic*).
-- If reading coworkers' web roles (`powerpagecomponent_mspp_webrole_contact`) is refused on Dev, add the smallest permission that allows it and record it here.
+- **Web roles of same-account contacts (read)** (added 2026-10-08 after Dev returned `dataverse 403 … no permission to read the powerpagecomponent table`): table `powerpagecomponent`, **Parent** scope under *Contact – same account (read)* through `powerpagecomponent_mspp_webrole_contact`, read only, same four roles. Never Global: `powerpagecomponent` also holds site settings and Server Logic code. `test/server-logic/permissions.test.ts` guards both rules.
 
 ### Announcement (Dataverse + Web API)
 
