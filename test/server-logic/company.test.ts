@@ -229,14 +229,17 @@ const contactsOf = async (options: Parameters<typeof fakeServer>[0]) =>
     name: string; phone: string; email: string; portalAccess: boolean; portalRole: string; isYou: boolean
   }[]
 
-test('reads the session account id and lists the portal contacts on that account with their web roles', async () => {
+// Only active contacts who finished activation count: ops deactivate a contact to remove access (runbook), and a contact
+// created by an unfinished activation has no adx_identity_username yet (S1 registration design).
+test('reads the session account id and lists only active, activated portal contacts on that account with their web roles', async () => {
   const { server, dataverse } = fakeServer()
   await load(server).get()
   expect(dataverse[0].args[2]).toContain('parentcustomerid_account($select=accountid,name,chp_bccustomerno,chp_bccompanyid)')
   const list = dataverse.find((d) => d.op === 'RetrieveMultipleRecords')!
   expect(list.args[0]).toBe('contacts')
   expect(list.args[1]).toBe(
-    '$select=emailaddress1&$filter=_parentcustomerid_value eq acc-1&$expand=powerpagecomponent_mspp_webrole_contact($select=name)',
+    '$select=emailaddress1&$filter=_parentcustomerid_value eq acc-1 and statecode eq 0 and adx_identity_username ne null' +
+      '&$expand=powerpagecomponent_mspp_webrole_contact($select=name)',
   )
 })
 

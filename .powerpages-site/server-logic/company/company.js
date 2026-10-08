@@ -278,12 +278,14 @@ async function get() {
         return ((people && people.value) || []).filter((row) => companyNos.indexOf(row.companyNo) >= 0 && !row.privacyBlocked);
     }
 
-    // Portal contacts on the session's Account and their web roles (table permission "Contact - same account (read)").
+    // Active, activated portal contacts on the session's Account and their web roles (table permission
+    // "Contact - same account (read)"). Deactivating a contact removes access (runbook); no username = activation unfinished.
     function portalContacts(scope) {
         var result = parseResult(
             Server.Connector.Dataverse.RetrieveMultipleRecords(
                 "contacts",
                 "$select=emailaddress1&$filter=_parentcustomerid_value eq " + scope.accountId +
+                    " and statecode eq 0 and adx_identity_username ne null" +
                     "&$expand=powerpagecomponent_mspp_webrole_contact($select=name)"
             ),
             "dataverse"
