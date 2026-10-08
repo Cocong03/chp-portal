@@ -4,6 +4,7 @@ import { canSee } from '@/auth/access'
 import { useMe } from '@/auth/useMe'
 import type { Section, SectionKey } from '@/layout/sections'
 import { Placeholder } from '@/modules/Placeholder'
+import { PageErrorBoundary } from './PageErrorBoundary'
 
 // Built modules, one chunk each. Sections not listed here show the placeholder until their sub-project lands.
 const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
@@ -18,9 +19,12 @@ export function SectionRoute({ section }: { section: Section }) {
   if (!data || !canSee(data.roles, section.key)) return <Navigate to="/" replace />
   const Page = PAGES[section.key]
   if (!Page) return <Placeholder label={section.label} />
+  // Keyed by section so moving to another section clears a failed page.
   return (
-    <Suspense fallback={null}>
-      <Page />
-    </Suspense>
+    <PageErrorBoundary key={section.key}>
+      <Suspense fallback={null}>
+        <Page />
+      </Suspense>
+    </PageErrorBoundary>
   )
 }
