@@ -1,6 +1,6 @@
 import { MOCK_SESSION_KEY } from '@/auth/session'
 import { ApiError, BlockedError, GENERIC_ERROR, serverLogic } from './serverLogic'
-import type { CompanyDto, MeDto } from './types'
+import type { CompanyDto, MeDto, SiteDto } from './types'
 
 const caught = async (promise: Promise<unknown>) => (await promise.catch((error: unknown) => error)) as ApiError
 
@@ -29,6 +29,18 @@ describe('on the dev server', () => {
   test('serves the company fixture', async () => {
     sessionStorage.setItem(MOCK_SESSION_KEY, 'full@test.ph')
     expect((await serverLogic<CompanyDto>('company')).customerNo).toBe('10482')
+  })
+
+  test('serves the sites fixture from the wireframe SITES', async () => {
+    const sites = await serverLogic<SiteDto[]>('sites')
+    expect(sites.map((s) => s.code)).toEqual(['PLANT1', 'PLANT2', 'PLANT3'])
+    expect(sites[0].isDefault).toBe(true)
+  })
+
+  test('the company fixture carries the wireframe PORTAL_CONTACTS', async () => {
+    const company = await serverLogic<CompanyDto>('company')
+    expect(company.website).toBe('www.jdsantoshardware.ph')
+    expect(company.contacts.map((c) => c.name)).toEqual(['J.D. Santos', 'Elena Ramos', 'Miguel Torres', 'Grace Villanueva'])
   })
 
   test('an endpoint without a mock is a 404 ApiError', async () => {

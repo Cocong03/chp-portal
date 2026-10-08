@@ -9,12 +9,47 @@ export interface MeDto {
   blocked?: boolean
 }
 
-/** GET /_api/serverlogics/company. Field names follow the wireframe's ACCOUNTS[]. */
+/** GET /_api/serverlogics/company. Mirrors the wireframe's ACCOUNTS[] and PORTAL_CONTACTS[]. */
 export interface CompanyDto {
   customerNo: string
   customerName: string
   address: string
+  /** "" until BC exposes a website on the customer card. */
+  website: string
   vatRegNumber: string
   phone: string
   email: string
+  contacts: PortalContactDto[]
+}
+
+/** BC person contact of the customer, merged with portal activation and web role. */
+export interface PortalContactDto {
+  name: string
+  /** "" until BC exposes a job title on its contacts. */
+  title: string
+  phone: string
+  email: string
+  /** Activated on this account + a business web role + BC customerPortalAccess. */
+  portalAccess: boolean
+  /** Highest business web role; "" when portalAccess is false. */
+  portalRole: string
+  isYou: boolean
+}
+
+/** GET /_api/serverlogics/sites. Mirrors the wireframe's SITES[]. */
+export interface SiteDto {
+  code: string
+  name: string
+  address: string
+  city: string
+  contact: string
+  phone: string
+  email: string
+  isDefault: boolean
+}
+
+/** Dashboard banner (Dataverse chp_announcement, newest active row). Mirrors the wireframe's ANNOUNCEMENT. */
+export interface AnnouncementDto {
+  title: string
+  message: string
 }

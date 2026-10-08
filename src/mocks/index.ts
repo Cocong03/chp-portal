@@ -1,4 +1,4 @@
-import type { CompanyDto, MeDto } from '@/api/types'
+import type { CompanyDto, MeDto, SiteDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
 
 export interface MockRequest {
@@ -33,13 +33,37 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
       roles: ['Authenticated Users', ...(ROLES_BY_EMAIL.get(email) ?? ['Full Access'])],
     }
   },
-  // Wireframe ACCOUNTS[0]
+  // Wireframe ACCOUNTS[0] + PORTAL_CONTACTS
   company: (): CompanyDto => ({
     customerNo: '10482',
     customerName: 'J.D. Santos Hardware & Construction Supply',
     address: 'Blk 12 Lot 4, National Highway, Brgy. San Isidro, Cabuyao, Laguna',
+    website: 'www.jdsantoshardware.ph',
     vatRegNumber: '123-456-789-000',
     phone: '0917 552 6613',
     email: 'jd.santos@sample-customer.ph',
+    contacts: [
+      { name: 'J.D. Santos', title: 'Owner', phone: '0917 552 6613', email: 'jd.santos@sample-customer.ph', portalAccess: true, portalRole: 'Full Access', isYou: true },
+      { name: 'Elena Ramos', title: 'Purchasing Manager', phone: '0917 552 6614', email: 'elena.ramos@sample-customer.ph', portalAccess: true, portalRole: 'Orders & Delivery', isYou: false },
+      { name: 'Miguel Torres', title: 'Accounting Staff', phone: '0917 552 6615', email: 'miguel.torres@sample-customer.ph', portalAccess: true, portalRole: 'Finance & Documents', isYou: false },
+      { name: 'Grace Villanueva', title: 'Site Engineer', phone: '0917 552 6616', email: 'grace.villanueva@sample-customer.ph', portalAccess: false, portalRole: '', isYou: false },
+    ],
   }),
+  // Wireframe SITES
+  sites: (): SiteDto[] => [
+    { code: 'PLANT1', name: 'Plant 1 — Main Yard', address: 'Km 19 Marcos Highway, Brgy. San Roque', city: 'Antipolo City, Rizal', contact: 'Ramon Cruz', phone: '(02) 8531-4420', email: 'ramon.cruz@sample-customer.ph', isDefault: true },
+    { code: 'PLANT2', name: 'Plant 2 — North Depot', address: 'National Highway, Brgy. Sta. Cruz', city: 'Angat, Bulacan', contact: 'Ligaya Fernandez', phone: '(044) 815-2207', email: '', isDefault: false },
+    { code: 'PLANT3', name: 'Plant 3 — Warehouse A', address: 'Governor’s Drive, Brgy. Zone IV', city: 'Dasmariñas, Cavite', contact: 'Noel Bautista', phone: '(046) 402-7788', email: '', isDefault: false },
+  ],
+}
+
+/** Dev-server answers for the Power Pages Web API, by entity set name (rows as the API returns them). */
+export const webApiMocks: Record<string, (() => unknown[]) | undefined> = {
+  // Wireframe ANNOUNCEMENT
+  chp_announcements: () => [
+    {
+      chp_title: 'Holiday order cutoff schedule',
+      chp_message: 'Submit orders before 3:00 PM to lock in next-business-day confirmation over the upcoming holiday period.',
+    },
+  ],
 }
