@@ -28,7 +28,16 @@ S2 is split into four sub-projects, each with its own spec → plan → build: *
 | Contacts by customer (S2-18) | `MCRMContacts` + `mcrmBusinessRelation` exist | Uses them. If `MCRMContacts` can be filtered by customer no. directly, the relation hop is skipped |
 | Q6 Account & User Mgmt visibility per role (Rene) | Pending | Keeps the current assumption: all four business roles see the page, read-only |
 
-Field names for `mcrmShipToAddress`, the contact title/phone fields and the customer Ship-to Code are confirmed by a **read-only probe** of BC DEV before coding (see Testing). The probe reads the BC client secret into memory only and never prints or stores it; it runs only after the user approves it.
+## BC DEV facts (probed 2026-10-08, read-only, `scripts/dataverse/bc_probe.py`)
+
+| API | Fields used | Notes |
+|---|---|---|
+| `mcrmShipToAddress` | `documentNo` (= **customer no.**, misleading name), `code`, `name`, `address`, `address2`, `city`, `postCode`, `contact`, `phoneNo` | camelCase, unlike `mcrmCustomers`. `$filter=documentNo eq '<no>'` works. **No county, no email, no default flag** (`shipmentMethod`, `contact1/2`, `phoneNo1/2` exist but are empty). **C00000009 (BESTRADE) has no ship-tos**; C00000002/06/13/21 have some |
+| `mcrmCustomers` | (unchanged) | **No Ship-to Code field** → `isDefault` is always `false` until BC adds a default (S2-01). No website field (S2-18) |
+| `mcrmBusinessRelation` | `contactNo`, `vendorNo`, `linktoTable` | `vendorNo eq '<customer>' and linktoTable eq 'Customer'` works (C00000009 → one company contact) |
+| `MCRMContacts` | `no`, `companyNo`, `type`, `name`, `phoneNo`, `mobilePhoneNo`, `eMail`, `customerPortalAccess`, `privacyBlocked` | `type eq 'Person'` works. **No job title field** → Title shows "" until BC adds one (S2-18). Phone = `phoneNo`, else `mobilePhoneNo` |
+
+Field names for `mcrmShipToAddress`, the contact title/phone fields and the customer Ship-to Code were confirmed by a **read-only probe** of BC DEV before coding (see Testing). The probe reads the BC client secret into memory only and never prints or stores it; it runs only after the user approves it.
 
 ## 1. Server side
 
