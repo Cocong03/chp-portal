@@ -42,6 +42,8 @@ Changes apply within about a minute, on the person's next page load.
 
 To stop someone signing in at all, deactivate their **Contact** as well (Portal Management, portal team).
 
+**Need it to take effect immediately** (e.g. a dismissed employee)? Turn off **Customer Portal Access** on their person contact in BC: the portal checks it live on every request, so an open session is blocked on its next page load. Deactivating the grant or the Contact can take up to 15 minutes to reach a session that's already signed in (Power Pages caches Dataverse data).
+
 ## Who can use Concreat Connect Admin
 
 CHP IT gives the staff member the **Basic User** and **Concreat Connect Admin** security roles and a Power Apps license.
