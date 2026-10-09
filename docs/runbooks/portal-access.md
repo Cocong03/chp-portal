@@ -52,5 +52,5 @@ CHP IT gives the staff member the **Basic User** and **Concreat Connect Admin** 
 
 1. Open **Concreat Connect Admin** → **Announcements** → **New**.
 2. Enter a **Title** and **Message**, set **Active** to **Yes**, then **Save**.
-3. Every signed-in customer sees it at the top of the Dashboard within 5 minutes. If several are active, the most recently changed one is shown.
+3. Every signed-in customer sees it at the top of the Dashboard within **15 minutes** (Power Pages caches the announcement; changes made in this app aren't pushed to the site instantly). If several are active, the most recently changed one is shown. Plan time-critical notices 15 minutes ahead.
 4. To remove it, set **Active** to **No** (or delete the record). With no active announcement, no banner is shown.
