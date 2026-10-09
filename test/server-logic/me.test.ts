@@ -92,7 +92,8 @@ test.each([
 test('checks BC with the Dataverse email of the signed-in contact', async () => {
   const { server, http } = fakeServer({ record: contact(ACCOUNT) })
   await load(server).get()
-  expect(decodeURIComponent(http[0])).toContain("tolower(eMail) eq 'full@example.com' and customerPortalAccess eq true")
+  // Only Person contacts let someone in (decided 2026-10-09), never a company contact's shared email.
+  expect(decodeURIComponent(http[0])).toContain("tolower(eMail) eq 'full@example.com' and customerPortalAccess eq true and type eq 'Person'")
 })
 
 test('BC down is a load error, never a block', async () => {

@@ -291,7 +291,7 @@
           "Accept": "application/json"
         },
         "queries": {
-          "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true",
+          "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true and type eq 'Person'",
           "$select": "no,type,companyNo,name,customerPortalAccess",
           "$top": "20"
         }

@@ -156,7 +156,7 @@ test('checks BC portal access with the Dataverse email, lower-cased and quoted, 
   const { server, http } = fakeServer({ email: "O'Neil@Bestrade.PH" })
   await load(server).get()
   expect(decodeURIComponent(call(http, 'MCRMContacts').url)).toContain(
-    "$filter=tolower(eMail) eq 'o''neil@bestrade.ph' and customerPortalAccess eq true",
+    "$filter=tolower(eMail) eq 'o''neil@bestrade.ph' and customerPortalAccess eq true and type eq 'Person'",
   )
   expect(decodeURIComponent(call(http, 'mcrmBusinessRelation').url)).toContain(
     "$filter=(contactNo eq 'CT0001') and linktoTable eq 'Customer'",

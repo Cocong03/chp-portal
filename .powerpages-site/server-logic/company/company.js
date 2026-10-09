@@ -82,7 +82,8 @@ async function get() {
         return scope;
     }
 
-    // True while BC has a contact with this email, customerPortalAccess = true, linked to the session's customer.
+    // True while BC has a Person contact with this email, customerPortalAccess = true, linked to the session's customer.
+    // Company contacts never count (decided 2026-10-09): their shared email would be a login the Contacts list doesn't show.
     // The email comes from Dataverse, never from the request. A BC failure throws (an error, not a block).
     // ponytail: two BC calls per request; add a short-lived cache if Dev timings show it matters.
     async function hasPortalAccess(scope, email) {
@@ -93,7 +94,7 @@ async function get() {
         var contacts = await bcGet(
             scope,
             "MCRMContacts",
-            odataQuery({ $filter: "tolower(eMail) eq " + odataLiteral(address) + " and customerPortalAccess eq true", $select: "companyNo", $top: "20" })
+            odataQuery({ $filter: "tolower(eMail) eq " + odataLiteral(address) + " and customerPortalAccess eq true and type eq 'Person'", $select: "companyNo", $top: "20" })
         );
         var companies = ((contacts && contacts.value) || []).map((row) => row.companyNo).filter((no) => no);
         if (companies.length === 0) {

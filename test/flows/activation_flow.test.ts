@@ -33,7 +33,11 @@ test('matches BC contacts by lower-cased email, with quotes doubled', () => {
 // towards the Q10 several-customers rule (customers come only from the filtered contacts' companies).
 test('only BC contacts with customer portal access can activate or count towards Q10', () => {
   const [, contacts] = actions.find(([name]) => name === 'Get_BC_contacts')!
-  expect(contacts.inputs.queries.$filter).toBe("tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true")
+  // Decided 2026-10-09: only Person contacts — a company contact's shared email must never become a portal login
+  // that the Contacts & Portal Access list doesn't show.
+  expect(contacts.inputs.queries.$filter).toBe(
+    "tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true and type eq 'Person'",
+  )
   const [, companies] = actions.find(([name]) => name === 'Company_no_list')!
   expect(companies.inputs.from).toBe("@body('Get_BC_contacts')?['value']")
 })
