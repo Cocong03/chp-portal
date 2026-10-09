@@ -2,6 +2,8 @@
 
 Who can sign in to Concreat Connect, and what they see, is managed in Dataverse — never in BC (decided 2026-09-15).
 
+**Who may sign in at all** is BC's **Customer Portal Access** flag on the customer's **person** contact (one per named user, with their own email). The flag on a **company** contact is ignored (decided 2026-10-09): a shared company email can't be used to activate or sign in. Turning the flag off on the person contact blocks them on their next page load.
+
 ## What each role sees
 
 | Web role | Sections |
