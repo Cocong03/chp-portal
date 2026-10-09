@@ -30,9 +30,29 @@
     }
   },
   "actions": {
-    "List_contacts_by_email": {
+    "Get_grant": {
       "type": "OpenApiConnection",
       "runAfter": {},
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "chp_accessgrants",
+          "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
+          "$select": "chp_accessgrantid,chp_email,chp_bccustomerno,chp_webrole,statecode"
+        }
+      }
+    },
+    "List_contacts_by_email": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Get_grant": [
+          "Succeeded"
+        ]
+      },
       "inputs": {
         "host": {
           "connectionName": "shared_commondataserviceforapps",
@@ -42,7 +62,7 @@
         "parameters": {
           "entityName": "contacts",
           "$select": "contactid,_parentcustomerid_value",
-          "$filter": "emailaddress1 eq '@{replace(triggerOutputs()?['body/chp_email'], '''', '''''')}' and statecode eq 0",
+          "$filter": "emailaddress1 eq '@{replace(outputs('Get_grant')?['body/chp_email'], '''', '''''')}' and statecode eq 0",
           "$top": 2
         }
       }
@@ -71,7 +91,7 @@
                 "parameters": {
                   "entityName": "chp_accessgrants",
                   "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
-                  "item/chp_status": "@if(equals(triggerOutputs()?['body/statecode'], 1), 775000004, 775000000)"
+                  "item/chp_status": "@if(equals(outputs('Get_grant')?['body/statecode'], 1), 775000004, 775000000)"
                 }
               }
             }
@@ -114,14 +134,14 @@
                   },
                   {
                     "equals": [
-                      "@empty(triggerOutputs()?['body/chp_bccustomerno'])",
+                      "@empty(outputs('Get_grant')?['body/chp_bccustomerno'])",
                       false
                     ]
                   },
                   {
                     "equals": [
                       "@outputs('Get_parent_account')?['body/chp_bccustomerno']",
-                      "@triggerOutputs()?['body/chp_bccustomerno']"
+                      "@outputs('Get_grant')?['body/chp_bccustomerno']"
                     ]
                   }
                 ]
@@ -130,7 +150,7 @@
                 "Grant_role_name": {
                   "type": "Compose",
                   "runAfter": {},
-                  "inputs": "@if(equals(triggerOutputs()?['body/chp_webrole'], 775000000), 'Full Access', if(equals(triggerOutputs()?['body/chp_webrole'], 775000001), 'Orders & Delivery', if(equals(triggerOutputs()?['body/chp_webrole'], 775000002), 'Finance & Documents', if(equals(triggerOutputs()?['body/chp_webrole'], 775000003), 'View Only', ''))))"
+                  "inputs": "@if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000000), 'Full Access', if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000001), 'Orders & Delivery', if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000002), 'Finance & Documents', if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000003), 'View Only', ''))))"
                 },
                 "List_current_business_roles": {
                   "type": "OpenApiConnection",
@@ -161,7 +181,7 @@
                   },
                   "expression": {
                     "equals": [
-                      "@triggerOutputs()?['body/statecode']",
+                      "@outputs('Get_grant')?['body/statecode']",
                       0
                     ]
                   },
@@ -388,7 +408,7 @@
                       "parameters": {
                         "entityName": "chp_accessgrants",
                         "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
-                        "item/chp_status": "@if(equals(triggerOutputs()?['body/statecode'], 1), 775000004, 775000002)"
+                        "item/chp_status": "@if(equals(outputs('Get_grant')?['body/statecode'], 1), 775000004, 775000002)"
                       }
                     }
                   }
@@ -412,7 +432,7 @@
               "parameters": {
                 "entityName": "chp_accessgrants",
                 "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
-                "item/chp_status": "@if(equals(triggerOutputs()?['body/statecode'], 1), 775000004, 775000003)"
+                "item/chp_status": "@if(equals(outputs('Get_grant')?['body/statecode'], 1), 775000004, 775000003)"
               }
             }
           }

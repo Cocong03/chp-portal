@@ -19,7 +19,7 @@ function findAction(actions: Record<string, any>, name: string): any {
 test('a grant only applies when its customer no. is present (blank never matches blank)', () => {
   const conditions = JSON.stringify(findAction(definition.actions, 'Customer_matches').expression)
   // Logic Apps conditions have no "empty" operator: compare the @empty() function to false (Dev rejected the operator form).
-  expect(conditions).toContain(`{"equals":["@empty(triggerOutputs()?['body/chp_bccustomerno'])",false]}`)
+  expect(conditions).toContain(`{"equals":["@empty(outputs('Get_grant')?['body/chp_bccustomerno'])",false]}`)
 })
 
 // Decided 2026-10-08: the access grant is the source of truth for a contact's business role.
@@ -55,7 +55,7 @@ test('an active grant removes every other business role before adding its own', 
 
 test('a deactivated grant removes all business roles and is marked Revoked', () => {
   const isActive = findAction(definition.actions, 'Grant_is_active')
-  expect(JSON.stringify(isActive.expression)).toContain("triggerOutputs()?['body/statecode']")
+  expect(JSON.stringify(isActive.expression)).toContain("outputs('Get_grant')?['body/statecode']")
   const revoke = isActive.else.actions
   expect(revoke.Remove_all_business_roles.type).toBe('Foreach')
   expect(revoke.Remove_all_business_roles.actions.Unrelate_role.inputs.host.operationId).toBe('DisassociateEntities')
@@ -67,7 +67,20 @@ test.each(['Set_status_Pending', 'Set_status_Customer_mismatch', 'Set_status_Dup
   '%s says Revoked instead when the grant was deactivated (no roles touched)',
   (name) => {
     expect(String(findAction(definition.actions, name).inputs.parameters['item/chp_status'])).toContain(
-      `if(equals(triggerOutputs()?['body/statecode'], 1), ${REVOKED},`,
+      `if(equals(outputs('Get_grant')?['body/statecode'], 1), ${REVOKED},`,
     )
   },
 )
+
+// Seen on Dev 2026-10-09: an update sent only the changed columns, so triggerOutputs()?['body/chp_email'] was null and
+// the run failed. Every field now comes from a fresh read of the grant; the trigger supplies only the row id.
+test('reads the grant by id first and never takes its columns from the trigger payload', () => {
+  const [first] = Object.entries(definition.actions as Record<string, any>).find(([, a]) => Object.keys(a.runAfter ?? {}).length === 0)!
+  expect(first).toBe('Get_grant')
+  expect(definition.actions.Get_grant.inputs.parameters).toMatchObject({
+    entityName: 'chp_accessgrants',
+    recordId: "@triggerOutputs()?['body/chp_accessgrantid']",
+  })
+  const body = JSON.stringify(definition.actions)
+  expect(body.match(/triggerOutputs\(\)\?\['body\/(?!chp_accessgrantid')[^']+'\]/g) ?? []).toEqual([])
+})
