@@ -1,4 +1,0 @@
-description: "S2-14: Dashboard announcement is read through the Web API"
-id: 1a5938cb-207f-4c99-908a-ea3151d522b5
-name: Webapi/chp_announcement/enabled
-value: true

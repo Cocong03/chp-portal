@@ -15,7 +15,7 @@ S2 is split into four sub-projects, each with its own spec → plan → build: *
 | 1 | "Portal access" column (Contacts & Portal Access) | **Yes** only when the BC contact has activated (a Dataverse Contact on the session's Account with the same email, case-insensitive), has at least one business web role, **and** BC `customerPortalAccess` = true. Otherwise **No**. A pending access grant (S1-13) still shows **No** until activation applies it |
 | 2 | Site request features on the Sites page (Pending Requests card, "Request a new delivery site", "Request a change") | **Left out** until S4-06 builds them. No disabled or placeholder controls |
 | 3 | Where the contacts list comes from | The existing **`company`** Server Logic returns the company card **and** the contacts (Architecture §6). No new `contacts` endpoint |
-| 4 | Announcement data path | **Power Pages Web API**, Global read (Architecture §5). Adds `src/api/webApi.ts`, which S4 reuses |
+| 4 | Announcement data path | ~~Power Pages Web API~~ → **`announcement` Server Logic read live (`skipCache`)** (changed 2026-10-09: the Web API's shared cache delayed ops edits up to 15 min). Global read table permission kept; `Webapi/chp_announcement/*` settings and `src/api/webApi.ts` removed |
 | 5 | Tables | One **`DataTable`** in `src/ui/` on TanStack Table and the shadcn `Table` primitives (DESIGN.md §5). No pagination in A; it arrives with Orders (B) |
 | 6 | Dashboard greeting | Not built. Mockup v2 removed it (2026-09-29, mockup line 4830). S2-12 is updated to match |
 

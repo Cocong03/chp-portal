@@ -169,7 +169,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **Dashboard — credit tiles** (Credit limit, Available credit) | BC Available Credit ext | – | `dashboard` (same call New Order uses) |
 | **Dashboard — Balance / Balance due / Overdue** | BC customer ledger | – | `dashboard` |
 | **Dashboard — Sales statistics tiles** (5 counts) | BC Sales Orders (+ archive) | – | `dashboard` (BC-side count endpoint preferred) |
-| **Dashboard — Announcement** | Dataverse `Announcement` (single active row, set by account team) | – | Web API (Global read) |
+| **Dashboard — Announcement** | Dataverse `chp_announcement` (newest active row, set by the account team in Concreat Connect Admin) | – | `announcement` Server Logic, read live with `skipCache` (decided 2026-10-09: the Web API served this Global-read table from a shared cache for up to 15 min) |
 | **Orders list / filters / paging / export** | BC Sales Orders + archive (status mapping below) | – | `orders` GET (server-side filter/page; `all=true` for export) |
 | **Order view / Reorder / Trip ID** | BC SO + lines + Trip ID field | – | `orders` GET `?id=` |
 | **Blanket Orders tab / Blanket entry** | BC Blanket Sales Orders + schedule | BC Sales Order referencing Blanket SO # | `blanket-orders`, `orders` POST |
@@ -200,6 +200,7 @@ One Server Logic record per resource. Function names follow the HTTP verb. Serve
 | Endpoint (`/_api/serverlogics/…`) | Verb | Roles | Returns / does |
 |---|---|---|---|
 | `me` | GET | all | Contact name, active account (customer no/name, company), roles. Phase 2: linked accounts |
+| `announcement` | GET | all | Newest active Dashboard announcement `{ title, message }` or `null`, read live (`skipCache`) |
 | `dashboard` | GET | all | Credit (limit, exposure, available), ledger tiles, SO status counts. **One call, fanned out server-side** |
 | `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export |
 | `orders` | POST | Full, Orders&Delivery | Submit: re-quote → re-check credit → create BC SO (or approval path). Requires an **idempotency key** from the client |

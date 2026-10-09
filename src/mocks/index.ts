@@ -1,4 +1,4 @@
-import type { CompanyDto, MeDto, SiteDto } from '@/api/types'
+import type { AnnouncementDto, CompanyDto, MeDto, SiteDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
 
 export interface MockRequest {
@@ -49,21 +49,15 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
       { name: 'Grace Villanueva', title: 'Site Engineer', phone: '0917 552 6616', email: 'grace.villanueva@sample-customer.ph', portalAccess: false, portalRole: '', isYou: false },
     ],
   }),
+  // Wireframe ANNOUNCEMENT
+  announcement: (): AnnouncementDto => ({
+    title: 'Holiday order cutoff schedule',
+    message: 'Submit orders before 3:00 PM to lock in next-business-day confirmation over the upcoming holiday period.',
+  }),
   // Wireframe SITES
   sites: (): SiteDto[] => [
     { code: 'PLANT1', name: 'Plant 1 — Main Yard', address: 'Km 19 Marcos Highway, Brgy. San Roque', city: 'Antipolo City, Rizal', contact: 'Ramon Cruz', phone: '(02) 8531-4420', email: 'ramon.cruz@sample-customer.ph', isDefault: true },
     { code: 'PLANT2', name: 'Plant 2 — North Depot', address: 'National Highway, Brgy. Sta. Cruz', city: 'Angat, Bulacan', contact: 'Ligaya Fernandez', phone: '(044) 815-2207', email: '', isDefault: false },
     { code: 'PLANT3', name: 'Plant 3 — Warehouse A', address: 'Governor’s Drive, Brgy. Zone IV', city: 'Dasmariñas, Cavite', contact: 'Noel Bautista', phone: '(046) 402-7788', email: '', isDefault: false },
-  ],
-}
-
-/** Dev-server answers for the Power Pages Web API, by entity set name (rows as the API returns them). */
-export const webApiMocks: Record<string, (() => unknown[]) | undefined> = {
-  // Wireframe ANNOUNCEMENT
-  chp_announcements: () => [
-    {
-      chp_title: 'Holiday order cutoff schedule',
-      chp_message: 'Submit orders before 3:00 PM to lock in next-business-day confirmation over the upcoming holiday period.',
-    },
   ],
 }
