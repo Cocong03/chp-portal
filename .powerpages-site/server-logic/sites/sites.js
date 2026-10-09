@@ -223,15 +223,30 @@ async function get() {
         return parts.filter((part) => part && String(part).trim()).join(", ");
     }
 
+    // The customer card's Ship-to Code is the default delivery site (mcrmCustomers.ShipToCode, added by BC 2026-10-09).
+    async function defaultShipTo(scope) {
+        var result = await bcGet(
+            scope,
+            "mcrmCustomers",
+            odataQuery({ $filter: "Customer_No eq " + odataLiteral(scope.customerNo), $select: "Customer_No,ShipToCode" })
+        );
+        var card = ((result && result.value) || []).find((row) => row.Customer_No === scope.customerNo);
+        return (card && card.ShipToCode) || "";
+    }
+
     Server.Logger.Log("sites GET called");
     return respond(async () => {
         var scope = await sessionScope();
-        var result = await bcGet(
-            scope,
-            "mcrmShipToAddress",
-            odataQuery({ $filter: "documentNo eq " + odataLiteral(scope.customerNo), $select: SHIP_TO_FIELDS, $top: "500" })
-        );
-        return ((result && result.value) || [])
+        var results = await Promise.all([
+            bcGet(
+                scope,
+                "mcrmShipToAddress",
+                odataQuery({ $filter: "documentNo eq " + odataLiteral(scope.customerNo), $select: SHIP_TO_FIELDS, $top: "500" })
+            ),
+            defaultShipTo(scope)
+        ]);
+        var defaultCode = results[1];
+        return ((results[0] && results[0].value) || [])
             // Defence in depth: only the session customer's rows, whatever BC returns.
             .filter((row) => row.documentNo === scope.customerNo)
             .map((row) => ({
@@ -241,9 +256,9 @@ async function get() {
                 city: joined([row.city, row.postCode]),
                 contact: row.contact || "",
                 phone: row.phoneNo || "",
-                // BC's ship-to API has no email or default flag yet (S2-01).
+                // BC's ship-to API has no email yet (S2-01).
                 email: "",
-                isDefault: false
+                isDefault: defaultCode !== "" && row.code === defaultCode
             }))
             .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));
     });

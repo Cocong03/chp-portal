@@ -21,6 +21,7 @@ const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatus
 function fakeServer({
   account = { accountid: 'acc-1', name: 'BESTRADE', chp_bccustomerno: 'C00000009', chp_bccompanyid: 'co-1' } as unknown,
   shipTos = [SHIP_TO, { ...SHIP_TO, code: 'PLANT1', name: 'Plant 1 — Main Yard' }] as unknown[],
+  customers = [{ Customer_No: 'C00000009', ShipToCode: 'PLANT1' }] as unknown[],
   bcDown = false,
   context = { ServerLogicName: 'sites', QueryParameters: {}, Body: '' } as unknown,
 } = {}) {
@@ -39,6 +40,7 @@ function fakeServer({
           if (url.includes('/MCRMContacts')) return ok({ value: [{ companyNo: 'CT0001' }] })
           if (url.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: (account as { chp_bccustomerno: string }).chp_bccustomerno }] })
           if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
+          if (url.includes('/mcrmCustomers')) return ok({ value: customers })
           return ok({ value: shipTos })
         },
       },
@@ -50,12 +52,12 @@ function fakeServer({
 const SAFE = "We couldn't load this information. Please try again."
 const decoded = (http: { url: string }[], entity: string) => decodeURIComponent(http.find((c) => c.url.includes(`/${entity}?`))!.url)
 
-test("returns the session customer's ship-tos in the wireframe's SITES shape, sorted by code", async () => {
+test("returns the session customer's ship-tos in the wireframe's SITES shape, sorted by code, default flagged", async () => {
   const { server } = fakeServer()
   expect(JSON.parse(await load(server).get())).toEqual([
     {
       code: 'PLANT1', name: 'Plant 1 — Main Yard', address: 'National Highway, Brgy. Sta. Cruz', city: 'Angat, 3012',
-      contact: 'Ligaya Fernandez', phone: '(044) 815-2207', email: '', isDefault: false,
+      contact: 'Ligaya Fernandez', phone: '(044) 815-2207', email: '', isDefault: true,
     },
     {
       code: 'PLANT2', name: 'Plant 2 — North Depot', address: 'National Highway, Brgy. Sta. Cruz', city: 'Angat, 3012',
@@ -96,4 +98,25 @@ test('drops a row that belongs to another customer', async () => {
 test('BC down → only the customer-safe error', async () => {
   const { server } = fakeServer({ bcDown: true })
   await expect(load(server).get()).rejects.toThrow(SAFE)
+})
+
+// BC added mcrmCustomers.ShipToCode (2026-10-09): the customer card's Ship-to Code is the default delivery site.
+test("reads the default from the session customer's card, quotes doubled", async () => {
+  const { server, http } = fakeServer({
+    account: { accountid: 'acc-1', name: 'X', chp_bccustomerno: "O'1", chp_bccompanyid: 'co-1' },
+    shipTos: [{ ...SHIP_TO, documentNo: "O'1" }],
+    customers: [{ Customer_No: "O'1", ShipToCode: 'PLANT2' }],
+  })
+  const [site] = JSON.parse(await load(server).get())
+  expect(site.isDefault).toBe(true)
+  expect(decoded(http, 'mcrmCustomers')).toContain("$filter=Customer_No eq 'O''1'&$select=Customer_No,ShipToCode")
+})
+
+test.each([
+  ['the customer card has no Ship-to Code', [{ Customer_No: 'C00000009', ShipToCode: '' }]],
+  ['the Ship-to Code matches no ship-to', [{ Customer_No: 'C00000009', ShipToCode: 'GONE' }]],
+  ["BC returns another customer's card", [{ Customer_No: 'C00000001', ShipToCode: 'PLANT1' }]],
+])('no site is default when %s', async (_case, customers) => {
+  const { server } = fakeServer({ customers })
+  expect(JSON.parse(await load(server).get()).some((s: { isDefault: boolean }) => s.isDefault)).toBe(false)
 })

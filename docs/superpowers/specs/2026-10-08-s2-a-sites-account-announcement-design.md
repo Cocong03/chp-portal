@@ -33,7 +33,7 @@ S2 is split into four sub-projects, each with its own spec → plan → build: *
 | API | Fields used | Notes |
 |---|---|---|
 | `mcrmShipToAddress` | `documentNo` (= **customer no.**, misleading name), `code`, `name`, `address`, `address2`, `city`, `postCode`, `contact`, `phoneNo` | camelCase, unlike `mcrmCustomers`. `$filter=documentNo eq '<no>'` works. **No county, no email, no default flag** (`shipmentMethod`, `contact1/2`, `phoneNo1/2` exist but are empty). **C00000009 (BESTRADE) has no ship-tos**; C00000002/06/13/21 have some |
-| `mcrmCustomers` | (unchanged) | **No Ship-to Code field** → `isDefault` is always `false` until BC adds a default (S2-01). No website field (S2-18) |
+| `mcrmCustomers` | `ShipToCode` | **Added by BC 2026-10-09**: the customer card's Ship-to Code; `sites` reads it in parallel and flags that ship-to as Default. No website field (S2-18) |
 | `mcrmBusinessRelation` | `contactNo`, `vendorNo`, `linktoTable` | `vendorNo eq '<customer>' and linktoTable eq 'Customer'` works (C00000009 → one company contact) |
 | `MCRMContacts` | `no`, `companyNo`, `type`, `name`, `phoneNo`, `mobilePhoneNo`, `eMail`, `customerPortalAccess`, `privacyBlocked` | `type eq 'Person'` works. **No job title field** → Title shows "" until BC adds one (S2-18). Phone = `phoneNo`, else `mobilePhoneNo` |
 
