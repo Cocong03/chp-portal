@@ -35,6 +35,7 @@ test('the Order total is BC\'s total, not a sum of the lines', async () => {
   answerOrder({ ...MOCK_ORDERS[0], total: 999 })
   renderApp(<OrderDialog id="SO-100482" onClose={() => {}} />)
   const lines = await screen.findByRole('table', { name: 'Order lines' })
+  expect(await within(lines).findByText('₱999.00')).toBeInTheDocument()
   expect(within(lines).getByRole('row', { name: /Order total/ })).toHaveTextContent('₱999.00')
 })
 
@@ -49,7 +50,7 @@ test('an order without lines says so', async () => {
   answerOrder({ ...MOCK_ORDERS[0], so: 'SOR0000000013', total: 0, lines: [], trip: null, ship: null })
   renderApp(<OrderDialog id="SOR0000000013" onClose={() => {}} />)
   const lines = await screen.findByRole('table', { name: 'Order lines' })
-  expect(within(lines).getByRole('cell', { name: 'No items on this order.' })).toBeInTheDocument()
+  expect(await within(lines).findByRole('cell', { name: 'No items on this order.' })).toBeInTheDocument()
   expect(within(lines).getByRole('row', { name: /Order total/ })).toHaveTextContent('₱0.00')
   // No Trip ID note (ship unknown); the details grid's "Trip ID number" label is always there.
   expect(screen.queryByText(/No Trip ID number yet|assigned/)).not.toBeInTheDocument()
@@ -76,4 +77,18 @@ test('Close calls onClose; nothing renders without an id', async () => {
   first.unmount()
   renderApp(<OrderDialog id={null} onClose={onClose} />)
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+test('while loading, the dialog keeps its layout: field labels, the lines table and the Order total row', async () => {
+  vi.mocked(serverLogic).mockImplementation((name, options) =>
+    name === 'orders' ? new Promise(() => {}) : actualServerLogic(name, options),
+  )
+  renderApp(<OrderDialog id="SO-100482" onClose={() => {}} />)
+  const dialog = await screen.findByRole('dialog', { name: 'SO-100482' })
+  for (const label of ['Order date', 'Status', 'PO reference', 'Shipment method', 'Delivery site', 'Expected delivery date', 'Blanket SO #', 'Trip ID number']) {
+    expect(within(dialog).getByText(label)).toBeInTheDocument()
+  }
+  const lines = within(dialog).getByRole('table', { name: 'Order lines' })
+  expect(within(lines).getByRole('columnheader', { name: 'Unit price' })).toBeInTheDocument()
+  expect(within(lines).getByRole('row', { name: /Order total/ })).toBeInTheDocument()
 })

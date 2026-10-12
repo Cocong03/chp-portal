@@ -15,6 +15,8 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
   const sites = useSites().data ?? []
   const data = order.data
   const note = data && tripNote(data)
+  /** While the order loads, each value is a bar the size of what it stands in for, so the layout doesn't jump. */
+  const bone = (width = 'w-24') => <Skeleton className={cn('h-4', width)} />
 
   return (
     <Dialog open={!!id} onOpenChange={(open) => !open && onClose()}>
@@ -27,26 +29,24 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
           <QueryError onRetry={() => void order.refetch()} />
         ) : data === null ? (
           <p className="text-[13.5px] text-muted-foreground">We couldn't find this order.</p>
-        ) : !data ? (
-          <Skeleton className="h-40 w-full" />
         ) : (
           <>
             <dl className="grid grid-cols-1 gap-x-5 gap-y-2.5 rounded-lg bg-muted px-4 py-3.5 sm:grid-cols-2">
               {(
                 [
-                  ['Order date', formatDate(data.date)],
-                  ['Status', <OrderStatusPill key="s" status={data.status} />],
-                  ['PO reference', data.po || '—'],
-                  ['Shipment method', data.ship === 'Pickup' ? 'Pick up' : data.ship ?? '—'],
-                  ['Delivery site', siteLabel(data.site, sites)],
-                  ['Expected delivery date', formatDate(data.edd)],
-                  ['Blanket SO #', data.bso ?? '—'],
-                  ['Trip ID number', data.trip?.id ?? '—'],
+                  ['Order date', data ? formatDate(data.date) : bone()],
+                  ['Status', data ? <OrderStatusPill key="s" status={data.status} /> : bone('w-20')],
+                  ['PO reference', data ? data.po || '—' : bone('w-16')],
+                  ['Shipment method', data ? (data.ship === 'Pickup' ? 'Pick up' : data.ship ?? '—') : bone('w-16')],
+                  ['Delivery site', data ? siteLabel(data.site, sites) : bone('w-44')],
+                  ['Expected delivery date', data ? formatDate(data.edd) : bone()],
+                  ['Blanket SO #', data ? data.bso ?? '—' : bone('w-28')],
+                  ['Trip ID number', data ? data.trip?.id ?? '—' : bone('w-20')],
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-0.5">
                   <dt className="text-[11px] font-semibold tracking-wider text-faint uppercase">{label}</dt>
-                  <dd className="text-[13.5px]">{value}</dd>
+                  <dd className="flex min-h-5 items-center text-[13.5px]">{value}</dd>
                 </div>
               ))}
             </dl>
@@ -65,7 +65,18 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                   </TableRow>
                 </TableHeader>
                 <TableBody>
-                  {data.lines.length === 0 ? (
+                  {!data ? (
+                    [0, 1].map((i) => (
+                      <TableRow key={i} className="hover:bg-transparent">
+                        <TableCell>{bone('w-48')}</TableCell>
+                        {['w-8', 'w-12', 'w-16', 'w-20'].map((width, j) => (
+                          <TableCell key={j}>
+                            <div className={cn('flex', j !== 1 && 'justify-end')}>{bone(width)}</div>
+                          </TableCell>
+                        ))}
+                      </TableRow>
+                    ))
+                  ) : data.lines.length === 0 ? (
                     <TableRow className="hover:bg-transparent">
                       <TableCell colSpan={5} className="py-[26px] text-center text-faint">
                         No items on this order.
@@ -88,7 +99,9 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                     <TableCell colSpan={4} className="text-right font-bold">
                       Order total
                     </TableCell>
-                    <TableCell className="text-right font-mono font-bold tabular-nums">{peso(data.total)}</TableCell>
+                    <TableCell className="text-right font-mono font-bold tabular-nums">
+                      {data ? peso(data.total) : <div className="flex justify-end">{bone('w-24')}</div>}
+                    </TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
