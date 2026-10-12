@@ -100,7 +100,11 @@ test('Next and Prev change pages; Clear filters resets everything', async () => 
 
 test('a page past the end jumps back to the last page', async () => {
   renderApp(<OrdersPage />, { route: '/orders?page=9' })
+  // Final review 2026-10-12: while it jumps back, the table must not claim there are no orders next to "14 orders".
   expect(await screen.findByText('Showing 11–14 of 14 orders')).toBeInTheDocument()
+  expect(screen.queryByRole('cell', { name: "You don't have any orders yet." })).not.toBeInTheDocument()
+  expect(await screen.findByRole('row', { name: /SO-100338/ })).toBeInTheDocument()
+  expect(lastOrdersQuery()).toEqual({ page: '2' })
 })
 
 test.each([

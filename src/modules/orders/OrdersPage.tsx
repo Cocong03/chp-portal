@@ -174,7 +174,8 @@ export function OrdersPage() {
               label="Orders"
               columns={tableColumns}
               data={rows}
-              loading={orders.isPending}
+              // Also while jumping back from a page past the end, so the table never says "no orders" next to "14 orders".
+              loading={orders.isPending || filters.page > lastPage}
               emptyMessage={filtered ? 'No orders match your filters.' : "You don't have any orders yet."}
               className="shadow-none"
             />

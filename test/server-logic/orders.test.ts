@@ -187,3 +187,17 @@ test('BC down → only the customer-safe error', async () => {
   const { server } = fakeServer({ bcDown: true })
   await expect(load(server).get()).rejects.toThrow(SAFE)
 })
+
+// Final review 2026-10-12: a date that matches the pattern but doesn't exist made BC answer 400 and broke the list.
+test('impossible calendar dates are dropped, never sent to BC', async () => {
+  const { server, http } = fakeServer({ query: { from: '2026-02-30', to: '2026-13-45' } })
+  await load(server).get()
+  expect(orderCalls(http)[0]).toContain(`$filter=${BASE}&`)
+})
+
+// Final review 2026-10-12: the 200-row search cap must keep the newest orders, not an arbitrary 200.
+test('each search query asks BC for the newest orders first', async () => {
+  const { server, http } = fakeServer({ query: { q: 'sor' } })
+  await load(server).get()
+  for (const c of orderCalls(http)) expect(c).toContain('$orderby=orderDate desc,salesOrderNo desc')
+})

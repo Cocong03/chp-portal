@@ -231,6 +231,15 @@ async function get() {
         return value === undefined || value === null ? "" : String(value).trim();
     }
 
+    // Dates go into the filter unquoted: only a real calendar date in YYYY-MM-DD form (2026-02-30 is dropped too).
+    function isoDate(value) {
+        if (!ISO_DATE.test(value)) {
+            return false;
+        }
+        var date = new Date(value + "T00:00:00Z");
+        return !isNaN(date.getTime()) && date.toISOString().slice(0, 10) === value;
+    }
+
     function bcDate(value) {
         return value && value !== "0001-01-01" ? value : null;
     }
@@ -281,11 +290,10 @@ async function get() {
         if (site) {
             parts.push("shiptoCode eq " + odataLiteral(site));
         }
-        // Dates go into the filter unquoted, so only an exact YYYY-MM-DD is accepted.
-        if (ISO_DATE.test(from)) {
+        if (isoDate(from)) {
             parts.push("orderDate ge " + from);
         }
-        if (ISO_DATE.test(to)) {
+        if (isoDate(to)) {
             parts.push("orderDate le " + to);
         }
         return parts.join(" and ");
@@ -350,7 +358,13 @@ async function get() {
                 bcGet(
                     scope,
                     "mcrmSalesOrders",
-                    odataQuery({ $filter: filter + " and contains(" + term[0] + "," + odataLiteral(term[1]) + ")", $select: ORDER_FIELDS, $top: SEARCH_CAP })
+                    odataQuery({
+                        $filter: filter + " and contains(" + term[0] + "," + odataLiteral(term[1]) + ")",
+                        $select: ORDER_FIELDS,
+                        // ponytail: newest 200 per query; page through BC if a customer's searches ever need more.
+                        $orderby: "orderDate desc,salesOrderNo desc",
+                        $top: SEARCH_CAP
+                    })
                 )
             )
         );
