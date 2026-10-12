@@ -283,7 +283,9 @@ async function get() {
     }
 
     function listFilter(scope) {
-        var parts = ["sellToCustomerNo eq " + odataLiteral(scope.customerNo), "startswith(salesOrderNo," + odataLiteral(SO_SERIES) + ")"];
+        // The runtime rejects any script containing the "with" + "(" sequence, even inside a string (seen on Dev
+        // 2026-10-12), so the OData function name is joined to its parenthesis at run time.
+        var parts = ["sellToCustomerNo eq " + odataLiteral(scope.customerNo), "startswith" + "(salesOrderNo," + odataLiteral(SO_SERIES) + ")"];
         var site = param("site");
         var from = param("from");
         var to = param("to");

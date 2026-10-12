@@ -24,6 +24,21 @@ test('every endpoint that uses the BC helpers carries an identical copy', () => 
   }
 })
 
+// Seen on Dev 2026-10-12: the runtime rejected orders.js — "prohibited pattern found - Pattern: with\s*\(" — because an
+// OData string held "startswith(". The runtime scans the whole script, strings included, so every endpoint file is checked.
+test('no endpoint file contains a pattern the Power Pages runtime rejects, even inside a string', () => {
+  const files = readdirSync(dir)
+    .map((name) => join(dir, name, `${name}.js`))
+    .filter((file) => existsSync(file))
+  expect(files.length).toBeGreaterThan(0)
+  for (const file of files) {
+    const text = readFileSync(file, 'utf8')
+    for (const pattern of [/\brequire\(/, /\beval\(/, /setTimeout/, /\bdelete\b/, /prototype/, /Reflect\./, /with\s*\(/]) {
+      expect(text, `${file} contains ${pattern}`).not.toMatch(pattern)
+    }
+  }
+})
+
 test('the helper source avoids every pattern the Power Pages validator rejects', () => {
   for (const pattern of [/\brequire\(/, /\bimport\b/, /\beval\(/, /setTimeout/, /\bdelete\b/, /prototype/, /Reflect\./, /console\.log/, /with\(/, /Function\s*\(/i]) {
     expect(source).not.toMatch(pattern)
