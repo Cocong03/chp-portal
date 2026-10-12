@@ -1,5 +1,6 @@
 import type { AnnouncementDto, CompanyDto, MeDto, SiteDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
+import { ordersMock } from './orders'
 
 export interface MockRequest {
   method: string
@@ -54,6 +55,7 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
     title: 'Holiday order cutoff schedule',
     message: 'Submit orders before 3:00 PM to lock in next-business-day confirmation over the upcoming holiday period.',
   }),
+  orders: ordersMock,
   // Wireframe SITES
   sites: (): SiteDto[] => [
     { code: 'PLANT1', name: 'Plant 1 — Main Yard', address: 'Km 19 Marcos Highway, Brgy. San Roque', city: 'Antipolo City, Rizal', contact: 'Ramon Cruz', phone: '(02) 8531-4420', email: 'ramon.cruz@sample-customer.ph', isDefault: true },

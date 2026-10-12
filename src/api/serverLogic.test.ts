@@ -1,6 +1,6 @@
 import { MOCK_SESSION_KEY } from '@/auth/session'
 import { ApiError, BlockedError, GENERIC_ERROR, serverLogic } from './serverLogic'
-import type { CompanyDto, MeDto, SiteDto } from './types'
+import type { CompanyDto, MeDto, OrderDto, OrdersPageDto, SiteDto } from './types'
 
 const caught = async (promise: Promise<unknown>) => (await promise.catch((error: unknown) => error)) as ApiError
 
@@ -41,6 +41,22 @@ describe('on the dev server', () => {
     const company = await serverLogic<CompanyDto>('company')
     expect(company.website).toBe('www.jdsantoshardware.ph')
     expect(company.contacts.map((c) => c.name)).toEqual(['J.D. Santos', 'Elena Ramos', 'Miguel Torres', 'Grace Villanueva'])
+  })
+
+  test('the orders mock pages the wireframe ORDERS newest first and filters like the endpoint', async () => {
+    const first = await serverLogic<OrdersPageDto>('orders', { query: {} })
+    expect(first).toMatchObject({ total: 14, page: 1, pageSize: 10 })
+    expect(first.orders[0].so).toBe('SO-100482')
+    expect((await serverLogic<OrdersPageDto>('orders', { query: { page: '2' } })).orders).toHaveLength(4)
+    expect((await serverLogic<OrdersPageDto>('orders', { query: { status: 'Open' } })).orders.map((o) => o.so)).toEqual(['SO-100467'])
+    expect((await serverLogic<OrdersPageDto>('orders', { query: { q: 'po-8841' } })).orders.map((o) => o.so)).toEqual(['SO-100482'])
+  })
+
+  test('the orders mock answers detail by id, and notFound for an unknown id', async () => {
+    const order = await serverLogic<OrderDto>('orders', { query: { id: 'SO-100482' } })
+    expect(order.lines[0]).toMatchObject({ code: 'CEM-T1-40KG', qty: 600, uom: 'BAG' })
+    expect(order.total).toBe(order.lines.reduce((sum, l) => sum + l.lineTotal, 0))
+    expect(await serverLogic('orders', { query: { id: 'SO-1' } })).toEqual({ notFound: true })
   })
 
   test('an endpoint without a mock is a 404 ApiError', async () => {

@@ -53,3 +53,40 @@ export interface AnnouncementDto {
   title: string
   message: string
 }
+export type OrderStatus = 'Open' | 'Pending Prepayment' | 'Ready for Dispatch' | 'Completely Shipped' | 'Invoiced'
+
+/** One row of GET /_api/serverlogics/orders. Mirrors the wireframe's ORDERS[]; null = BC has no value yet. */
+export interface OrderSummaryDto {
+  so: string
+  date: string
+  po: string
+  site: string
+  ship: 'Pickup' | 'Delivery' | null
+  bso: string | null
+  trip: { id: string; assignedAt: string | null } | null
+  edd: string | null
+  total: number
+  status: OrderStatus | null
+}
+
+export interface OrderLineDto {
+  code: string
+  description: string
+  qty: number
+  uom: string
+  unitPrice: number
+  /** BC's line amount; never computed in the SPA. */
+  lineTotal: number
+}
+
+/** GET /_api/serverlogics/orders?id=… */
+export interface OrderDto extends OrderSummaryDto {
+  lines: OrderLineDto[]
+}
+
+export interface OrdersPageDto {
+  orders: OrderSummaryDto[]
+  total: number
+  page: number
+  pageSize: number
+}
