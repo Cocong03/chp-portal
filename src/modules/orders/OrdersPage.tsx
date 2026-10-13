@@ -59,6 +59,8 @@ function columns(sites: SiteDto[], onView: (so: string) => void): DataColumn<Ord
     {
       id: 'view',
       header: '',
+      // Pinned: the table scrolls sideways on narrower screens and View must stay in reach.
+      meta: { className: 'sticky right-0' },
       cell: ({ row }) => (
         <Button variant="ghost" size="sm" onClick={() => onView(row.original.so)}>
           View

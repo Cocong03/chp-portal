@@ -11,7 +11,8 @@ const LOADING_ROWS = [0, 1, 2]
 
 /**
  * The portal's table (DESIGN.md §5): wireframe header and cell styles, skeleton rows while loading,
- * one centred row when empty. `data` must be stable (memoised or from the query cache).
+ * one centred row when empty. `data` must be stable (memoised or from the query cache). Cells take the row's background,
+ * so a column pinned with `meta.className: 'sticky right-0'` covers what scrolls under it.
  */
 export function DataTable<T extends RowData>({
   label,
@@ -40,7 +41,7 @@ export function DataTable<T extends RowData>({
                 <TableHead
                   key={header.id}
                   className={cn(
-                    'h-auto bg-muted px-2.5 py-[11px] text-[11.5px] font-semibold tracking-wider text-faint uppercase',
+                    'h-auto bg-muted px-2.5 py-[11px] text-[11.5px] font-semibold tracking-wider whitespace-normal text-faint uppercase',
                     metaClass(header.column.columnDef.meta),
                   )}
                 >
@@ -69,11 +70,11 @@ export function DataTable<T extends RowData>({
             </TableRow>
           ) : (
             rows.map((row) => (
-              <TableRow key={row.id} className="hover:bg-muted">
+              <TableRow key={row.id} className="bg-card hover:bg-muted">
                 {row.getAllCells().map((cell) => (
                   <TableCell
                     key={cell.id}
-                    className={cn('px-2.5 py-[13px] text-[13.5px] whitespace-normal', metaClass(cell.column.columnDef.meta))}
+                    className={cn('bg-inherit px-2.5 py-[13px] text-[13.5px] whitespace-normal', metaClass(cell.column.columnDef.meta))}
                   >
                     <table.FlexRender cell={cell} />
                   </TableCell>
