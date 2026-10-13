@@ -56,7 +56,8 @@ test('the topbar shows the company, account and signed-in user', async () => {
 
 test('a deep link inside the role lands on that section and marks it current', async () => {
   signInAs('full@test.ph', '/ledger')
-  expect(await screen.findByRole('heading', { level: 1, name: 'Customer Ledger' })).toBeInTheDocument()
+  // The Ledger page is lazy-loaded; its first load in Vitest can take over a second.
+  expect(await screen.findByRole('heading', { level: 1, name: 'Customer Ledger' }, { timeout: 5000 })).toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Customer Ledger' })).toHaveAttribute('aria-current', 'page')
   expect(screen.getByRole('link', { name: 'Dashboard' })).not.toHaveAttribute('aria-current')
   expect(document.title).toBe('Customer Ledger — Concreat Connect')

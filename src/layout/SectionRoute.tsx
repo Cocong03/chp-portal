@@ -10,6 +10,7 @@ import { PageErrorBoundary } from './PageErrorBoundary'
 const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
   dashboard: lazy(() => import('@/modules/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage }))),
   orders: lazy(() => import('@/modules/orders/OrdersPage').then((m) => ({ default: m.OrdersPage }))),
+  ledger: lazy(() => import('@/modules/ledger/LedgerPage').then((m) => ({ default: m.LedgerPage }))),
   sites: lazy(() => import('@/modules/sites/SitesPage').then((m) => ({ default: m.SitesPage }))),
   account: lazy(() => import('@/modules/account/AccountPage').then((m) => ({ default: m.AccountPage }))),
 }
@@ -18,7 +19,8 @@ const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
 export function SectionRoute({ section }: { section: Section }) {
   const { data } = useMe()
   if (!data || !canSee(data.roles, section.key)) return <Navigate to="/" replace />
-  const Page = PAGES[section.key]
+  // ponytail: Customer Ledger runs only in the local build until BC's ledger API exists (S2-07); delete this condition then.
+  const Page = section.key === 'ledger' && !import.meta.env.DEV ? undefined : PAGES[section.key]
   if (!Page) return <Placeholder label={section.label} />
   // Keyed by section so moving to another section clears a failed page.
   return (
