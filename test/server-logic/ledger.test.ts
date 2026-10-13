@@ -176,8 +176,9 @@ test('BC down → only the customer-safe error', async () => {
 test('only Full Access and Finance & Documents can call it', () => {
   const yml = readFileSync(resolve('.powerpages-site/server-logic/ledger/ledger.serverlogic.yml'), 'utf8')
   expect(yml).toContain('name: ledger')
-  expect(yml.match(/^  - [0-9a-f-]{36}$/gm)).toEqual([
-    '  - 56b29291-b981-4ef0-865b-41c1e9523a97',
-    '  - c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3',
+  // Trimmed lines, so a CRLF checkout reads the same.
+  expect(yml.split('\n').map((line) => line.trim()).filter((line) => /^- [0-9a-f-]{36}$/.test(line))).toEqual([
+    '- 56b29291-b981-4ef0-865b-41c1e9523a97',
+    '- c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3',
   ])
 })
