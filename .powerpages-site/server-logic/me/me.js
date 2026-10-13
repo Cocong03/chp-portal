@@ -77,30 +77,32 @@ async function get() {
             companyId: account.chp_bccompanyid,
             customerName: account.name || ""
         };
-        if (!(await hasPortalAccess(scope, contact.emailaddress1))) {
+        if (!(await portalContact(scope, contact.emailaddress1))) {
             throw blockedError();
         }
         return scope;
     }
 
-    // True while BC has a Person contact with this email, customerPortalAccess = true, linked to the session's customer.
+    // The BC Person contact with this email, customerPortalAccess = true, linked to the session's customer; null when there's
+    // none. One email is one person, so the first match serves for the name.
     // Company contacts never count (decided 2026-10-09): their shared email would be a login the Contacts list doesn't show.
     // The email comes from Dataverse, never from the request. A BC failure throws (an error, not a block).
     // ponytail: two BC calls per request; add a short-lived cache if Dev timings show it matters.
-    async function hasPortalAccess(scope, email) {
+    async function portalContact(scope, email) {
         var address = String(email || "").trim().toLowerCase();
         if (!address) {
-            return false;
+            return null;
         }
         var contacts = await bcGet(
             scope,
             "MCRMContacts",
-            odataQuery({ $filter: "tolower(eMail) eq " + odataLiteral(address) + " and customerPortalAccess eq true and type eq 'Person'", $select: "companyNo", $top: "20" })
+            odataQuery({ $filter: "tolower(eMail) eq " + odataLiteral(address) + " and customerPortalAccess eq true and type eq 'Person'", $select: "companyNo,name", $top: "20" })
         );
-        var companies = ((contacts && contacts.value) || []).map((row) => row.companyNo).filter((no) => no);
-        if (companies.length === 0) {
-            return false;
+        var found = ((contacts && contacts.value) || []).filter((row) => row.companyNo);
+        if (found.length === 0) {
+            return null;
         }
+        var companies = found.map((row) => row.companyNo);
         var relations = await bcGet(
             scope,
             "mcrmBusinessRelation",
@@ -109,7 +111,7 @@ async function get() {
                 $select: "vendorNo"
             })
         );
-        return ((relations && relations.value) || []).some((row) => row.vendorNo === scope.customerNo);
+        return ((relations && relations.value) || []).some((row) => row.vendorNo === scope.customerNo) ? found[0] : null;
     }
 
     function blockedError() {
@@ -259,10 +261,13 @@ async function get() {
 
         if (account && account.chp_bccustomerno && account.chp_bccompanyid) {
             var scope = { contactId: user.contactid, customerNo: account.chp_bccustomerno, companyId: account.chp_bccompanyid, customerName: account.name || "" };
-            if (!(await hasPortalAccess(scope, contact.emailaddress1))) {
+            var bcContact = await portalContact(scope, contact.emailaddress1);
+            if (!bcContact) {
                 Server.Logger.Warn("me blocked: BC customerPortalAccess is off");
                 return JSON.stringify({ contact: who, account: null, roles: [], blocked: true });
             }
+            // BC owns the name; the Dataverse copy is only what activation saw.
+            who.name = String(bcContact.name || "").trim() || who.name;
         }
 
         // Server.User.Roles reached scripts as the text "System.String[]" on Dev (2026-10-04),

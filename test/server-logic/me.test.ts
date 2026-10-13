@@ -89,6 +89,13 @@ test.each([
   expect(calls).toHaveLength(1)
 })
 
+// Seen on Dev 2026-10-13: a name changed in BC never reached the portal, which showed the copy made at activation.
+test('the name comes live from the BC contact, falling back to Dataverse when BC has none', async () => {
+  const { server, http } = fakeServer({ record: contact(ACCOUNT), portalContacts: [{ companyNo: 'CT1', name: 'ERLINDAS ARENAS GAWAN' }] })
+  expect(JSON.parse(await load(server).get()).contact).toEqual({ name: 'ERLINDAS ARENAS GAWAN', email: 'full@example.com' })
+  expect(decodeURIComponent(http[0])).toContain('$select=companyNo,name')
+})
+
 test('checks BC with the Dataverse email of the signed-in contact', async () => {
   const { server, http } = fakeServer({ record: contact(ACCOUNT) })
   await load(server).get()
