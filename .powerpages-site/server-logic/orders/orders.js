@@ -218,8 +218,6 @@ async function get() {
     }
     // #endregion bc-helpers
 
-    // mcrmSalesOrders also returns blanket (BSO), credit memo (SCM) and invoice (SIN) documents and has no document
-    // type; BC rejects "not", so only the SOR series is listed. Switch to documentType eq 'Order' when BC adds it.
     // Portal status ← BC Sales Header status (confirmed 2026-09-14). BC encodes spaces in enum values as _x0020_.
     // Completely Shipped and Invoiced come from archived orders, which the API doesn't return yet (S2-03).
     var STATUS_FROM_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Released": "Ready for Dispatch" };
