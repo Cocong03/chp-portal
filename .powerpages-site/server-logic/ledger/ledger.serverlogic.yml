@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3
+description: 'Signed-in customer''s BC Customer Ledger Entries, filtered and paged in BC (S2-08)'
+display_name: 'Ledger (BC Customer Ledger Entries)'
+id: 538d4c3e-de20-4e8e-a76b-b3f1c75f199d
+name: ledger
