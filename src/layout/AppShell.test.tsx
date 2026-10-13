@@ -47,9 +47,10 @@ test('Finance & Documents sees only its sections', async () => {
 
 test('the topbar shows the company, account and signed-in user', async () => {
   signInAs('full@test.ph')
-  expect(await screen.findByText('Solid Cement')).toBeInTheDocument()
-  expect(screen.getByText(/J\.D\. Santos Hardware & Construction Supply/)).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: /J\.D\. Santos/ })).toHaveTextContent('JS')
+  const topbar = await screen.findByRole('banner')
+  expect(await within(topbar).findByText('Solid Cement')).toBeInTheDocument()
+  expect(within(topbar).getByText(/J\.D\. Santos Hardware & Construction Supply/)).toBeInTheDocument()
+  expect(within(topbar).getByRole('button', { name: /J\.D\. Santos/ })).toHaveTextContent('JS')
   expect(screen.getByRole('img', { name: 'Concreat' })).toHaveAttribute('src', '/concreat-logo.webp')
 })
 
