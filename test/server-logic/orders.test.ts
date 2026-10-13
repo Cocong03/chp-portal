@@ -11,10 +11,11 @@ const SETTINGS: Record<string, string> = {
   'BC/ClientId': 'client-1',
   'BC/ClientSecret': 'secret-1',
 }
-// BC DEV field names (probed 2026-10-12).
+// BC DEV field names (probed 2026-10-12; documentType and status added 2026-10-13, spaces encoded as _x0020_).
 const ORDER = {
   salesOrderNo: 'SOR0000000006', sellToCustomerNo: 'C00000002', orderDate: '2026-10-09', externalDocumentNo: 'PO1',
   shiptoCode: '65072350', shipmentMethodCode: '', tripEntryNo: '', requestDeliveryDate: '0001-01-01', totalAmountInclVAT: 12500.5,
+  documentType: 'Order', status: 'Open',
 }
 const LINE = {
   documentNo: 'SOR0000000006', itemNo: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', quantity: 50,
@@ -64,7 +65,7 @@ function fakeServer({
 
 const SAFE = "We couldn't load this information. Please try again."
 const orderCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrders?'))
-const BASE = "sellToCustomerNo eq 'C00000002' and startswith(salesOrderNo,'SOR')"
+const BASE = "sellToCustomerNo eq 'C00000002' and documentType eq 'Order'"
 
 test("lists the session customer's SOR orders newest first, 10 per page, with the total count", async () => {
   const { server, http } = fakeServer({ query: { page: '2' }, count: 14 })
@@ -72,7 +73,7 @@ test("lists the session customer's SOR orders newest first, 10 per page, with th
     orders: [
       {
         so: 'SOR0000000006', date: '2026-10-09', po: 'PO1', site: '65072350', ship: null, bso: null, trip: null,
-        edd: null, total: 12500.5, status: null,
+        edd: null, total: 12500.5, status: 'Open',
       },
     ],
     total: 14,
@@ -111,9 +112,9 @@ test('an invalid page number falls back to page 1', async () => {
   expect(orderCalls(http)[0]).toContain('$skip=0')
 })
 
-test('drops rows BC returns for another customer or outside the SOR series', async () => {
+test('drops rows BC returns for another customer or that are not sales orders', async () => {
   const { server } = fakeServer({
-    orders: [ORDER, { ...ORDER, salesOrderNo: 'SOR9', sellToCustomerNo: 'C1' }, { ...ORDER, salesOrderNo: 'BSO0000000001' }],
+    orders: [ORDER, { ...ORDER, salesOrderNo: 'SOR9', sellToCustomerNo: 'C1' }, { ...ORDER, salesOrderNo: 'BSO0000000001', documentType: 'Blanket_x0020_Order' }],
     count: 3,
   })
   expect(JSON.parse(await load(server).get()).orders.map((o: { so: string }) => o.so)).toEqual(['SOR0000000006'])
@@ -165,10 +166,10 @@ test('detail returns the order with its BC lines', async () => {
   const { server, http } = fakeServer({ query: { id: 'SOR0000000006' } })
   expect(JSON.parse(await load(server).get())).toEqual({
     so: 'SOR0000000006', date: '2026-10-09', po: 'PO1', site: '65072350', ship: null, bso: null, trip: null, edd: null,
-    total: 12500.5, status: null,
+    total: 12500.5, status: 'Open',
     lines: [{ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', qty: 50, uom: 'BAG', unitPrice: 245, lineTotal: 12250 }],
   })
-  expect(orderCalls(http)[0]).toContain("$filter=salesOrderNo eq 'SOR0000000006' and sellToCustomerNo eq 'C00000002'")
+  expect(orderCalls(http)[0]).toContain("$filter=salesOrderNo eq 'SOR0000000006' and sellToCustomerNo eq 'C00000002' and documentType eq 'Order'")
   expect(http.some((u) => u.includes("chpSalesOrderLines?$filter=documentNo eq 'SOR0000000006'"))).toBe(true)
 })
 
@@ -200,4 +201,32 @@ test('each search query asks BC for the newest orders first', async () => {
   const { server, http } = fakeServer({ query: { q: 'sor' } })
   await load(server).get()
   for (const c of orderCalls(http)) expect(c).toContain('$orderby=orderDate desc,salesOrderNo desc')
+})
+
+// Confirmed mapping (CLAUDE.md, 2026-09-14). BC encodes spaces in enum values ("Pending_x0020_Prepayment").
+test.each([
+  ['Open', 'Open'],
+  ['Pending_x0020_Prepayment', 'Pending Prepayment'],
+  ['Released', 'Ready for Dispatch'],
+  ['Pending_x0020_Approval', null],
+])('BC status %s → %s', async (bc, portal) => {
+  const { server } = fakeServer({ orders: [{ ...ORDER, status: bc }] })
+  expect(JSON.parse(await load(server).get()).orders[0].status).toBe(portal)
+})
+
+test.each([
+  ['Open', "status eq 'Open'"],
+  ['Pending Prepayment', "status eq 'Pending Prepayment'"],
+  ['Ready for Dispatch', "status eq 'Released'"],
+])('the %s filter runs in BC', async (status, clause) => {
+  const { server, http } = fakeServer({ query: { status } })
+  await load(server).get()
+  expect(orderCalls(http)[0]).toContain(`$filter=${BASE} and ${clause}&`)
+})
+
+// Completely Shipped and Invoiced come from archived orders, which the API doesn't return yet (S2-03).
+test.each(['Completely Shipped', 'Invoiced', "x' or 1 eq 1"])('the %s filter answers with no orders and never reaches BC', async (status) => {
+  const { server, http } = fakeServer({ query: { status } })
+  expect(JSON.parse(await load(server).get())).toEqual({ orders: [], total: 0, page: 1, pageSize: 10 })
+  expect(orderCalls(http)).toEqual([])
 })

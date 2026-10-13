@@ -218,10 +218,13 @@ async function get() {
 
     // mcrmSalesOrders also returns blanket (BSO), credit memo (SCM) and invoice (SIN) documents and has no document
     // type; BC rejects "not", so only the SOR series is listed. Switch to documentType eq 'Order' when BC adds it.
-    var SO_SERIES = "SOR";
+    // Portal status ← BC Sales Header status (confirmed 2026-09-14). BC encodes spaces in enum values as _x0020_.
+    // Completely Shipped and Invoiced come from archived orders, which the API doesn't return yet (S2-03).
+    var STATUS_FROM_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Released": "Ready for Dispatch" };
+    var STATUS_TO_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Ready for Dispatch": "Released" };
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
-    var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT";
+    var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,status";
     var LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,AmountIncludingVAT";
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -245,7 +248,7 @@ async function get() {
     }
 
     function owned(row, scope) {
-        return row.sellToCustomerNo === scope.customerNo && String(row.salesOrderNo || "").indexOf(SO_SERIES) === 0;
+        return row.sellToCustomerNo === scope.customerNo && row.documentType === "Order";
     }
 
     function newestFirst(a, b) {
@@ -255,7 +258,7 @@ async function get() {
         return a.salesOrderNo < b.salesOrderNo ? 1 : a.salesOrderNo > b.salesOrderNo ? -1 : 0;
     }
 
-    // Status, ship (Pick up / Delivery), Blanket SO # and the Trip ID assigned date stay null until BC provides them (S2-03).
+    // Ship (Pick up / Delivery), Blanket SO # and the Trip ID assigned date stay null until BC provides them (S2-03).
     function toSummary(row) {
         return {
             so: row.salesOrderNo,
@@ -267,7 +270,7 @@ async function get() {
             trip: row.tripEntryNo ? { id: row.tripEntryNo, assignedAt: null } : null,
             edd: bcDate(row.requestDeliveryDate),
             total: Number(row.totalAmountInclVAT) || 0,
-            status: null
+            status: STATUS_FROM_BC[String(row.status || "").split("_x0020_").join(" ")] || null
         };
     }
 
@@ -283,12 +286,14 @@ async function get() {
     }
 
     function listFilter(scope) {
-        // The runtime rejects any script containing the "with" + "(" sequence, even inside a string (seen on Dev
-        // 2026-10-12), so the OData function name is joined to its parenthesis at run time.
-        var parts = ["sellToCustomerNo eq " + odataLiteral(scope.customerNo), "startswith" + "(salesOrderNo," + odataLiteral(SO_SERIES) + ")"];
+        var parts = ["sellToCustomerNo eq " + odataLiteral(scope.customerNo), "documentType eq 'Order'"];
+        var status = param("status");
         var site = param("site");
         var from = param("from");
         var to = param("to");
+        if (status) {
+            parts.push("status eq " + odataLiteral(STATUS_TO_BC[status]));
+        }
         if (site) {
             parts.push("shiptoCode eq " + odataLiteral(site));
         }
@@ -302,14 +307,11 @@ async function get() {
     }
 
     async function detail(scope, id) {
-        if (id.indexOf(SO_SERIES) !== 0) {
-            return { notFound: true };
-        }
         var found = await bcGet(
             scope,
             "mcrmSalesOrders",
             odataQuery({
-                $filter: "salesOrderNo eq " + odataLiteral(id) + " and sellToCustomerNo eq " + odataLiteral(scope.customerNo),
+                $filter: "salesOrderNo eq " + odataLiteral(id) + " and sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq 'Order'",
                 $select: ORDER_FIELDS
             })
         );
@@ -329,6 +331,10 @@ async function get() {
     }
 
     async function list(scope, page) {
+        var status = param("status");
+        if (status && Object.keys(STATUS_TO_BC).indexOf(status) === -1) {
+            return { orders: [], total: 0, page: page, pageSize: PAGE_SIZE };
+        }
         var filter = listFilter(scope);
         var q = param("q").slice(0, 50);
         if (!q) {
