@@ -15,7 +15,7 @@ const SETTINGS: Record<string, string> = {
 const ENTRY = {
   customerNo: 'C00000002', postingDate: '2026-09-12', documentType: 'Invoice', documentNo: 'SIN0000000003',
   externalDocumentNo: 'PO-8858', description: 'September cement delivery', dueDate: '2026-10-12',
-  amount: 63250, remainingAmount: 63250, open: true,
+  amount: 63250, remainingAmount: 63250, open: true, entryNo: 1001,
 }
 const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify(value) })
 
@@ -73,7 +73,7 @@ test("lists the session customer's open entries newest first, 10 per page, with 
   })
   const call = ledgerCalls(http)[0]
   expect(call).toContain(`$filter=${BASE} and open eq true&`)
-  expect(call).toContain('$orderby=postingDate desc,documentNo desc')
+  expect(call).toContain('$orderby=postingDate desc,entryNo desc')
   expect(call).toContain('$top=10')
   expect(call).toContain('$skip=0')
   expect(call).toContain('$count=true')
@@ -126,7 +126,7 @@ test('maps payments and credits: negative amounts, no due date, no PO, closed, B
 })
 
 test('search: codes in upper case, description as typed, lower case and Capitalised; merged, de-duplicated, newest first', async () => {
-  const older = { ...ENTRY, documentNo: 'SIN0000000001', postingDate: '2026-08-01', description: 'August cement delivery' }
+  const older = { ...ENTRY, entryNo: 900, documentNo: 'SIN0000000001', postingDate: '2026-08-01', description: 'August cement delivery' }
   const { server, http } = fakeServer({
     query: { q: 'cement' },
     search: {
@@ -144,13 +144,13 @@ test('search: codes in upper case, description as typed, lower case and Capitali
     expect(calls.some((c) => c.includes(`$filter=${BASE} and open eq true and ${clause}&`))).toBe(true)
   }
   for (const c of calls) {
-    expect(c).toContain('$orderby=postingDate desc,documentNo desc')
+    expect(c).toContain('$orderby=postingDate desc,entryNo desc')
     expect(c).toContain('$top=200')
   }
 })
 
 test('search pages the merged results in the endpoint', async () => {
-  const many = Array.from({ length: 12 }, (_, i) => ({ ...ENTRY, documentNo: `SIN${String(i).padStart(3, '0')}`, postingDate: `2026-09-${String(i + 1).padStart(2, '0')}` }))
+  const many = Array.from({ length: 12 }, (_, i) => ({ ...ENTRY, entryNo: i, documentNo: `SIN${String(i).padStart(3, '0')}`, postingDate: `2026-09-${String(i + 1).padStart(2, '0')}` }))
   const { server } = fakeServer({ query: { q: 'SIN', page: '2' }, search: { "contains(documentNo,'SIN')": many }, entries: [] })
   const page = JSON.parse(await load(server).get())
   expect(page).toMatchObject({ total: 12, page: 2 })
@@ -181,4 +181,14 @@ test('only Full Access and Finance & Documents can call it', () => {
     '- 56b29291-b981-4ef0-865b-41c1e9523a97',
     '- c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3',
   ])
+})
+
+// Final review 2026-10-13: one payment can post several entries with the same type, number and date (one per settled
+// invoice). They must all show, and BC's entry number keeps paging stable when such entries tie.
+test('search keeps separate BC entries that share a document number and date', async () => {
+  const line = (entryNo: number) => ({ ...ENTRY, documentType: 'Payment', documentNo: 'PMT-1', entryNo, amount: -100 })
+  const { server, http } = fakeServer({ query: { q: 'PMT-1' }, search: { "contains(documentNo,'PMT-1')": [line(7), line(9), line(8)] }, entries: [] })
+  const page = JSON.parse(await load(server).get())
+  expect(page.total).toBe(3)
+  expect(ledgerCalls(http)[0]).toContain('$select=customerNo,entryNo,')
 })

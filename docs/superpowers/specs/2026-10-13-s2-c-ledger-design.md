@@ -31,6 +31,7 @@ Standard Cust. Ledger Entry fields, camelCase, every one filterable and sortable
 | Portal | BC field | Notes |
 |---|---|---|
 | Scope | `customerNo` | the portal always filters on it |
+| Sort and identity | `entryNo` | Entry No., unique; one payment can post several entries with the same type, number and date (added after the final review 2026-10-13) |
 | Posting date | `postingDate` | |
 | Document type | `documentType` | Invoice / Credit Memo / Payment (BC encodes spaces as `_x0020_`, as seen on `mcrmSalesOrders`) |
 | Document no. | `documentNo` | Code field (upper case) |
@@ -49,8 +50,8 @@ Standard Cust. Ledger Entry fields, camelCase, every one filterable and sortable
 - **Scope:** `sessionScope()` only; any customer/company value in the request is ignored. Filter always starts `customerNo eq '<session customer>'`.
 - **Query parameters:** `q` (≤50 chars), `type` (`Invoice` | `Credit Memo` | `Payment`; anything else → empty page, no BC call), `show` (`all`; anything else = open only), `from`/`to` (real calendar dates only, as in `orders`), `page` (1–1000, default 1).
 - **Filter:** `customerNo eq …` + `open eq true` (unless `show=all`) + `documentType eq '<type>'` + `postingDate ge/le`. Every value through `odataLiteral`.
-- **List (no `q`):** `$orderby=postingDate desc,documentNo desc`, `$top=10`, `$skip`, `$count=true` → total from `@odata.count`.
-- **Search (`q`):** parallel queries, each `filter and contains(<field>,'<term>')`, `$orderby` newest first, `$top=200`; merged, de-duplicated (by `documentNo` + `documentType` + `postingDate`), sorted newest first, paged in the endpoint:
+- **List (no `q`):** `$orderby=postingDate desc,entryNo desc`, `$top=10`, `$skip`, `$count=true` → total from `@odata.count`.
+- **Search (`q`):** parallel queries, each `filter and contains(<field>,'<term>')`, `$orderby` newest first, `$top=200`; merged, de-duplicated (by `entryNo`), sorted newest first, paged in the endpoint:
   - `documentNo` and `externalDocumentNo` with the term in **UPPER CASE**
   - `description` with the term **as typed**, **lower case** and **Capitalised** (first letter upper, rest lower), distinct variants only
   - ponytail: newest 200 per query (same ceiling as `orders`)

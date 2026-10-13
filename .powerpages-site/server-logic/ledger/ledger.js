@@ -223,8 +223,9 @@ async function get() {
     var TYPES = ["Invoice", "Credit Memo", "Payment"];
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
-    var FIELDS = "customerNo,postingDate,documentType,documentNo,externalDocumentNo,description,dueDate,amount,remainingAmount,open";
-    var ORDER_BY = "postingDate desc,documentNo desc";
+    var FIELDS = "customerNo,entryNo,postingDate,documentType,documentNo,externalDocumentNo,description,dueDate,amount,remainingAmount,open";
+    // Entry No. is unique: one payment can post several entries with the same type, number and date.
+    var ORDER_BY = "postingDate desc,entryNo desc";
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
     function param(name) {
@@ -264,7 +265,7 @@ async function get() {
         if (a.postingDate !== b.postingDate) {
             return a.postingDate < b.postingDate ? 1 : -1;
         }
-        return a.documentNo < b.documentNo ? 1 : a.documentNo > b.documentNo ? -1 : 0;
+        return (Number(b.entryNo) || 0) - (Number(a.entryNo) || 0);
     }
 
     function listFilter(scope, type) {
@@ -344,7 +345,7 @@ async function get() {
         var seen = {};
         results.forEach((res) => {
             ((res && res.value) || []).filter(mine).forEach((row) => {
-                var key = row.documentType + "|" + row.documentNo + "|" + row.postingDate;
+                var key = String(row.entryNo);
                 if (!seen[key]) {
                     seen[key] = true;
                     merged.push(row);
