@@ -90,3 +90,24 @@ export interface OrdersPageDto {
   page: number
   pageSize: number
 }
+
+/** GET /_api/serverlogics/ledger. Mirrors the wireframe's LEDGER_ENTRIES; amounts are BC's, signed (payments and credits negative). */
+export interface LedgerEntryDto {
+  docNo: string
+  refPo: string | null
+  /** 'Invoice' | 'Credit Memo' | 'Payment', or BC's own name for any other type. */
+  type: string
+  desc: string
+  postingDate: string
+  dueDate: string | null
+  original: number
+  remaining: number
+  status: 'Open' | 'Closed'
+}
+
+export interface LedgerPageDto {
+  entries: LedgerEntryDto[]
+  total: number
+  page: number
+  pageSize: number
+}

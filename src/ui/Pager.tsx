@@ -6,12 +6,15 @@ export function Pager({
   pageSize,
   total,
   noun,
+  plural = `${noun}s`,
   onPage,
 }: {
   page: number
   pageSize: number
   total: number
   noun: string
+  /** Defaults to noun + "s" ("orders"); pass it for irregular plurals ("entries"). */
+  plural?: string
   onPage: (page: number) => void
 }) {
   const from = total ? (page - 1) * pageSize + 1 : 0
@@ -20,7 +23,7 @@ export function Pager({
   return (
     <div className="mt-3 flex flex-wrap items-center justify-between gap-2.5 text-[12.5px] text-muted-foreground">
       <span>
-        Showing {from}–{to} of {total} {total === 1 ? noun : `${noun}s`}
+        Showing {from}–{to} of {total} {total === 1 ? noun : plural}
       </span>
       <div className="flex gap-2">
         <Button variant="outline" size="sm" disabled={page <= 1} onClick={() => onPage(page - 1)}>
