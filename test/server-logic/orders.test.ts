@@ -15,7 +15,7 @@ const SETTINGS: Record<string, string> = {
 const ORDER = {
   salesOrderNo: 'SOR0000000006', sellToCustomerNo: 'C00000002', orderDate: '2026-10-09', externalDocumentNo: 'PO1',
   shiptoCode: '65072350', shipmentMethodCode: '', tripEntryNo: '', requestDeliveryDate: '0001-01-01', totalAmountInclVAT: 12500.5,
-  documentType: 'Order', status: 'Open',
+  documentType: 'Order', status: 'Open', completelyShipped: false, blanketOrderNo: '',
 }
 const LINE = {
   documentNo: 'SOR0000000006', itemNo: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', quantity: 50,
@@ -215,18 +215,32 @@ test.each([
 })
 
 test.each([
-  ['Open', "status eq 'Open'"],
-  ['Pending Prepayment', "status eq 'Pending Prepayment'"],
-  ['Ready for Dispatch', "status eq 'Released'"],
+  ['Open', "status eq 'Open' and completelyShipped eq false"],
+  ['Pending Prepayment', "status eq 'Pending Prepayment' and completelyShipped eq false"],
+  ['Ready for Dispatch', "status eq 'Released' and completelyShipped eq false"],
+  ['Completely Shipped', 'completelyShipped eq true'],
 ])('the %s filter runs in BC', async (status, clause) => {
   const { server, http } = fakeServer({ query: { status } })
   await load(server).get()
   expect(orderCalls(http)[0]).toContain(`$filter=${BASE} and ${clause}&`)
 })
 
-// Completely Shipped and Invoiced come from archived orders, which the API doesn't return yet (S2-03).
-test.each(['Completely Shipped', 'Invoiced', "x' or 1 eq 1"])('the %s filter answers with no orders and never reaches BC', async (status) => {
+// Invoiced orders are gone from mcrmSalesOrders and live only in the archive, which the portal doesn't read yet (S2-03).
+test.each(['Invoiced', "x' or 1 eq 1"])('the %s filter answers with no orders and never reaches BC', async (status) => {
   const { server, http } = fakeServer({ query: { status } })
   expect(JSON.parse(await load(server).get())).toEqual({ orders: [], total: 0, page: 1, pageSize: 10 })
   expect(orderCalls(http)).toEqual([])
+})
+
+// BC added these to mcrmSalesOrders on 2026-10-14: an order still in BC with everything shipped (not yet invoiced) is
+// Completely Shipped whatever its Status says; a drawdown names its blanket order.
+test('a completely shipped order is Completely Shipped, and a drawdown shows its Blanket SO #', async () => {
+  const { server, http } = fakeServer({
+    orders: [{ ...ORDER, status: 'Released', completelyShipped: true, blanketOrderNo: 'BSO0000000001' }, { ...ORDER, salesOrderNo: 'SOR0000000007' }],
+    count: 2,
+  })
+  const [shipped, plain] = JSON.parse(await load(server).get()).orders
+  expect(shipped).toMatchObject({ status: 'Completely Shipped', bso: 'BSO0000000001' })
+  expect(plain).toMatchObject({ status: 'Open', bso: null })
+  expect(orderCalls(http)[0]).toContain(',blanketOrderNo,completelyShipped&')
 })

@@ -218,13 +218,19 @@ async function get() {
     }
     // #endregion bc-helpers
 
-    // Portal status ← BC Sales Header status (confirmed 2026-09-14). BC encodes spaces in enum values as _x0020_.
-    // Completely Shipped and Invoiced come from archived orders, which the API doesn't return yet (S2-03).
+    // Portal status ← BC Sales Header status (confirmed 2026-09-14); an order with everything shipped is Completely Shipped
+    // whatever its Status says. BC encodes spaces in enum values as _x0020_. Invoiced orders are gone from mcrmSalesOrders
+    // (BC deletes an order once fully invoiced) and live only in mcrmSalesOrderArchives, which the portal doesn't read yet.
     var STATUS_FROM_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Released": "Ready for Dispatch" };
-    var STATUS_TO_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Ready for Dispatch": "Released" };
+    var STATUS_FILTER = {
+        "Open": "status eq 'Open' and completelyShipped eq false",
+        "Pending Prepayment": "status eq 'Pending Prepayment' and completelyShipped eq false",
+        "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
+        "Completely Shipped": "completelyShipped eq true"
+    };
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
-    var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,status";
+    var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,status,blanketOrderNo,completelyShipped";
     var LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,AmountIncludingVAT";
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
@@ -258,7 +264,7 @@ async function get() {
         return a.salesOrderNo < b.salesOrderNo ? 1 : a.salesOrderNo > b.salesOrderNo ? -1 : 0;
     }
 
-    // Ship (Pick up / Delivery), Blanket SO # and the Trip ID assigned date stay null until BC provides them (S2-03).
+    // Ship (Pick up / Delivery) and the Trip ID assigned date stay null until BC provides them (S2-03).
     function toSummary(row) {
         return {
             so: row.salesOrderNo,
@@ -266,11 +272,11 @@ async function get() {
             po: row.externalDocumentNo || "",
             site: row.shiptoCode || "",
             ship: null,
-            bso: null,
+            bso: row.blanketOrderNo || null,
             trip: row.tripEntryNo ? { id: row.tripEntryNo, assignedAt: null } : null,
             edd: bcDate(row.requestDeliveryDate),
             total: Number(row.totalAmountInclVAT) || 0,
-            status: STATUS_FROM_BC[String(row.status || "").split("_x0020_").join(" ")] || null
+            status: row.completelyShipped === true ? "Completely Shipped" : STATUS_FROM_BC[String(row.status || "").split("_x0020_").join(" ")] || null
         };
     }
 
@@ -292,7 +298,7 @@ async function get() {
         var from = param("from");
         var to = param("to");
         if (status) {
-            parts.push("status eq " + odataLiteral(STATUS_TO_BC[status]));
+            parts.push(STATUS_FILTER[status]);
         }
         if (site) {
             parts.push("shiptoCode eq " + odataLiteral(site));
@@ -332,7 +338,7 @@ async function get() {
 
     async function list(scope, page) {
         var status = param("status");
-        if (status && Object.keys(STATUS_TO_BC).indexOf(status) === -1) {
+        if (status && Object.keys(STATUS_FILTER).indexOf(status) === -1) {
             return { orders: [], total: 0, page: page, pageSize: PAGE_SIZE };
         }
         var filter = listFilter(scope);
