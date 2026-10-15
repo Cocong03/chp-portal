@@ -1,0 +1,9 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+  - c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3
+  - 0c42c9f3-bc20-40a2-8c6a-a731a263ed83
+description: 'Signed-in customer''s Dashboard figures: Sales Orders counts per status and the account overview (S2-11)'
+display_name: 'Dashboard (BC counts and account overview)'
+id: d1900c3f-40f9-4bdb-a195-aad2617aed2b
+name: dashboard
