@@ -12,6 +12,8 @@ const ME: MeDto = {
   roles: ['Full Access'],
 }
 const ledger = SECTIONS.find((s) => s.key === 'ledger')!
+// Load the lazy Ledger chunk up front: its first load under a busy full-suite run took over 5 s (2026-10-15).
+beforeAll(() => import('@/modules/ledger/LedgerPage'), 30_000)
 
 function renderRoute() {
   const client = createQueryClient()

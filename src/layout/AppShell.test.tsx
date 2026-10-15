@@ -23,6 +23,9 @@ const ALL_SECTIONS = [
   'Account and User Management',
 ]
 
+// Load the lazy Ledger chunk up front: its first load under a busy full-suite run took over 5 s (2026-10-15).
+beforeAll(() => import('@/modules/ledger/LedgerPage'), 30_000)
+
 function signInAs(email: string, route = '/') {
   sessionStorage.setItem(MOCK_SESSION_KEY, email)
   return renderApp(<App />, { route })
