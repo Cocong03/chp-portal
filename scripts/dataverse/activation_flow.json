@@ -1149,12 +1149,46 @@
         ]
       }
     },
+    "Get_login": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "contacts",
+          "$select": "contactid",
+          "$filter": "contactid eq @{variables('ContactId')} and adx_identity_passwordhash ne null",
+          "$top": 1
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Apply_pending_grants": [
+          "Succeeded"
+        ]
+      }
+    },
     "Already_activated": {
       "type": "If",
       "expression": {
-        "equals": [
-          "@not(equals(variables('Username'), ''))",
-          true
+        "and": [
+          {
+            "not": {
+              "equals": [
+                "@variables('Username')",
+                ""
+              ]
+            }
+          },
+          {
+            "greater": [
+              "@length(body('Get_login')?['value'])",
+              0
+            ]
+          }
         ]
       },
       "actions": {
@@ -1192,9 +1226,47 @@
         }
       },
       "runAfter": {
-        "Apply_pending_grants": [
+        "Get_login": [
           "Succeeded"
         ]
+      },
+      "else": {
+        "actions": {
+          "Stale_username": {
+            "type": "If",
+            "expression": {
+              "not": {
+                "equals": [
+                  "@variables('Username')",
+                  ""
+                ]
+              }
+            },
+            "actions": {
+              "Clear_stale_username": {
+                "type": "OpenApiConnection",
+                "inputs": {
+                  "host": {
+                    "connectionName": "shared_commondataserviceforapps",
+                    "operationId": "UpdateOnlyRecord",
+                    "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                  },
+                  "parameters": {
+                    "entityName": "contacts",
+                    "recordId": "@variables('ContactId')",
+                    "item/adx_identity_username": "@null"
+                  },
+                  "authentication": "@parameters('$authentication')"
+                },
+                "runAfter": {}
+              }
+            },
+            "else": {
+              "actions": {}
+            },
+            "runAfter": {}
+          }
+        }
       }
     },
     "List_open_invitations": {

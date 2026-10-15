@@ -43,7 +43,7 @@ sequenceDiagram
     opt no Contact
       F->>DV: create Contact (lastname = BC displayName)
     end
-    opt Contact not yet activated (no adx_identity_username)
+    opt Contact not yet activated (no saved password)
       F->>DV: create adx_invitation (Single, 1 use, 7 days)
       F->>M: email link /activate/complete?code=…&email=…
     end
@@ -88,7 +88,7 @@ sequenceDiagram
 | Proof of email ownership | The password is set only through a link sent **to the BC email address**, so knowing someone's email isn't enough to take over their account |
 | No customer enumeration | The flow always returns `{"status":"ok"}` and the page always shows the same "Check your inbox" message |
 | Single-use, expiring links | Invitation `adx_maximumredemptions = 1`, `adx_expirydate = +7 days`, random 32-hex code |
-| No double activation | If the Contact already has `adx_identity_username`, no new invitation is created |
+| No double activation | If the Contact already has a username **and a saved password** (`adx_identity_passwordhash ne null`, filtered on, never read), no new invitation is created. A username without a password (activation never completed, seen 2026-10-15) gets the username cleared and a new invitation |
 | OData injection safe | The email is lower-cased and trimmed, with single quotes doubled, before going into `$filter` |
 | Passwords never touch our code | Power Pages hashes and stores them; the SPA only posts to Power Pages' own endpoints |
 | CSRF | Every POST carries the token from `/_layout/tokenhtml` |

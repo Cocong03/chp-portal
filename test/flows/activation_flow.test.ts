@@ -131,3 +131,32 @@ test('an unused invitation from the last 10 minutes ends the run with ok and sen
   const [, cancel] = actions.find(([n]) => n === 'Cancel_earlier_invitations')!
   expect(cancel.runAfter).toEqual({ Cooldown: ['Succeeded'] })
 })
+
+// Seen on Dev 2026-10-15: a contact had a username but no password (its activation link never completed). The flow
+// called it "already active", sent no new link, and Power Pages' reset sends nothing for a login without a password —
+// a dead end. Already active now means a saved password; the hash is only filtered on, never read into run history.
+test('already active means the contact has a saved password, checked without reading the hash', () => {
+  const [, login] = actions.find(([n]) => n === 'Get_login')!
+  expect(login.inputs.parameters).toMatchObject({
+    entityName: 'contacts',
+    $select: 'contactid',
+    $filter: "contactid eq @{variables('ContactId')} and adx_identity_passwordhash ne null",
+  })
+  const [, check] = actions.find(([n]) => n === 'Already_activated')!
+  expect(JSON.stringify(check.expression)).toContain("body('Get_login')")
+  expect(JSON.stringify(check.expression)).toContain("variables('Username')")
+  expect(text).not.toMatch(/\$select[^,}]*passwordhash/)
+})
+
+test('a contact left with a username but no password gets the username cleared before its new link', () => {
+  const [, check] = actions.find(([n]) => n === 'Already_activated')!
+  const [, stale] = Object.entries(check.else.actions as Record<string, Action>).find(([n]) => n === 'Stale_username')!
+  expect(JSON.stringify(stale.expression)).toContain("variables('Username')")
+  expect(stale.actions.Clear_stale_username.inputs.parameters).toEqual({
+    entityName: 'contacts',
+    recordId: "@variables('ContactId')",
+    'item/adx_identity_username': '@null',
+  })
+  const [, list] = actions.find(([n]) => n === 'List_open_invitations')!
+  expect(list.runAfter).toEqual({ Already_activated: ['Succeeded'] })
+})
