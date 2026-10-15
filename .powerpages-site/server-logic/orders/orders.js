@@ -228,6 +228,8 @@ async function get() {
         "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
         "Completely Shipped": "completelyShipped eq true"
     };
+    // Portal ship ← BC Shipment Method Code (PICKUP / DELIVERY on DEV, 2026-10-15); any other code shows "—".
+    var SHIP_FROM_BC = { "PICKUP": "Pickup", "DELIVERY": "Delivery" };
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
     var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,status,blanketOrderNo,completelyShipped";
@@ -264,14 +266,14 @@ async function get() {
         return a.salesOrderNo < b.salesOrderNo ? 1 : a.salesOrderNo > b.salesOrderNo ? -1 : 0;
     }
 
-    // Ship (Pick up / Delivery) and the Trip ID assigned date stay null until BC provides them (S2-03).
+    // The Trip ID assigned date stays null until BC provides it (S2-03).
     function toSummary(row) {
         return {
             so: row.salesOrderNo,
             date: row.orderDate || "",
             po: row.externalDocumentNo || "",
             site: row.shiptoCode || "",
-            ship: null,
+            ship: SHIP_FROM_BC[String(row.shipmentMethodCode || "").toUpperCase()] || null,
             bso: row.blanketOrderNo || null,
             trip: row.tripEntryNo ? { id: row.tripEntryNo, assignedAt: null } : null,
             edd: bcDate(row.requestDeliveryDate),

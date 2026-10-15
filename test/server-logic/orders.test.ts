@@ -244,3 +244,15 @@ test('a completely shipped order is Completely Shipped, and a drawdown shows its
   expect(plain).toMatchObject({ status: 'Open', bso: null })
   expect(orderCalls(http)[0]).toContain(',blanketOrderNo,completelyShipped&')
 })
+
+// BC filled shipmentMethodCode on 2026-10-15: PICKUP and DELIVERY are the only codes on DEV orders.
+test.each([
+  ['PICKUP', 'Pickup'],
+  ['DELIVERY', 'Delivery'],
+  ['delivery', 'Delivery'],
+  ['', null],
+  ['COURIER', null],
+])('shipment method %s → ship %s', async (code, ship) => {
+  const { server } = fakeServer({ orders: [{ ...ORDER, shipmentMethodCode: code }] })
+  expect(JSON.parse(await load(server).get()).orders[0].ship).toBe(ship)
+})
