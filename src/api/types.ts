@@ -114,6 +114,6 @@ export interface LedgerPageDto {
 
 /** GET /_api/serverlogics/dashboard. null = BC doesn't provide it yet (Invoiced: archive change; balances: S2-07; available credit: S2-09). */
 export interface DashboardDto {
-  counts: { open: number; pendingPrepayment: number; readyForDispatch: number; completelyShipped: number; invoiced: number | null }
+  counts: { open: number | null; pendingPrepayment: number | null; readyForDispatch: number | null; completelyShipped: number | null; invoiced: number | null }
   account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; availableCredit: number | null }
 }

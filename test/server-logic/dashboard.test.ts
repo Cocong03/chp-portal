@@ -14,7 +14,13 @@ const SETTINGS: Record<string, string> = {
 const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify(value) })
 const COUNTS: Record<string, number> = { Open: 7, 'Pending Prepayment': 1, 'Ready for Dispatch': 2, 'Completely Shipped': 0 }
 
-function fakeServer({ query = {} as Record<string, string>, card = [{ Customer_No: 'C00000002', CreditLimit: 750000 }] as unknown[], bcDown = false } = {}) {
+function fakeServer({
+  query = {} as Record<string, string>,
+  card = [{ Customer_No: 'C00000002', CreditLimit: 750000 }] as unknown[],
+  bcDown = false,
+  cardDown = false,
+  noCount = false,
+} = {}) {
   const http: string[] = []
   const server = {
     User: { contactid: 'c-1' },
@@ -36,7 +42,10 @@ function fakeServer({ query = {} as Record<string, string>, card = [{ Customer_N
           if (plain.includes('/MCRMContacts')) return ok({ value: [{ companyNo: 'CT1', name: 'ERLINDA' }] })
           if (plain.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: 'C00000002' }] })
           if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
-          if (plain.includes('/mcrmCustomers')) return ok({ value: card })
+          if (plain.includes('/mcrmCustomers')) {
+            return cardDown ? JSON.stringify({ StatusCode: 400, IsSuccessStatusCode: false, ReasonPhrase: 'Bad Request', Body: '' }) : ok({ value: card })
+          }
+          if (noCount) return ok({ value: [] })
           const status = Object.keys(RULES).find((s) => plain.includes(RULES[s]))!
           return ok({ value: [{ salesOrderNo: 'SOR1' }], '@odata.count': COUNTS[status] })
         },
@@ -93,4 +102,20 @@ test('every business role can call it', () => {
     '- c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3',
     '- 0c42c9f3-bc20-40a2-8c6a-a731a263ed83',
   ])
+})
+
+// Final review 2026-10-15: a confident 0 when BC sends no count would mislead; "—" is honest.
+test('a count BC does not return is null, never a made-up 0', async () => {
+  const { server } = fakeServer({ noCount: true })
+  expect(JSON.parse(await load(server).get()).counts).toEqual({
+    open: null, pendingPrepayment: null, readyForDispatch: null, completelyShipped: null, invoiced: null,
+  })
+})
+
+// Final review 2026-10-15: the credit limit isn't shown on the deployed site yet; its failure must not take down the live counts.
+test('a failing customer-card read leaves the counts and gives no credit limit', async () => {
+  const { server } = fakeServer({ cardDown: true })
+  const dto = JSON.parse(await load(server).get())
+  expect(dto.counts.open).toBe(7)
+  expect(dto.account.creditLimit).toBeNull()
 })

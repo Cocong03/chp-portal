@@ -47,13 +47,13 @@ var ORDER_STATUS_FILTER = {
 - `.powerpages-site/server-logic/dashboard/dashboard.js` + `dashboard.serverlogic.yml`, web roles **Full Access** `56b29291-b981-4ef0-865b-41c1e9523a97`, **Orders & Delivery** `11bb7218-55fb-4cae-b8a1-5af2f41237c5`, **Finance & Documents** `c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3`, **View Only** `0c42c9f3-bc20-40a2-8c6a-a731a263ed83`.
 - Scope from `sessionScope()` only; request values ignored.
 - In parallel (`Promise.all`):
-  - one `mcrmSalesOrders` query per status in `ORDER_STATUS_FILTER`: `$filter=sellToCustomerNo eq '<customer>' and documentType eq 'Order' and <clause>`, `$select=salesOrderNo`, `$top=1`, `$count=true` → `Number(@odata.count)`, 0 if missing;
-  - `mcrmCustomers` `$filter=Customer_No eq '<customer>'`, `$select=Customer_No,CreditLimit`, `$top=1` → `creditLimit` (row re-checked against the session customer; `null` if no row).
+  - one `mcrmSalesOrders` query per status in `ORDER_STATUS_FILTER`: `$filter=sellToCustomerNo eq '<customer>' and documentType eq 'Order' and <clause>`, `$select=salesOrderNo`, `$top=1`, `$count=true` → `Number(@odata.count)`, `null` ("—") if missing (final review 2026-10-15);
+  - `mcrmCustomers` `$filter=Customer_No eq '<customer>'`, `$select=Customer_No,CreditLimit`, `$top=1` → `creditLimit` (row re-checked against the session customer; `null` if no row); a failed read logs a warning and gives `null`, so it never takes down the live counts).
 - Response:
 
 ```ts
 export interface DashboardDto {
-  counts: { open: number; pendingPrepayment: number; readyForDispatch: number; completelyShipped: number; invoiced: number | null }
+  counts: { open: number | null; pendingPrepayment: number | null; readyForDispatch: number | null; completelyShipped: number | null; invoiced: number | null }
   account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; availableCredit: number | null }
 }
 ```

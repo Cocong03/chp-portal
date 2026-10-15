@@ -247,16 +247,25 @@ async function get() {
                 $count: "true"
             })
         );
-        var count = Number(result && result["@odata.count"]);
-        return isNaN(count) ? 0 : count;
+        // No count from BC shows "—", never a made-up 0.
+        var raw = result && result["@odata.count"];
+        var count = Number(raw);
+        return raw === undefined || raw === null || isNaN(count) ? null : count;
     }
 
+    // The credit limit isn't on the deployed Dashboard yet: a failed read gives null instead of failing the live counts.
     async function creditLimit(scope) {
-        var result = await bcGet(
-            scope,
-            "mcrmCustomers",
-            odataQuery({ $filter: "Customer_No eq " + odataLiteral(scope.customerNo), $select: "Customer_No,CreditLimit", $top: "1" })
-        );
+        var result;
+        try {
+            result = await bcGet(
+                scope,
+                "mcrmCustomers",
+                odataQuery({ $filter: "Customer_No eq " + odataLiteral(scope.customerNo), $select: "Customer_No,CreditLimit", $top: "1" })
+            );
+        } catch (err) {
+            Server.Logger.Warn("dashboard credit limit read failed: " + safeDetail(err));
+            return null;
+        }
         var card = ((result && result.value) || []).find((row) => row.Customer_No === scope.customerNo);
         return card ? Number(card.CreditLimit) || 0 : null;
     }
