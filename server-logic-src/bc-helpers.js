@@ -112,6 +112,15 @@ function blockedError() {
     return err;
 }
 
+// Portal status → mcrmSalesOrders filter clause (confirmed mapping 2026-09-14; Completely Shipped wins over Status).
+// Shared so the Orders filter and the Dashboard counts can't drift. Invoiced lives in BC's archive (S2-03).
+var ORDER_STATUS_FILTER = {
+    "Open": "status eq 'Open' and completelyShipped eq false",
+    "Pending Prepayment": "status eq 'Pending Prepayment' and completelyShipped eq false",
+    "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
+    "Completely Shipped": "completelyShipped eq true"
+};
+
 // OData string literal with single quotes doubled (architecture rule 4).
 function odataLiteral(value) {
     return "'" + String(value).split("'").join("''") + "'";

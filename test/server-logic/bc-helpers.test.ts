@@ -76,3 +76,22 @@ test('the plugin validator sees only HTTP verb functions at the top level of eve
     expect(topLevelFunctions(readFileSync(file, 'utf8')).filter((name) => !['get', 'post', 'put', 'patch', 'del'].includes(name)), file).toEqual([])
   }
 })
+
+// 2026-10-15: one definition of the Orders status rules, so Dashboard counts can never disagree with the Orders filter.
+test('the helpers define the Orders status filter rules once', () => {
+  const rules = new Function('Server', `${source}\nreturn ORDER_STATUS_FILTER`)({})
+  expect(rules).toEqual({
+    Open: "status eq 'Open' and completelyShipped eq false",
+    'Pending Prepayment': "status eq 'Pending Prepayment' and completelyShipped eq false",
+    'Ready for Dispatch': "status eq 'Released' and completelyShipped eq false",
+    'Completely Shipped': 'completelyShipped eq true',
+  })
+})
+
+test('no endpoint writes its own status clauses outside the shared helpers', () => {
+  for (const file of endpointFiles) {
+    const text = readFileSync(file, 'utf8')
+    const own = text.slice(0, text.indexOf(START)) + text.slice(text.indexOf(END))
+    expect(own, file).not.toMatch(/completelyShipped eq/)
+  }
+})

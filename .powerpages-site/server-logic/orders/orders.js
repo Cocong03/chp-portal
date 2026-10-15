@@ -119,6 +119,15 @@ async function get() {
         return err;
     }
 
+    // Portal status → mcrmSalesOrders filter clause (confirmed mapping 2026-09-14; Completely Shipped wins over Status).
+    // Shared so the Orders filter and the Dashboard counts can't drift. Invoiced lives in BC's archive (S2-03).
+    var ORDER_STATUS_FILTER = {
+        "Open": "status eq 'Open' and completelyShipped eq false",
+        "Pending Prepayment": "status eq 'Pending Prepayment' and completelyShipped eq false",
+        "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
+        "Completely Shipped": "completelyShipped eq true"
+    };
+
     // OData string literal with single quotes doubled (architecture rule 4).
     function odataLiteral(value) {
         return "'" + String(value).split("'").join("''") + "'";
@@ -222,12 +231,6 @@ async function get() {
     // whatever its Status says. BC encodes spaces in enum values as _x0020_. Invoiced orders are gone from mcrmSalesOrders
     // (BC deletes an order once fully invoiced) and live only in mcrmSalesOrderArchives, which the portal doesn't read yet.
     var STATUS_FROM_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Released": "Ready for Dispatch" };
-    var STATUS_FILTER = {
-        "Open": "status eq 'Open' and completelyShipped eq false",
-        "Pending Prepayment": "status eq 'Pending Prepayment' and completelyShipped eq false",
-        "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
-        "Completely Shipped": "completelyShipped eq true"
-    };
     // Portal ship ← BC Shipment Method Code (PICKUP / DELIVERY on DEV, 2026-10-15); any other code shows "—".
     var SHIP_FROM_BC = { "PICKUP": "Pickup", "DELIVERY": "Delivery" };
     var PAGE_SIZE = 10;
@@ -300,7 +303,7 @@ async function get() {
         var from = param("from");
         var to = param("to");
         if (status) {
-            parts.push(STATUS_FILTER[status]);
+            parts.push(ORDER_STATUS_FILTER[status]);
         }
         if (site) {
             parts.push("shiptoCode eq " + odataLiteral(site));
@@ -340,7 +343,7 @@ async function get() {
 
     async function list(scope, page) {
         var status = param("status");
-        if (status && Object.keys(STATUS_FILTER).indexOf(status) === -1) {
+        if (status && Object.keys(ORDER_STATUS_FILTER).indexOf(status) === -1) {
             return { orders: [], total: 0, page: page, pageSize: PAGE_SIZE };
         }
         var filter = listFilter(scope);
