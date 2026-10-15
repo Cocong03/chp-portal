@@ -11,7 +11,7 @@ The **Customer Ledger** section, built to `docs/Mockup-chp-v2.html` (`#section-l
 | # | Topic | Decision |
 |---|---|---|
 | 1 | Approach | **Contract first (A):** screen + `ledger` endpoint now, against the requested BC fields below. The list goes to the BC team as the S2-07 request |
-| 2 | Dev site until BC delivers | `/ledger` keeps **"This section is coming soon."** on the deployed site. The page is routed only in the local build (`import.meta.env.DEV`), one marked switch in `SectionRoute.tsx`, removed when S2-07 lands. The `ledger` Server Logic is deployed anyway (nothing calls it). **Changed 2026-10-15 (client request):** the deployed site shows the page on the sample entries with a *Sample data* notice; `serverLogic` answers `ledger` from `src/mocks` (`SAMPLE_ONLY`) until S2-07 |
+| 2 | Dev site until BC delivers | `/ledger` keeps **"This section is coming soon."** on the deployed site. The page is routed only in the local build (`import.meta.env.DEV`), one marked switch in `SectionRoute.tsx`, removed when S2-07 lands. The `ledger` Server Logic is deployed anyway (nothing calls it). **Changed 2026-10-15 (client request):** the deployed site shows the page on the sample entries (no on-screen notice; the client presents them as sample data); `serverLogic` answers `ledger` from `src/mocks` (`SAMPLE_ONLY`) until S2-07 |
 | 3 | Columns | The wireframe's nine. **No running-balance column** (the wireframe has none; plan row S2-08's "Running balance matches BC" is corrected to "Matches the wireframe") |
 | 4 | Not now | **CSV / Excel** button (S3-14). Balance tiles are the Dashboard's (separate spec) |
 | 5 | Dates | Rows show `Sep 12, 2026`; the wireframe's "(2026)" header note is dropped (same as Orders, decision 5 there) |

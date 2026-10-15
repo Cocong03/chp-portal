@@ -143,15 +143,14 @@ test('a failed load shows the error with Try again; the greeting and announcemen
   expect(await region('Sales Orders')).toBeInTheDocument()
 })
 
-// Until BC has balances (S2-07) and available credit (S2-09), the deployed site shows the Account overview on sample figures, marked as such.
-test('the deployed build shows the Account overview on the sample figures, marked as sample data', async () => {
+// Until BC has balances (S2-07) and available credit (S2-09), the deployed site shows the Account overview on the sample figures (the client presents them as sample data).
+test('the deployed build shows the Account overview on the sample figures', async () => {
   vi.stubEnv('DEV', false)
   const me: MeDto = { contact: { name: 'J.D. Santos', email: 'full@test.ph' }, account: null, roles: ['Full Access'] }
   const live: DashboardDto = { ...dashboardMock(), account: { balance: null, balanceDue: null, overdue: null, creditLimit: 5, availableCredit: null } }
   vi.mocked(serverLogic).mockImplementation(async (name) => (name === 'me' ? me : name === 'dashboard' ? live : null) as never)
   renderApp(<DashboardPage />)
   const overview = await region('Account overview')
-  expect(within(overview).getByText(/Sample data/)).toBeInTheDocument()
   expect(await within(overview).findByText('₱468,250.00')).toBeInTheDocument()
   expect(within(overview).getByText('₱750,000.00')).toBeInTheDocument()
   expect(await region('Sales Orders')).toBeInTheDocument()

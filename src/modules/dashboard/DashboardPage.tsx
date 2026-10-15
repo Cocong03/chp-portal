@@ -7,7 +7,6 @@ import { usePageTitle } from '@/lib/usePageTitle'
 import { SAMPLE_ACCOUNT } from '@/mocks/dashboard'
 import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
-import { SampleNotice } from '@/ui/SampleNotice'
 import { Skeleton } from '@/ui/skeleton'
 import { AnnouncementBanner } from './AnnouncementBanner'
 import { Greeting } from './Greeting'
@@ -24,14 +23,13 @@ const ORDER_TILES: { key: keyof DashboardDto['counts']; label: string; status: s
   { key: 'invoiced', label: 'Invoiced', status: 'Invoiced', tone: 'clear' },
 ]
 
-function Section({ title, note, children }: { title: string; note?: ReactNode; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   const id = `dashboard-${title.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <section aria-labelledby={id} className="mb-[30px]">
       <h2 id={id} className="mb-3.5 text-[19px] font-bold">
         {title}
       </h2>
-      {note}
       <div className={GRID}>{children}</div>
     </section>
   )
@@ -44,7 +42,7 @@ export function DashboardPage() {
   const canOpenOrders = canSee(roles, 'orders')
   const data = dashboard.data
   const money = (value: number | null | undefined) => (data ? (value == null ? '—' : peso(value)) : <Skeleton className="h-7 w-32" />)
-  // ponytail: sample balances until BC has them (S2-07) and available credit (S2-09); then data?.account and drop the notice.
+  // ponytail: sample balances until BC has them (S2-07) and available credit (S2-09); then data?.account.
   const account = data && SAMPLE_ACCOUNT
   const overdue = account?.overdue ?? null
   const overdueTone: TileTone = overdue == null ? 'neutral' : overdue > 0 ? 'alert' : 'clear'
@@ -64,7 +62,7 @@ export function DashboardPage() {
         <QueryError onRetry={() => void dashboard.refetch()} />
       ) : (
         <>
-          <Section title="Account overview" note={<SampleNotice className="mb-3.5" />}>
+          <Section title="Account overview">
             <StatTile label="Outstanding Balance" value={money(account?.balance)} caption="Total outstanding on your account" />
             <StatTile label="Balance Due Today" value={money(account?.balanceDue)} caption="Due now per your payment terms" />
             <StatTile label="Overdue amount" value={money(account ? overdue : undefined)} caption={overdueCaption} tone={overdueTone} />
