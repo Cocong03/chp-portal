@@ -9,12 +9,12 @@ Customer portal for **Concreat Holdings (CHP)** customers. Customers sign in, pl
 
 ## Read these first
 
-| Doc                                                          | Use it for                                                                                                |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `docs/Concreat_Hub_Architecture.md`                          | The architecture. Follow it; propose changes there before deviating                                       |
-| `docs/Concreat_Hub_Implementation_Plan.md`                   | Task IDs (S0–S5, P2), dependencies, "done when" checks. Reference task IDs in commits/PRs                 |
-| `docs/Concreat_Hub_Registration_Architecture.md`             | Sign-in/activation design ported from the POC, plus lessons learned                                       |
-| `Standard_Portal_Flow_v47_ForDevBuildGuide.html` (wireframe) | **The UI spec.** Exact fields, labels, dropdown values, copy and behavior. Build to it; don't redesign it |
+| Doc                                              | Use it for                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `docs/Concreat_Hub_Architecture.md`              | The architecture. Follow it; propose changes there before deviating                                       |
+| `docs/Concreat_Hub_Implementation_Plan.md`       | Task IDs (S0–S5, P2), dependencies, "done when" checks. Reference task IDs in commits/PRs                 |
+| `docs/Concreat_Hub_Registration_Architecture.md` | Sign-in/activation design ported from the POC, plus lessons learned                                       |
+| `Mockup-chp-v2.html` (wireframe)                 | **The UI spec.** Exact fields, labels, dropdown values, copy and behavior. Build to it; don't redesign it |
 
 | Power Platform / BC Developer Packages (.docx)
 
@@ -25,7 +25,7 @@ see at docs\bc-api-collection.json
 
 ## UI Mockup
 
-- see at docs\Standard_Portal_Flow_v47_ForDevBuildGuide.html
+- see at docs\Mockup-chp-v2.html (updated at 10/08/2026)
 
 ## Tech stack
 
@@ -108,11 +108,11 @@ docs/               architecture, plan, registration docs
 
 ## Environments
 
-|      | Power Platform                                                   | BC                                                          |
-| ---- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
+|      | Power Platform                                                   | BC                                                                                                     |
+| ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
 | Dev  | _CHP Customer Portal_ (`https://org380257ac.crm5.dynamics.com/`) | Concreat Sandbox Dev - environment `DEV` (renamed from TRAINING 2026-10-04) · SOLID CEMENT CORPORATION |
-| UAT  | TBD                                                              | Concreat UAT sandbox                                        |
-| Prod | TBD                                                              | Concreat production                                         |
+| UAT  | TBD                                                              | Concreat UAT sandbox                                                                                   |
+| Prod | TBD                                                              | Concreat production                                                                                    |
 
 - **Never develop or test against BC production.** Orders and activations create real records and send real emails.
 - Confirm the target with `pac auth who` before any deploy. Deploy only with `pac pages upload-code-site` (**never** `pac pages upload`).

@@ -1,22 +1,24 @@
-import { formatDate, peso } from '@/lib/format'
-import { cn } from '@/lib/utils'
-import { useSites } from '@/modules/sites/useSites'
-import { Button } from '@/ui/button'
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog'
-import { QueryError } from '@/ui/QueryError'
-import { Skeleton } from '@/ui/skeleton'
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
-import { OrderStatusPill, siteLabel, tripNote } from './orderDisplay'
-import { useOrder } from './useOrders'
+import { formatDate, peso } from "@/lib/format";
+import { cn } from "@/lib/utils";
+import { useSites } from "@/modules/sites/useSites";
+import { Button } from "@/ui/button";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/ui/dialog";
+import { QueryError } from "@/ui/QueryError";
+import { Skeleton } from "@/ui/skeleton";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/ui/table";
+import { OrderStatusPill, siteLabel, tripNote } from "./orderDisplay";
+import { useOrder } from "./useOrders";
 
 /** The wireframe's View modal: details, BC lines and Order total, Trip ID note. Reorder arrives with New Order (S3). */
 export function OrderDialog({ id, onClose }: { id: string | null; onClose: () => void }) {
-  const order = useOrder(id)
-  const sites = useSites().data ?? []
-  const data = order.data
-  const note = data && tripNote(data)
+  const order = useOrder(id);
+  const sites = useSites().data ?? [];
+  const data = order.data;
+  const note = data && tripNote(data);
   /** While the order loads, each value is a bar the size of what it stands in for, so the layout doesn't jump. */
-  const bone = (width = 'w-24') => <Skeleton className={cn('h-4', width)} />
+  const bone = (width = "w-24") => <Skeleton className={cn("h-4", width)} />;
+
+  console.log(data?.lines);
 
   return (
     <Dialog open={!!id} onOpenChange={(open) => !open && onClose()}>
@@ -34,14 +36,14 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
             <dl className="grid grid-cols-1 gap-x-5 gap-y-2.5 rounded-lg bg-muted px-4 py-3.5 sm:grid-cols-2">
               {(
                 [
-                  ['Order date', data ? formatDate(data.date) : bone()],
-                  ['Status', data ? <OrderStatusPill key="s" status={data.status} /> : bone('w-20')],
-                  ['PO reference', data ? data.po || '—' : bone('w-16')],
-                  ['Shipment method', data ? (data.ship === 'Pickup' ? 'Pick up' : data.ship ?? '—') : bone('w-16')],
-                  ['Delivery site', data ? siteLabel(data.site, sites) : bone('w-44')],
-                  ['Expected delivery date', data ? formatDate(data.edd) : bone()],
-                  ['Blanket SO #', data ? data.bso ?? '—' : bone('w-28')],
-                  ['Trip ID number', data ? data.trip?.id ?? '—' : bone('w-20')],
+                  ["Order date", data ? formatDate(data.date) : bone()],
+                  ["Status", data ? <OrderStatusPill key="s" status={data.status} /> : bone("w-20")],
+                  ["PO reference", data ? data.po || "—" : bone("w-16")],
+                  ["Shipment method", data ? (data.ship === "Pickup" ? "Pick up" : (data.ship ?? "—")) : bone("w-16")],
+                  ["Delivery site", data ? siteLabel(data.site, sites) : bone("w-44")],
+                  ["Expected delivery date", data ? formatDate(data.edd) : bone()],
+                  ["Blanket SO #", data ? (data.bso ?? "—") : bone("w-28")],
+                  ["Trip ID number", data ? (data.trip?.id ?? "—") : bone("w-20")],
                 ] as const
               ).map(([label, value]) => (
                 <div key={label} className="flex flex-col gap-0.5">
@@ -54,11 +56,8 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
               <Table aria-label="Order lines">
                 <TableHeader>
                   <TableRow className="hover:bg-transparent">
-                    {['Item', 'Qty', 'UOM', 'Unit price', 'Line total'].map((h, i) => (
-                      <TableHead
-                        key={h}
-                        className={cn('bg-muted text-[11.5px] font-semibold tracking-wider text-faint uppercase', i % 2 && i !== 2 && 'text-right')}
-                      >
+                    {["Item", "Qty", "UOM", "Unit price", "Line total"].map((h, i) => (
+                      <TableHead key={h} className={cn("bg-muted text-[11.5px] font-semibold tracking-wider text-faint uppercase", i % 2 && i !== 2 && "text-right")}>
                         {h}
                       </TableHead>
                     ))}
@@ -68,10 +67,10 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                   {!data ? (
                     [0, 1].map((i) => (
                       <TableRow key={i} className="hover:bg-transparent">
-                        <TableCell>{bone('w-48')}</TableCell>
-                        {['w-8', 'w-12', 'w-16', 'w-20'].map((width, j) => (
+                        <TableCell>{bone("w-48")}</TableCell>
+                        {["w-8", "w-12", "w-16", "w-20"].map((width, j) => (
                           <TableCell key={j}>
-                            <div className={cn('flex', j !== 1 && 'justify-end')}>{bone(width)}</div>
+                            <div className={cn("flex", j !== 1 && "justify-end")}>{bone(width)}</div>
                           </TableCell>
                         ))}
                       </TableRow>
@@ -88,8 +87,8 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                         <TableCell className="whitespace-normal">
                           {line.code} — {line.description}
                         </TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">{line.qty.toLocaleString('en-PH')}</TableCell>
-                        <TableCell className="font-mono">{line.uom || '—'}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{line.qty.toLocaleString("en-PH")}</TableCell>
+                        <TableCell className="font-mono">{line.uom || "—"}</TableCell>
                         <TableCell className="text-right font-mono tabular-nums">{peso(line.unitPrice)}</TableCell>
                         <TableCell className="text-right font-mono tabular-nums">{peso(line.lineTotal)}</TableCell>
                       </TableRow>
@@ -99,23 +98,12 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                     <TableCell colSpan={4} className="text-right font-bold">
                       Order total
                     </TableCell>
-                    <TableCell className="text-right font-mono font-bold tabular-nums">
-                      {data ? peso(data.total) : <div className="flex justify-end">{bone('w-24')}</div>}
-                    </TableCell>
+                    <TableCell className="text-right font-mono font-bold tabular-nums">{data ? peso(data.total) : <div className="flex justify-end">{bone("w-24")}</div>}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>
             </div>
-            {note && (
-              <p
-                className={cn(
-                  'rounded-lg px-3.5 py-2.5 text-[13px]',
-                  note.tone === 'good' ? 'bg-success-soft text-success' : 'bg-warning-soft text-warning',
-                )}
-              >
-                {note.text}
-              </p>
-            )}
+            {note && <p className={cn("rounded-lg px-3.5 py-2.5 text-[13px]", note.tone === "good" ? "bg-success-soft text-success" : "bg-warning-soft text-warning")}>{note.text}</p>}
           </>
         )}
         <DialogFooter>
@@ -125,5 +113,5 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
         </DialogFooter>
       </DialogContent>
     </Dialog>
-  )
+  );
 }

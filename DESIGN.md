@@ -1,6 +1,6 @@
 # Concreat Hub — Design System
 
-Source of truth for look and feel: the wireframe `docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html` (v47). This file extracts its style guide and maps every pattern onto **shadcn/ui** components. Tokens live in `src/styles/theme.css`; components live in `src/ui/`.
+Source of truth for look and feel: the wireframe `docs/Mockup-chp-v2.html`. This file extracts its style guide and maps every pattern onto **shadcn/ui** components. Tokens live in `src/styles/theme.css`; components live in `src/ui/`.
 
 **Rules**
 

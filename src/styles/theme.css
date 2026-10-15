@@ -1,14 +1,14 @@
 /* Scan only src/ for class names. */
-@import 'tailwindcss' source('..');
-@import 'tw-animate-css';
+@import "tailwindcss" source("..");
+@import "tw-animate-css";
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Tokens from the wireframe (docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html),
+/* Tokens from the wireframe (docs/Mockup-chp-v2.html),
    mapped onto the shadcn/ui variable names. */
 /* [data-theme='light'] re-applies the light tokens inside a dark page (sign-in screens are fixed light). */
 :root,
-[data-theme='light'] {
+[data-theme="light"] {
   /* Fixed brand palette for the sign-in screens (DESIGN.md §7); deliberately not redefined for dark. */
   --brand-navy: #1b2e63;
   --brand-navy-deep: #0c1633;
@@ -45,7 +45,7 @@
   --ring: #2560a8;
 }
 
-[data-theme='dark'] {
+[data-theme="dark"] {
   --background: #10161d;
   --foreground: #e7ecf1;
   --card: #161f29;
@@ -75,8 +75,8 @@
 }
 
 @theme inline {
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
   /* Wireframe radii (DESIGN.md §3): controls 6, notes 8, cards 10, dialogs 12. */
   --radius-sm: 4px;
   --radius-md: 6px;

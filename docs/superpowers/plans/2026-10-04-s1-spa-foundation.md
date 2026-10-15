@@ -16,7 +16,7 @@
 ## Global Constraints
 
 - **Name and titles:** customers see **Concreat Connect**. Every page sets `document.title` to `"<Page> — Concreat Connect"`.
-- **Copy:** use the wireframe's wording exactly (`docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html`); Activate/SetPassword copy comes from the spec tables. No BC jargon in UI text.
+- **Copy:** use the wireframe's wording exactly (`docs/Mockup-chp-v2.html`); Activate/SetPassword copy comes from the spec tables. No BC jargon in UI text.
 - **Network:** the SPA never calls BC. It calls only `/_api/serverlogics/<name>`, `/_layout/tokenhtml`, `/SignIn`, `/Account/Login/*` and `/_api/cloudflow/v1.0/trigger/<id>`.
 - **Server Logic requests:** every request, GET included, sends `__RequestVerificationToken` and `X-Requested-With: XMLHttpRequest` (Microsoft Learn, "Author server logic"). The response envelope is `{ RequestId, Success, Data, ExecutionTime, ServerLogicName, Error }`.
 - **Power Pages sign-in:** POST `/SignIn` with fields `Email`, **`PasswordValue`**, `ReturnUrl`, `__RequestVerificationToken`.
@@ -2253,7 +2253,7 @@ Co-Authored-By: Claude Opus 5.5 <noreply@anthropic.com>"
 ```markdown
 # Wording and naming checklist (S1-11 → verified at S5-04)
 
-Customer-facing text follows the wireframe (`docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html`) and the renames in the developer packages. Add a row whenever a screen applies a rename.
+Customer-facing text follows the wireframe (`docs/Mockup-chp-v2.html`) and the renames in the developer packages. Add a row whenever a screen applies a rename.
 
 | Rename / rule | Source | Applied in | Verified (S5-04) |
 |---|---|---|---|

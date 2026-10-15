@@ -1,7 +1,7 @@
 # Concreat Hub — Power Pages Solution Architecture (Release 1)
 
 **Status:** Proposal for team review · **Prepared:** Sept 30, 2026 · **Audience:** PASI Power Platform team, BC Integration team
-**Inputs:** Power Platform & BC Developer Packages (Sept 27), monday.com export, `Standard_Portal_Flow_v47_ForDevBuildGuide.html`, BC Postman collection, and the working login/activation POC in this repo.
+**Inputs:** Power Platform & BC Developer Packages (Sept 27), monday.com export, `Mockup-chp-v2.html`, BC Postman collection, and the working login/activation POC in this repo.
 
 > INTERNAL — PASI project team only (same classification as the source packages).
 

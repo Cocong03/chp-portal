@@ -1,6 +1,6 @@
 # Wording and naming checklist (S1-11 → verified at S5-04)
 
-Customer-facing text follows the wireframe (`docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html`) and the renames in the developer packages. Add a row whenever a screen applies a rename.
+Customer-facing text follows the wireframe (`docs/Mockup-chp-v2.html`) and the renames in the developer packages. Add a row whenever a screen applies a rename.
 
 | Rename / rule | Source | Applied in | Verified (S5-04) |
 |---|---|---|---|

@@ -1,0 +1,17 @@
+Sales Orders (mcrmSalesOrders), adding to the status request
+
+1. status should be filterable ($filter=status eq 'Released'), not just returned. Then the status filter works and the dashboard can count orders with $count, so a separate "SO counts by status" API (S2-10) isn't needed.
+2. documentType, so the portal can stop filtering on the SOR prefix. The API also returns blanket orders (BSO), credit memos (SCM) and invoices (SIN).
+3. Archived orders: the shipped or invoiced orders. In the same API or a second one, but with the same fields. Without them the portal can't show "Completely Shipped" or "Invoiced".
+4. Ship method: how to tell Pick up from Delivery. shipmentMethodCode is empty on every order, so tell us which field holds it and its values.
+5. Trip ID and the date it was assigned. tripEntryNo is empty. Is it the same field as BC's "Current Trip Entry No." column?
+6. Expected delivery date. requestDeliveryDate is empty. Which field does BC use for it?
+7. Blanket SO # on an order created from a blanket order.
+8. Lines (chpSalesOrderLines): does unitPrice include VAT?
+
+APIs the next portal pages need (not built yet)
+
+9. Customer Ledger Entries (S2-07): every entry with date, type, document no., description, amount, remaining amount and due date. Also the balance, balance due and overdue amount. The Ledger page needs this.
+10. Available Credit (S2-09): credit limit, exposure, available and past due, all live. It must update as soon as an SO is created. The dashboard and order checkout need it.
+11. Documents (S2-15): posted invoices, credit memos, posted warehouse shipments and payments, each with its PDF as base64. The Document Center needs this.
+12. Blanket Sales Orders (S3-15, lower priority): schedule and remaini
