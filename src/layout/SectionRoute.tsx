@@ -19,8 +19,7 @@ const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
 export function SectionRoute({ section }: { section: Section }) {
   const { data } = useMe()
   if (!data || !canSee(data.roles, section.key)) return <Navigate to="/" replace />
-  // ponytail: Customer Ledger runs only in the local build until BC's ledger API exists (S2-07); delete this condition then.
-  const Page = section.key === 'ledger' && !import.meta.env.DEV ? undefined : PAGES[section.key]
+  const Page = PAGES[section.key]
   if (!Page) return <Placeholder label={section.label} />
   // Keyed by section so moving to another section clears a failed page.
   return (

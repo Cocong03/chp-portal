@@ -44,9 +44,12 @@ interface Envelope {
   error?: unknown
 }
 
+// ponytail: the deployed site answers these from src/mocks until BC has the API (ledger: S2-07); remove a name when it goes live.
+const SAMPLE_ONLY = new Set(['ledger'])
+
 /** The SPA's only Server Logic caller. On the dev server it answers from src/mocks. */
 export async function serverLogic<T>(name: string, { method = 'GET', query, body }: ServerLogicOptions = {}): Promise<T> {
-  if (import.meta.env.DEV) {
+  if (import.meta.env.DEV || SAMPLE_ONLY.has(name)) {
     const mock = mocks[name]
     if (!mock) throw new ApiError(404, `No mock for Server Logic "${name}"`)
     await new Promise((resolve) => setTimeout(resolve, 150))

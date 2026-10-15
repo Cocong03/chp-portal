@@ -39,6 +39,7 @@ test('shows open entries in the wireframe columns with BC amounts, pills and the
   expect(screen.getByRole('combobox', { name: 'Show open items or all entries' })).toHaveTextContent('Open items only')
   expect(await screen.findByText('Showing 1–4 of 4 entries')).toBeInTheDocument()
   expect(document.title).toBe('Customer Ledger — Concreat Connect')
+  expect(screen.getByRole('note')).toHaveTextContent('Sample data')
 })
 
 test('payments and credits show the minus before the peso sign, dashes for no PO or due date, green Closed', async () => {

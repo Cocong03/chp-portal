@@ -11,7 +11,7 @@ The Dashboard body built to `docs/Mockup-chp-v2.html` (`#section-dashboard`, `re
 | # | Topic | Decision |
 |---|---|---|
 | 1 | Approach | **A:** one `dashboard` endpoint fanning out BC calls in parallel (Architecture §6). The status filter rules move into the shared stamped helpers so `orders` and `dashboard` use one definition |
-| 2 | Account overview on Dev | **Hidden** in the deployed build (`import.meta.env.DEV` switch, as the Ledger), live once BC delivers balance/balance due/overdue and S2-09 available credit |
+| 2 | Account overview on Dev | **Hidden** in the deployed build (`import.meta.env.DEV` switch, as the Ledger), live once BC delivers balance/balance due/overdue and S2-09 available credit. **Changed 2026-10-15 (client request):** shown on the deployed site with the sample figures (`SAMPLE_ACCOUNT`) and a *Sample data* notice until then |
 | 3 | Roles | Every role sees every tile (the wireframe doesn't vary the Dashboard by role). Status tiles are **links only for roles that can open Orders** (Full Access, Orders & Delivery); for Finance & Documents and View Only they show the count without "View these orders →" |
 | 4 | Invoiced | Count `null` → "—", not a link, until BC delivers the archive change (S2-03) |
 | 5 | Counts | BC `$count` with the Orders filters — no counts API, so **S2-10 is not needed** |

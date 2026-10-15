@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils'
 import { DataTable, type DataColumn } from '@/ui/DataTable'
 import { DatePicker } from '@/ui/DatePicker'
 import { PageHeader } from '@/ui/PageHeader'
+import { SampleNotice } from '@/ui/SampleNotice'
 import { Pager } from '@/ui/Pager'
 import { QueryError } from '@/ui/QueryError'
 import { SearchField } from '@/ui/SearchField'
@@ -91,6 +92,8 @@ export function LedgerPage() {
   return (
     <>
       <PageHeader title="Customer Ledger" />
+      {/* ponytail: sample entries until BC's ledger API exists (S2-07); delete with the name in serverLogic's SAMPLE_ONLY. */}
+      <SampleNotice className="mb-4" />
       <SectionCard title="Customer Ledger">
         <Toolbar
           onClear={() => {

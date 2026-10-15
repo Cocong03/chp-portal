@@ -87,7 +87,8 @@ test('Account overview shows the BC figures in the wireframe tiles; overdue is r
   expect(within(overview).getByText('Past its due date — please settle to avoid delivery holds')).toBeInTheDocument()
 })
 
-test('nothing overdue is green; figures BC has not provided yet show a dash and are never green', async () => {
+// Re-enable when the Account overview reads BC's balances instead of SAMPLE_ACCOUNT (S2-07/S2-09).
+test.skip('nothing overdue is green; figures BC has not provided yet show a dash and are never green', async () => {
   const base = dashboardMock()
   answer('dashboard', { ...base, account: { ...base.account, overdue: 0 } } satisfies DashboardDto)
   const first = renderApp(<DashboardPage />)
@@ -142,12 +143,16 @@ test('a failed load shows the error with Try again; the greeting and announcemen
   expect(await region('Sales Orders')).toBeInTheDocument()
 })
 
-// Until BC has balances (S2-07) and available credit (S2-09), the deployed site shows only the Sales Orders tiles.
-test('the deployed build hides the Account overview', async () => {
+// Until BC has balances (S2-07) and available credit (S2-09), the deployed site shows the Account overview on sample figures, marked as such.
+test('the deployed build shows the Account overview on the sample figures, marked as sample data', async () => {
   vi.stubEnv('DEV', false)
   const me: MeDto = { contact: { name: 'J.D. Santos', email: 'full@test.ph' }, account: null, roles: ['Full Access'] }
-  vi.mocked(serverLogic).mockImplementation(async (name) => (name === 'me' ? me : name === 'dashboard' ? dashboardMock() : null) as never)
+  const live: DashboardDto = { ...dashboardMock(), account: { balance: null, balanceDue: null, overdue: null, creditLimit: 5, availableCredit: null } }
+  vi.mocked(serverLogic).mockImplementation(async (name) => (name === 'me' ? me : name === 'dashboard' ? live : null) as never)
   renderApp(<DashboardPage />)
+  const overview = await region('Account overview')
+  expect(within(overview).getByText(/Sample data/)).toBeInTheDocument()
+  expect(await within(overview).findByText('₱468,250.00')).toBeInTheDocument()
+  expect(within(overview).getByText('₱750,000.00')).toBeInTheDocument()
   expect(await region('Sales Orders')).toBeInTheDocument()
-  expect(screen.queryByRole('region', { name: 'Account overview' })).not.toBeInTheDocument()
 })

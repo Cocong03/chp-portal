@@ -4,8 +4,10 @@ import { canSee } from '@/auth/access'
 import { useMe } from '@/auth/useMe'
 import { peso } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { SAMPLE_ACCOUNT } from '@/mocks/dashboard'
 import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
+import { SampleNotice } from '@/ui/SampleNotice'
 import { Skeleton } from '@/ui/skeleton'
 import { AnnouncementBanner } from './AnnouncementBanner'
 import { Greeting } from './Greeting'
@@ -22,13 +24,14 @@ const ORDER_TILES: { key: keyof DashboardDto['counts']; label: string; status: s
   { key: 'invoiced', label: 'Invoiced', status: 'Invoiced', tone: 'clear' },
 ]
 
-function Section({ title, children }: { title: string; children: ReactNode }) {
+function Section({ title, note, children }: { title: string; note?: ReactNode; children: ReactNode }) {
   const id = `dashboard-${title.toLowerCase().replace(/\s+/g, '-')}`
   return (
     <section aria-labelledby={id} className="mb-[30px]">
       <h2 id={id} className="mb-3.5 text-[19px] font-bold">
         {title}
       </h2>
+      {note}
       <div className={GRID}>{children}</div>
     </section>
   )
@@ -41,7 +44,9 @@ export function DashboardPage() {
   const canOpenOrders = canSee(roles, 'orders')
   const data = dashboard.data
   const money = (value: number | null | undefined) => (data ? (value == null ? '—' : peso(value)) : <Skeleton className="h-7 w-32" />)
-  const overdue = data?.account.overdue ?? null
+  // ponytail: sample balances until BC has them (S2-07) and available credit (S2-09); then data?.account and drop the notice.
+  const account = data && SAMPLE_ACCOUNT
+  const overdue = account?.overdue ?? null
   const overdueTone: TileTone = overdue == null ? 'neutral' : overdue > 0 ? 'alert' : 'clear'
   const overdueCaption =
     overdueTone === 'alert'
@@ -59,16 +64,13 @@ export function DashboardPage() {
         <QueryError onRetry={() => void dashboard.refetch()} />
       ) : (
         <>
-          {/* ponytail: Account overview only in the local build until BC has balances (S2-07) and available credit (S2-09); delete this condition then. */}
-          {import.meta.env.DEV && (
-            <Section title="Account overview">
-              <StatTile label="Outstanding Balance" value={money(data?.account.balance)} caption="Total outstanding on your account" />
-              <StatTile label="Balance Due Today" value={money(data?.account.balanceDue)} caption="Due now per your payment terms" />
-              <StatTile label="Overdue amount" value={money(data ? overdue : undefined)} caption={overdueCaption} tone={overdueTone} />
-              <StatTile label="Credit limit" value={money(data?.account.creditLimit)} caption="Set on your customer record" />
-              <StatTile label="Available credit" value={money(data?.account.availableCredit)} caption="Kept in sync with your live credit standing" />
-            </Section>
-          )}
+          <Section title="Account overview" note={<SampleNotice className="mb-3.5" />}>
+            <StatTile label="Outstanding Balance" value={money(account?.balance)} caption="Total outstanding on your account" />
+            <StatTile label="Balance Due Today" value={money(account?.balanceDue)} caption="Due now per your payment terms" />
+            <StatTile label="Overdue amount" value={money(account ? overdue : undefined)} caption={overdueCaption} tone={overdueTone} />
+            <StatTile label="Credit limit" value={money(account?.creditLimit)} caption="Set on your customer record" />
+            <StatTile label="Available credit" value={money(account?.availableCredit)} caption="Kept in sync with your live credit standing" />
+          </Section>
           <Section title="Sales Orders">
             {ORDER_TILES.map((tile) => {
               const count = data?.counts[tile.key]

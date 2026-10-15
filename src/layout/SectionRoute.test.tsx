@@ -27,14 +27,9 @@ function renderRoute() {
   )
 }
 
-// Until BC's ledger API exists (S2-07), the deployed site keeps the placeholder; the page runs only locally.
-test('the deployed build keeps "coming soon" on the Customer Ledger', async () => {
+// Until BC's ledger API exists (S2-07), the deployed site shows the page on the sample entries (client request 2026-10-15).
+test('the deployed build shows the Customer Ledger page', async () => {
   vi.stubEnv('DEV', false)
-  renderRoute()
-  expect(await screen.findByText('This section is coming soon.')).toBeInTheDocument()
-})
-
-test('the local build shows the Customer Ledger page', async () => {
   renderRoute()
   // The lazy page chunk can take over a second to load the first time in Vitest.
   expect(await screen.findByRole('searchbox', { name: 'Search ledger entries' }, { timeout: 5000 })).toBeInTheDocument()
