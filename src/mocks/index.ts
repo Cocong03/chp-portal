@@ -1,5 +1,6 @@
 import type { AnnouncementDto, CompanyDto, MeDto, SiteDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
+import { dashboardMock } from './dashboard'
 import { ledgerMock } from './ledger'
 import { ordersMock } from './orders'
 
@@ -56,6 +57,7 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
     title: 'Holiday order cutoff schedule',
     message: 'Submit orders before 3:00 PM to lock in next-business-day confirmation over the upcoming holiday period.',
   }),
+  dashboard: dashboardMock,
   ledger: ledgerMock,
   orders: ordersMock,
   // Wireframe SITES
