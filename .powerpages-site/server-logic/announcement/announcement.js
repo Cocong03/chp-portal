@@ -51,8 +51,30 @@ async function get() {
     }
 
     // Customer and company come only from the signed-in contact's Account (architecture rule 3), and BC must still
-    // let this contact into the portal (customerPortalAccess, decided 2026-10-06).
+    // let this contact into the portal (customerPortalAccess, decided 2026-10-06). Check first: the path for writes.
     async function sessionScope() {
+        var scope = accountScope();
+        if (!(await portalContact(scope, scope.email))) {
+            throw blockedError();
+        }
+        return scope;
+    }
+
+    // Read-only endpoints: work(scope) reads BC while the portal-access check runs (about 1 s saved per call, 2026-10-16);
+    // nothing is returned until the check passes, so a blocked caller's data is read and thrown away, never sent.
+    async function scopedRead(work) {
+        var scope = accountScope();
+        var access = portalContact(scope, scope.email);
+        var data = work(scope);
+        // Settled below or dropped when access fails: never an unhandled rejection.
+        data.catch(() => null);
+        if (!(await access)) {
+            throw blockedError();
+        }
+        return data;
+    }
+
+    function accountScope() {
         var user = Server.User;
         if (!user || !user.contactid) {
             throw new Error("not-signed-in");
@@ -69,7 +91,7 @@ async function get() {
         if (!account || !account.chp_bccustomerno || !account.chp_bccompanyid) {
             throw new Error("no-account");
         }
-        var scope = {
+        return {
             contactId: user.contactid,
             accountId: account.accountid,
             email: String(contact.emailaddress1 || "").trim().toLowerCase(),
@@ -77,10 +99,6 @@ async function get() {
             companyId: account.chp_bccompanyid,
             customerName: account.name || ""
         };
-        if (!(await portalContact(scope, contact.emailaddress1))) {
-            throw blockedError();
-        }
-        return scope;
     }
 
     // The BC Person contact with this email, customerPortalAccess = true, linked to the session's customer; null when there's
@@ -181,10 +199,18 @@ async function get() {
             .join("&");
     }
 
-    async function bcToken(cfg) {
-        if (bcTokenCache) {
-            return bcTokenCache;
+    // Caches the request, not just the token, so calls made in parallel share one token request.
+    function bcToken(cfg) {
+        if (!bcTokenCache) {
+            bcTokenCache = requestToken(cfg);
+            bcTokenCache.catch(() => {
+                bcTokenCache = null;
+            });
         }
+        return bcTokenCache;
+    }
+
+    async function requestToken(cfg) {
         // The platform form-encodes a JSON object body itself; a raw "a=b&c=d" string is rejected as invalid JSON.
         var form = JSON.stringify({
             grant_type: "client_credentials",
@@ -204,8 +230,7 @@ async function get() {
         if (!response || !response.access_token) {
             throw new Error("bc-auth no access_token");
         }
-        bcTokenCache = response.access_token;
-        return bcTokenCache;
+        return response.access_token;
     }
 
     function bcUrl(cfg, scope, entity, query) {

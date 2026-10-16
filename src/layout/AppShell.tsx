@@ -44,6 +44,10 @@ export function AppShell() {
         <span className="sr-only">Loading your account…</span>
         <Skeleton className="h-6 w-48" />
         <Skeleton className="h-4 w-80" />
+        {/* The page renders hidden so its code and data load alongside the account; SectionRoute checks the role once it's in. */}
+        <div hidden>
+          <Outlet />
+        </div>
       </div>
     )
   } else if (me.isError && !me.data) {

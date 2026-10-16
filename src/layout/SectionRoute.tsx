@@ -15,10 +15,13 @@ const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
   account: lazy(() => import('@/modules/account/AccountPage').then((m) => ({ default: m.AccountPage }))),
 }
 
-/** UX-only guard. AppShell renders routes only once `me` has loaded; Server Logic web roles are the security. */
+/**
+ * UX-only guard; Server Logic web roles are the security. While `me` loads, AppShell renders the page hidden so its data
+ * loads alongside; the role decides once `me` is in.
+ */
 export function SectionRoute({ section }: { section: Section }) {
-  const { data } = useMe()
-  if (!data || !canSee(data.roles, section.key)) return <Navigate to="/" replace />
+  const { data, isPending } = useMe()
+  if (!isPending && (!data || !canSee(data.roles, section.key))) return <Navigate to="/" replace />
   const Page = PAGES[section.key]
   if (!Page) return <Placeholder label={section.label} />
   // Keyed by section so moving to another section clears a failed page.

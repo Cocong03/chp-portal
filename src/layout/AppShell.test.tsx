@@ -83,8 +83,35 @@ test('shows a loading state while the account loads', () => {
   expect(screen.getByRole('status')).toHaveTextContent('Loading your account…')
 })
 
+// 2026-10-16: the page's data loads alongside the account (about 2 s sooner) instead of after it.
+test("the page's data loads while the account is still loading, and shows once it has", async () => {
+  const actual = (await vi.importActual<typeof import('@/api/serverLogic')>('@/api/serverLogic')).serverLogic
+  let releaseMe = () => {}
+  const meGate = new Promise<void>((resolve) => (releaseMe = resolve))
+  vi.mocked(serverLogic).mockImplementation(async (name, options) => {
+    if (name === 'me') await meGate
+    return actual(name, options)
+  })
+  signInAs('full@test.ph', '/orders')
+  await waitFor(() => expect(vi.mocked(serverLogic).mock.calls.some(([name]) => name === 'orders')).toBe(true), { timeout: 5000 })
+  expect(screen.getByRole('status')).toHaveTextContent('Loading your account…')
+  expect(screen.queryByRole('table', { name: 'Orders' })).not.toBeInTheDocument()
+  releaseMe()
+  expect(await screen.findByRole('table', { name: 'Orders' })).toBeInTheDocument()
+  expect(vi.mocked(serverLogic).mock.calls.filter(([name]) => name === 'orders')).toHaveLength(1)
+})
+
 test('a failed account load offers Retry', async () => {
-  vi.mocked(serverLogic).mockRejectedValueOnce(new ApiError(500, 'boom'))
+  // The page's own calls now run alongside `me`, so fail `me` by name rather than the next call.
+  const actual = (await vi.importActual<typeof import('@/api/serverLogic')>('@/api/serverLogic')).serverLogic
+  let failed = false
+  vi.mocked(serverLogic).mockImplementation(async (name, options) => {
+    if (name === 'me' && !failed) {
+      failed = true
+      throw new ApiError(500, 'boom')
+    }
+    return actual(name, options)
+  })
   const user = userEvent.setup()
   signInAs('full@test.ph')
   expect(await screen.findByText("We couldn't load your account details. Please try again.")).toBeInTheDocument()

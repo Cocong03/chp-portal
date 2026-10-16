@@ -158,8 +158,9 @@ test('checks BC portal access with the Dataverse email, lower-cased and quoted, 
   expect(decodeURIComponent(call(http, 'MCRMContacts').url)).toContain(
     "$filter=tolower(eMail) eq 'o''neil@bestrade.ph' and customerPortalAccess eq true and type eq 'Person'",
   )
-  expect(decodeURIComponent(call(http, 'mcrmBusinessRelation').url)).toContain(
-    "$filter=(contactNo eq 'CT0001') and linktoTable eq 'Customer'",
+  // The endpoint's own contact read also calls mcrmBusinessRelation, alongside the check (scopedRead).
+  expect(http.map((c) => decodeURIComponent(c.url))).toContainEqual(
+    expect.stringContaining("mcrmBusinessRelation?$filter=(contactNo eq 'CT0001') and linktoTable eq 'Customer'"),
   )
 })
 
@@ -167,10 +168,10 @@ test.each([
   ['no BC contact with portal access for this email', { portalContacts: [] }],
   ['portal-enabled contacts belong to another customer', { relations: [{ vendorNo: 'C00000001' }] }],
   ['the contact has no email', { email: '' }],
-])('blocked when %s: returns {blocked:true} and reads no customer data', async (_case, options) => {
-  const { server, http, warnings } = fakeServer(options as Parameters<typeof fakeServer>[0])
+])('blocked when %s: returns {blocked:true} and no customer data', async (_case, options) => {
+  // The customer read runs alongside the access check (scopedRead) and is thrown away: only {blocked:true} is sent.
+  const { server, warnings } = fakeServer(options as Parameters<typeof fakeServer>[0])
   expect(JSON.parse(await load(server).get())).toEqual({ blocked: true })
-  expect(http.some((c) => c.url.includes('/mcrmCustomers'))).toBe(false)
   expect(warnings.join(' ')).toContain('blocked')
 })
 

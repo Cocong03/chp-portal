@@ -95,3 +95,96 @@ test('no endpoint writes its own status clauses outside the shared helpers', () 
     expect(own, file).not.toMatch(/completelyShipped eq/)
   }
 })
+
+// 2026-10-16: GET endpoints read BC alongside the BC portal-access check (about 1 s faster per call); nothing is returned
+// until the check passes.
+const SETTINGS: Record<string, string> = {
+  'BC/TenantId': 't', 'BC/EnvironmentName': 'DEV', 'BC/ApiBasePath': '/api/pasi/mcrm/v1.0', 'BC/ClientId': 'c', 'BC/ClientSecret': 's',
+}
+const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify(value) })
+const down = JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
+
+function helperServer({ contacts = [{ companyNo: 'CT1', name: 'Buyer' }] as unknown[], accessDown = false } = {}) {
+  const http: string[] = []
+  let tokens = 0
+  let releaseAccess = () => {}
+  const accessGate = new Promise<void>((resolve) => (releaseAccess = resolve))
+  const server = {
+    User: { contactid: 'c-1' },
+    SiteSetting: { Get: (name: string) => SETTINGS[name] },
+    Logger: { Log() {}, Error() {}, Warn() {} },
+    Context: { ServerLogicName: 'test' },
+    Connector: {
+      Dataverse: {
+        RetrieveRecord: () => ({
+          contactid: 'c-1', emailaddress1: 'Buyer@808.ph',
+          parentcustomerid_account: { accountid: 'acc-2', name: '808 TRADING', chp_bccustomerno: 'C00000002', chp_bccompanyid: 'co-1' },
+        }),
+      },
+      HttpClient: {
+        PostAsync: async () => {
+          tokens++
+          return ok({ access_token: 'tok' })
+        },
+        GetAsync: async (url: string) => {
+          const plain = decodeURIComponent(url)
+          http.push(plain)
+          if (plain.includes('/MCRMContacts')) {
+            await accessGate
+            return accessDown ? down : ok({ value: contacts })
+          }
+          if (plain.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: 'C00000002' }] })
+          return ok({ value: [{ salesOrderNo: 'SOR1' }] })
+        },
+      },
+    },
+  }
+  const h = new Function('Server', `${source}\nreturn { scopedRead, bcGet }`)(server) as {
+    scopedRead: <T>(work: (scope: { customerNo: string }) => Promise<T>) => Promise<T>
+    bcGet: (scope: unknown, entity: string, query: string) => Promise<{ value: unknown[] }>
+  }
+  return { h, http, releaseAccess, tokens: () => tokens }
+}
+const tick = () => new Promise((resolve) => setTimeout(resolve, 0))
+
+test('scopedRead starts the endpoint read before the access check answers, then returns it once access passes', async () => {
+  const { h, http, releaseAccess, tokens } = helperServer()
+  const result = h.scopedRead(async (scope) => (await h.bcGet(scope, 'mcrmSalesOrders', '$top=1')).value)
+  await tick()
+  expect(http.some((u) => u.includes('/mcrmSalesOrders'))).toBe(true)
+  expect(http.some((u) => u.includes('/mcrmBusinessRelation'))).toBe(false)
+  releaseAccess()
+  expect(await result).toEqual([{ salesOrderNo: 'SOR1' }])
+  expect(tokens()).toBe(1)
+})
+
+test('scopedRead hands the work the session customer only', async () => {
+  const { h, releaseAccess } = helperServer()
+  releaseAccess()
+  expect(await h.scopedRead(async (scope) => scope.customerNo)).toBe('C00000002')
+})
+
+test('scopedRead throws blocked, never the data, when BC portal access is off', async () => {
+  const { h, releaseAccess } = helperServer({ contacts: [] })
+  releaseAccess()
+  await expect(h.scopedRead(async () => 'secret')).rejects.toMatchObject({ blocked: true })
+})
+
+test('scopedRead: a failed access check is an error (not blocked), even when the read failed too', async () => {
+  const { h, releaseAccess } = helperServer({ accessDown: true })
+  const result = h.scopedRead(async () => {
+    throw new Error('read failed')
+  })
+  releaseAccess()
+  const err = await result.catch((e: { message: string; blocked?: boolean }) => e)
+  expect(err.message).toContain('503')
+  expect(err.blocked).toBeUndefined()
+})
+
+test('scopedRead: a failed read with access on is that error', async () => {
+  const { h, releaseAccess } = helperServer()
+  releaseAccess()
+  await expect(h.scopedRead(async () => {
+    throw new Error('read failed')
+  })).rejects.toThrow('read failed')
+})
