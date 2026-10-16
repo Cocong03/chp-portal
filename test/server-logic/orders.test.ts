@@ -21,6 +21,16 @@ const LINE = {
   documentNo: 'SOR0000000006', itemNo: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', quantity: 50,
   unitOfMeasureCode: 'BAG', unitPrice: 245, AmountIncludingVAT: 12250,
 }
+// mcrmSalesOrderArchives (probed 2026-10-16): one row per order, latest version; no status that says Invoiced.
+const ARCHIVED = {
+  salesOrderNo: 'SOR0000000003', sellToCustomerNo: 'C00000002', orderDate: '2026-09-16', externalDocumentNo: 'PO1',
+  shiptoCode: '65072350', shipmentMethodCode: 'PICKUP', tripEntryNo: '', requestDeliveryDate: '2026-09-16', totalAmountInclVAT: 25000,
+  documentType: 'Order', status: 'Released', completelyShipped: true, invoice: true, versionNo: 2, docNoOccurrence: 1,
+}
+const ARCHIVE_LINE = {
+  documentNo: 'SOR0000000003', docNoOccurrence: 1, versionNo: 2, itemNo: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag',
+  quantity: 100, unitOfMeasureCode: 'BAG', unitPrice: 250, amountIncludingVAT: 25000,
+}
 const ok = (value: unknown) => JSON.stringify({ StatusCode: 200, IsSuccessStatusCode: true, Body: JSON.stringify(value) })
 
 function fakeServer({
@@ -29,6 +39,10 @@ function fakeServer({
   count = 1 as number | undefined,
   search = {} as Record<string, unknown[]>,
   lines = [LINE] as unknown[],
+  archive = [] as unknown[],
+  archiveSearch = {} as Record<string, unknown[]>,
+  archiveLines = [ARCHIVE_LINE] as unknown[],
+  liveNos = undefined as string[] | undefined,
   bcDown = false,
 } = {}) {
   const http: string[] = []
@@ -53,6 +67,14 @@ function fakeServer({
           if (plain.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: 'C00000002' }] })
           if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
           if (plain.includes('/chpSalesOrderLines')) return ok({ value: lines })
+          if (plain.includes('/mcrmSalesOrderArchiveLines')) return ok({ value: archiveLines })
+          if (plain.includes('/mcrmSalesOrderArchives')) {
+            const term = Object.keys(archiveSearch).find((t) => plain.includes(t))
+            return ok({ value: term ? archiveSearch[term] : archive })
+          }
+          if (plain.includes('$select=salesOrderNo&')) {
+            return ok({ value: (liveNos ?? (orders as { salesOrderNo: string }[]).map((o) => o.salesOrderNo)).map((salesOrderNo) => ({ salesOrderNo })) })
+          }
           const term = Object.keys(search).find((t) => plain.includes(t))
           if (term) return ok({ value: search[term] })
           return ok(count === undefined ? { value: orders } : { value: orders, '@odata.count': count })
@@ -64,11 +86,15 @@ function fakeServer({
 }
 
 const SAFE = "We couldn't load this information. Please try again."
-const orderCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrders?'))
+// Order queries, not the live-order-number lookup that sorts out invoiced orders.
+const orderCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrders?') && !u.includes('$select=salesOrderNo&'))
+const archiveCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrderArchives?'))
 const BASE = "sellToCustomerNo eq 'C00000002' and documentType eq 'Order'"
 
 test("lists the session customer's SOR orders newest first, 10 per page, with the total count", async () => {
-  const { server, http } = fakeServer({ query: { page: '2' }, count: 14 })
+  // BC answers $top=20 with pages 1–2; the 11th row, the oldest, is page 2.
+  const newer = Array.from({ length: 10 }, (_, i) => ({ ...ORDER, salesOrderNo: `SOR1${i}`, orderDate: '2026-10-10' }))
+  const { server, http } = fakeServer({ query: { page: '2' }, orders: [...newer, ORDER], count: 14 })
   expect(JSON.parse(await load(server).get())).toEqual({
     orders: [
       {
@@ -83,8 +109,9 @@ test("lists the session customer's SOR orders newest first, 10 per page, with th
   const [call] = orderCalls(http)
   expect(call).toContain(`$filter=${BASE}&`)
   expect(call).toContain('$orderby=orderDate desc,salesOrderNo desc')
-  expect(call).toContain('$top=10')
-  expect(call).toContain('$skip=10')
+  // Pages 1–2 from each source, merged with the invoiced orders, then page 2 cut out.
+  expect(call).toContain('$top=20')
+  expect(call).not.toContain('$skip')
   expect(call).toContain('$count=true')
 })
 
@@ -109,7 +136,7 @@ test('customer or company values in the request are ignored', async () => {
 test('an invalid page number falls back to page 1', async () => {
   const { server, http } = fakeServer({ query: { page: '-3' } })
   expect(JSON.parse(await load(server).get()).page).toBe(1)
-  expect(orderCalls(http)[0]).toContain('$skip=0')
+  expect(orderCalls(http)[0]).toContain('$top=10')
 })
 
 test('drops rows BC returns for another customer or that are not sales orders', async () => {
@@ -181,7 +208,7 @@ test.each([
 ])('detail of %s → notFound, lines never read', async (_case, options) => {
   const { server, http } = fakeServer(options as Parameters<typeof fakeServer>[0])
   expect(JSON.parse(await load(server).get())).toEqual({ notFound: true })
-  expect(http.some((u) => u.includes('/chpSalesOrderLines'))).toBe(false)
+  expect(http.some((u) => u.includes('/chpSalesOrderLines') || u.includes('ArchiveLines'))).toBe(false)
 })
 
 test('BC down → only the customer-safe error', async () => {
@@ -225,18 +252,108 @@ test.each([
   expect(orderCalls(http)[0]).toContain(`$filter=${BASE} and ${clause}&`)
 })
 
-// Invoiced orders are gone from mcrmSalesOrders and live only in the archive, which the portal doesn't read yet (S2-03).
-test.each(['Invoiced', "x' or 1 eq 1"])('the %s filter answers with no orders and never reaches BC', async (status) => {
-  const { server, http } = fakeServer({ query: { status } })
+test('an unknown status filter answers with no orders and never reaches BC', async () => {
+  const { server, http } = fakeServer({ query: { status: "x' or 1 eq 1" } })
   expect(JSON.parse(await load(server).get())).toEqual({ orders: [], total: 0, page: 1, pageSize: 10 })
+  expect(http.filter((u) => u.includes('/mcrmSalesOrder'))).toEqual([])
+})
+
+// BC archives an order when it's posted and deletes it once fully invoiced (probed 2026-10-16): archived and no longer
+// live = Invoiced. A partly posted order is in both and keeps its live status.
+const PARTLY_POSTED = { ...ARCHIVED, salesOrderNo: 'SOR0000000006', orderDate: '2026-10-09', completelyShipped: false }
+
+test('the Invoiced filter lists archived orders that are no longer live, with the site and dates in the archive filter', async () => {
+  const { server, http } = fakeServer({ query: { status: 'Invoiced', site: 'S1', from: '2026-09-01' }, archive: [ARCHIVED, PARTLY_POSTED] })
+  expect(JSON.parse(await load(server).get())).toEqual({
+    orders: [
+      {
+        so: 'SOR0000000003', date: '2026-09-16', po: 'PO1', site: '65072350', ship: 'Pickup', bso: null, trip: null,
+        edd: '2026-09-16', total: 25000, status: 'Invoiced',
+      },
+    ],
+    total: 1,
+    page: 1,
+    pageSize: 10,
+  })
+  const [archive] = archiveCalls(http)
+  expect(archive).toContain(`$filter=${BASE} and shiptoCode eq 'S1' and orderDate ge 2026-09-01&`)
+  expect(archive).toContain('$orderby=orderDate desc,salesOrderNo desc')
   expect(orderCalls(http)).toEqual([])
+  expect(http.some((u) => u.includes(`/mcrmSalesOrders?$filter=${BASE}&$select=salesOrderNo&`))).toBe(true)
+})
+
+test('drops archive rows BC returns for another customer', async () => {
+  const { server } = fakeServer({ query: { status: 'Invoiced' }, archive: [{ ...ARCHIVED, sellToCustomerNo: 'C1' }] })
+  expect(JSON.parse(await load(server).get()).total).toBe(0)
+})
+
+test('All statuses merges live and invoiced orders newest first; the total counts both', async () => {
+  const older = { ...ARCHIVED, salesOrderNo: 'SOR0000000001', orderDate: '2026-08-01' }
+  const { server } = fakeServer({ orders: [ORDER], count: 1, archive: [ARCHIVED, older, PARTLY_POSTED] })
+  const page = JSON.parse(await load(server).get())
+  expect(page.orders.map((o: { so: string; status: string }) => [o.so, o.status])).toEqual([
+    ['SOR0000000006', 'Open'],
+    ['SOR0000000003', 'Invoiced'],
+    ['SOR0000000001', 'Invoiced'],
+  ])
+  expect(page.total).toBe(3)
+})
+
+test('page 2 of All statuses is cut from the merged list', async () => {
+  const live = Array.from({ length: 6 }, (_, i) => ({ ...ORDER, salesOrderNo: `SOR10${i}`, orderDate: `2026-10-0${i + 1}` }))
+  const archived = Array.from({ length: 6 }, (_, i) => ({ ...ARCHIVED, salesOrderNo: `SOR20${i}`, orderDate: `2026-09-0${i + 1}` }))
+  const { server } = fakeServer({ query: { page: '2' }, orders: live, count: 6, archive: archived })
+  const page = JSON.parse(await load(server).get())
+  expect(page.orders.map((o: { so: string }) => o.so)).toEqual(['SOR201', 'SOR200'])
+  expect(page.total).toBe(12)
+})
+
+test('a live status filter never reads the archive', async () => {
+  const { server, http } = fakeServer({ query: { status: 'Open' }, archive: [ARCHIVED] })
+  await load(server).get()
+  expect(archiveCalls(http)).toEqual([])
+})
+
+test('search finds invoiced orders too, with the same terms in the archive', async () => {
+  const { server, http } = fakeServer({
+    query: { q: 'po1' },
+    search: { "contains(externalDocumentNo,'PO1')": [ORDER] },
+    archiveSearch: { "contains(externalDocumentNo,'PO1')": [ARCHIVED] },
+  })
+  const page = JSON.parse(await load(server).get())
+  expect(page.orders.map((o: { so: string; status: string }) => [o.so, o.status])).toEqual([['SOR0000000006', 'Open'], ['SOR0000000003', 'Invoiced']])
+  expect(archiveCalls(http)).toHaveLength(3)
+  expect(archiveCalls(http).some((c) => c.includes(`$filter=${BASE} and contains(salesOrderNo,'PO1')&`))).toBe(true)
+})
+
+test('no archived match skips the live-order-number lookup', async () => {
+  const { server, http } = fakeServer({ query: { status: 'Invoiced' } })
+  await load(server).get()
+  expect(http.some((u) => u.includes('$select=salesOrderNo&'))).toBe(false)
+})
+
+test("detail of an invoiced order comes from the archive with that version's lines", async () => {
+  const { server, http } = fakeServer({ query: { id: 'SOR0000000003' }, orders: [], archive: [ARCHIVED] })
+  expect(JSON.parse(await load(server).get())).toEqual({
+    so: 'SOR0000000003', date: '2026-09-16', po: 'PO1', site: '65072350', ship: 'Pickup', bso: null, trip: null, edd: '2026-09-16',
+    total: 25000, status: 'Invoiced',
+    lines: [{ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', qty: 100, uom: 'BAG', unitPrice: 250, lineTotal: 25000 }],
+  })
+  expect(archiveCalls(http)[0]).toContain("$filter=salesOrderNo eq 'SOR0000000003' and sellToCustomerNo eq 'C00000002' and documentType eq 'Order'")
+  expect(http.some((u) => u.includes("mcrmSalesOrderArchiveLines?$filter=documentNo eq 'SOR0000000003' and versionNo eq 2 and docNoOccurrence eq 1"))).toBe(true)
+})
+
+test("detail of another customer's archived order → notFound, lines never read", async () => {
+  const { server, http } = fakeServer({ query: { id: 'SOR0000000003' }, orders: [], archive: [{ ...ARCHIVED, sellToCustomerNo: 'C1' }] })
+  expect(JSON.parse(await load(server).get())).toEqual({ notFound: true })
+  expect(http.some((u) => u.includes('ArchiveLines'))).toBe(false)
 })
 
 // BC added these to mcrmSalesOrders on 2026-10-14: an order still in BC with everything shipped (not yet invoiced) is
 // Completely Shipped whatever its Status says; a drawdown names its blanket order.
 test('a completely shipped order is Completely Shipped, and a drawdown shows its Blanket SO #', async () => {
   const { server, http } = fakeServer({
-    orders: [{ ...ORDER, status: 'Released', completelyShipped: true, blanketOrderNo: 'BSO0000000001' }, { ...ORDER, salesOrderNo: 'SOR0000000007' }],
+    orders: [{ ...ORDER, status: 'Released', completelyShipped: true, blanketOrderNo: 'BSO0000000001' }, { ...ORDER, salesOrderNo: 'SOR0000000007', orderDate: '2026-10-01' }],
     count: 2,
   })
   const [shipped, plain] = JSON.parse(await load(server).get()).orders

@@ -1,8 +1,8 @@
-# Active: S2 Read-only BC modules
+# Active: Update Orders page and Order Table
 
 See implementation plans at docs\Concreat_Hub_Implementation_Plan.md
 
 ## Requirements
 
-- Implement the s2 tasks, let me know if there's a dependency to other team like BC or Rene but implement what we have now
-- Here's the updated mockup at docs\Mockup-chp-v2.html. Please implement based on this mockup like the styles and wordings
+- BC team update the api for sales order archive endpoint and Invoice status is now one row per order. It shows the final status so please update the invoice in dashboard overview and orders. Could you confirm the endpoint and check?
+- Add skeleton loading when searching and filtering, clicking pagination with next and prev

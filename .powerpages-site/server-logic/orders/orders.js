@@ -120,13 +120,52 @@ async function get() {
     }
 
     // Portal status → mcrmSalesOrders filter clause (confirmed mapping 2026-09-14; Completely Shipped wins over Status).
-    // Shared so the Orders filter and the Dashboard counts can't drift. Invoiced lives in BC's archive (S2-03).
+    // Shared so the Orders filter and the Dashboard counts can't drift. Invoiced lives in BC's archive: see invoicedOrders.
     var ORDER_STATUS_FILTER = {
         "Open": "status eq 'Open' and completelyShipped eq false",
         "Pending Prepayment": "status eq 'Pending Prepayment' and completelyShipped eq false",
         "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
         "Completely Shipped": "completelyShipped eq true"
     };
+
+    function newestOrderFirst(a, b) {
+        if (a.orderDate !== b.orderDate) {
+            return a.orderDate < b.orderDate ? 1 : -1;
+        }
+        return a.salesOrderNo < b.salesOrderNo ? 1 : a.salesOrderNo > b.salesOrderNo ? -1 : 0;
+    }
+
+    // The session customer's Invoiced orders, newest first (S2-03, probed 2026-10-16). BC archives an order when it's posted
+    // and deletes it from mcrmSalesOrders once fully invoiced, so an archived order that's no longer live is Invoiced; the
+    // archive row's status, ship and invoice fields are a copy from before posting and can't tell. One archive query per
+    // extra filter clause ("" for none), merged. select must include salesOrderNo, sellToCustomerNo, documentType, orderDate.
+    // ponytail: newest 500 archived orders per clause and 1000 live order numbers; page through BC if a customer outgrows that.
+    async function invoicedOrders(scope, clauses, select) {
+        var base = "sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq 'Order'";
+        var results = await Promise.all(
+            clauses.map((clause) =>
+                bcGet(
+                    scope,
+                    "mcrmSalesOrderArchives",
+                    odataQuery({ $filter: base + (clause ? " and " + clause : ""), $select: select, $orderby: "orderDate desc,salesOrderNo desc", $top: "500" })
+                )
+            )
+        );
+        var archived = [];
+        results.forEach((res) => {
+            ((res && res.value) || []).forEach((row) => {
+                if (row.sellToCustomerNo === scope.customerNo && row.documentType === "Order" && !archived.some((seen) => seen.salesOrderNo === row.salesOrderNo)) {
+                    archived.push(row);
+                }
+            });
+        });
+        if (archived.length === 0) {
+            return [];
+        }
+        var live = await bcGet(scope, "mcrmSalesOrders", odataQuery({ $filter: base, $select: "salesOrderNo", $top: "1000" }));
+        var liveNos = ((live && live.value) || []).map((row) => row.salesOrderNo);
+        return archived.filter((row) => liveNos.indexOf(row.salesOrderNo) === -1).sort(newestOrderFirst);
+    }
 
     // OData string literal with single quotes doubled (architecture rule 4).
     function odataLiteral(value) {
@@ -229,14 +268,16 @@ async function get() {
 
     // Portal status ← BC Sales Header status (confirmed 2026-09-14); an order with everything shipped is Completely Shipped
     // whatever its Status says. BC encodes spaces in enum values as _x0020_. Invoiced orders are gone from mcrmSalesOrders
-    // (BC deletes an order once fully invoiced) and live only in mcrmSalesOrderArchives, which the portal doesn't read yet.
+    // (BC deletes an order once fully invoiced) and come from mcrmSalesOrderArchives through invoicedOrders.
     var STATUS_FROM_BC = { "Open": "Open", "Pending Prepayment": "Pending Prepayment", "Released": "Ready for Dispatch" };
     // Portal ship ← BC Shipment Method Code (PICKUP / DELIVERY on DEV, 2026-10-15); any other code shows "—".
     var SHIP_FROM_BC = { "PICKUP": "Pickup", "DELIVERY": "Delivery" };
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
     var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,status,blanketOrderNo,completelyShipped";
+    var ARCHIVE_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,versionNo,docNoOccurrence";
     var LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,AmountIncludingVAT";
+    var ARCHIVE_LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,amountIncludingVAT";
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
     function param(name) {
@@ -262,14 +303,8 @@ async function get() {
         return row.sellToCustomerNo === scope.customerNo && row.documentType === "Order";
     }
 
-    function newestFirst(a, b) {
-        if (a.orderDate !== b.orderDate) {
-            return a.orderDate < b.orderDate ? 1 : -1;
-        }
-        return a.salesOrderNo < b.salesOrderNo ? 1 : a.salesOrderNo > b.salesOrderNo ? -1 : 0;
-    }
-
-    // The Trip ID assigned date stays null until BC provides it (S2-03).
+    // The Trip ID assigned date stays null until BC provides it (S2-03). Only archive rows carry versionNo, and the
+    // archive rows that reach here are the invoiced ones.
     function toSummary(row) {
         return {
             so: row.salesOrderNo,
@@ -281,7 +316,7 @@ async function get() {
             trip: row.tripEntryNo ? { id: row.tripEntryNo, assignedAt: null } : null,
             edd: bcDate(row.requestDeliveryDate),
             total: Number(row.totalAmountInclVAT) || 0,
-            status: row.completelyShipped === true ? "Completely Shipped" : STATUS_FROM_BC[String(row.status || "").split("_x0020_").join(" ")] || null
+            status: row.versionNo !== undefined ? "Invoiced" : row.completelyShipped === true ? "Completely Shipped" : STATUS_FROM_BC[String(row.status || "").split("_x0020_").join(" ")] || null
         };
     }
 
@@ -292,19 +327,17 @@ async function get() {
             qty: Number(row.quantity) || 0,
             uom: row.unitOfMeasureCode || "",
             unitPrice: Number(row.unitPrice) || 0,
-            lineTotal: Number(row.AmountIncludingVAT) || 0
+            // Live lines spell it AmountIncludingVAT, archive lines amountIncludingVAT.
+            lineTotal: Number(row.AmountIncludingVAT || row.amountIncludingVAT) || 0
         };
     }
 
-    function listFilter(scope) {
-        var parts = ["sellToCustomerNo eq " + odataLiteral(scope.customerNo), "documentType eq 'Order'"];
-        var status = param("status");
+    // Site and date clauses, shared by the live and archive queries; "" when none.
+    function narrowFilter() {
+        var parts = [];
         var site = param("site");
         var from = param("from");
         var to = param("to");
-        if (status) {
-            parts.push(ORDER_STATUS_FILTER[status]);
-        }
         if (site) {
             parts.push("shiptoCode eq " + odataLiteral(site));
         }
@@ -317,53 +350,89 @@ async function get() {
         return parts.join(" and ");
     }
 
+    function liveFilter(scope, status) {
+        var narrow = narrowFilter();
+        return "sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq 'Order'" +
+            (status ? " and " + ORDER_STATUS_FILTER[status] : "") + (narrow ? " and " + narrow : "");
+    }
+
     async function detail(scope, id) {
-        var found = await bcGet(
-            scope,
-            "mcrmSalesOrders",
-            odataQuery({
-                $filter: "salesOrderNo eq " + odataLiteral(id) + " and sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq 'Order'",
-                $select: ORDER_FIELDS
-            })
-        );
+        var ownFilter = "salesOrderNo eq " + odataLiteral(id) + " and sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq 'Order'";
+        var found = await bcGet(scope, "mcrmSalesOrders", odataQuery({ $filter: ownFilter, $select: ORDER_FIELDS }));
         var order = ((found && found.value) || []).find((row) => row.salesOrderNo === id && owned(row, scope));
+        if (order) {
+            var lines = await bcGet(
+                scope,
+                "chpSalesOrderLines",
+                odataQuery({ $filter: "documentNo eq " + odataLiteral(id), $select: LINE_FIELDS, $top: "500" })
+            );
+            return withLines(order, lines, id);
+        }
+        // Not live: an invoiced order is in the archive, its lines under the archived version.
+        var archived = await bcGet(scope, "mcrmSalesOrderArchives", odataQuery({ $filter: ownFilter, $select: ARCHIVE_FIELDS }));
+        var row = ((archived && archived.value) || []).find((each) => each.salesOrderNo === id && owned(each, scope));
         // Another customer's order gets the same answer as a missing one.
-        if (!order) {
+        if (!row) {
             return { notFound: true };
         }
-        var lines = await bcGet(
+        var archiveLines = await bcGet(
             scope,
-            "chpSalesOrderLines",
-            odataQuery({ $filter: "documentNo eq " + odataLiteral(id), $select: LINE_FIELDS, $top: "500" })
+            "mcrmSalesOrderArchiveLines",
+            odataQuery({
+                $filter: "documentNo eq " + odataLiteral(id) + " and versionNo eq " + (Number(row.versionNo) || 0) + " and docNoOccurrence eq " + (Number(row.docNoOccurrence) || 0),
+                $select: ARCHIVE_LINE_FIELDS,
+                $top: "500"
+            })
         );
-        var dto = toSummary(order);
+        return withLines(row, archiveLines, id);
+    }
+
+    function withLines(row, lines, id) {
+        var dto = toSummary(row);
         dto.lines = ((lines && lines.value) || []).filter((line) => line.documentNo === id).map(toLine);
         return dto;
     }
 
+    function pageOf(rows, total, page) {
+        var start = (page - 1) * PAGE_SIZE;
+        return { orders: rows.slice(start, start + PAGE_SIZE).map(toSummary), total: total, page: page, pageSize: PAGE_SIZE };
+    }
+
+    // Invoiced orders come from the archive, the other statuses from the live orders; All statuses merges both.
     async function list(scope, page) {
         var status = param("status");
-        if (status && Object.keys(ORDER_STATUS_FILTER).indexOf(status) === -1) {
+        var invoiced = status === "Invoiced";
+        if (status && !invoiced && Object.keys(ORDER_STATUS_FILTER).indexOf(status) === -1) {
             return { orders: [], total: 0, page: page, pageSize: PAGE_SIZE };
         }
-        var filter = listFilter(scope);
+        var liveStatus = invoiced ? "" : status;
+        var readArchive = !status || invoiced;
+        var narrow = narrowFilter();
         var q = param("q").slice(0, 50);
         if (!q) {
-            var result = await bcGet(
-                scope,
-                "mcrmSalesOrders",
-                odataQuery({
-                    $filter: filter,
-                    $select: ORDER_FIELDS,
-                    $orderby: "orderDate desc,salesOrderNo desc",
-                    $top: String(PAGE_SIZE),
-                    $skip: String((page - 1) * PAGE_SIZE),
-                    $count: "true"
-                })
-            );
-            var rows = ((result && result.value) || []).filter((row) => owned(row, scope));
-            var count = Number(result && result["@odata.count"]);
-            return { orders: rows.map(toSummary), total: isNaN(count) ? rows.length : count, page: page, pageSize: PAGE_SIZE };
+            if (invoiced) {
+                var only = await invoicedOrders(scope, [narrow], ARCHIVE_FIELDS);
+                return pageOf(only, only.length, page);
+            }
+            // The first `page` pages of live orders, so the merge with the invoiced ones can cut out any page.
+            // ponytail: up to 10,000 live rows on page 1000; switch to $skip per source if deep pages get slow.
+            var both = await Promise.all([
+                bcGet(
+                    scope,
+                    "mcrmSalesOrders",
+                    odataQuery({
+                        $filter: liveFilter(scope, liveStatus),
+                        $select: ORDER_FIELDS,
+                        $orderby: "orderDate desc,salesOrderNo desc",
+                        $top: String(page * PAGE_SIZE),
+                        $count: "true"
+                    })
+                ),
+                readArchive ? invoicedOrders(scope, [narrow], ARCHIVE_FIELDS) : []
+            ]);
+            var rows = ((both[0] && both[0].value) || []).filter((row) => owned(row, scope));
+            var count = Number(both[0] && both[0]["@odata.count"]);
+            return pageOf(rows.concat(both[1]).sort(newestOrderFirst), (isNaN(count) ? rows.length : count) + both[1].length, page);
         }
         // BC can't "or" two fields and contains() is case-sensitive: search the SO number (upper case) and the PO
         // reference (as typed and upper case) separately, then merge.
@@ -372,32 +441,35 @@ async function get() {
         if (upper !== q) {
             terms.push(["externalDocumentNo", upper]);
         }
-        var results = await Promise.all(
-            terms.map((term) =>
-                bcGet(
-                    scope,
-                    "mcrmSalesOrders",
-                    odataQuery({
-                        $filter: filter + " and contains(" + term[0] + "," + odataLiteral(term[1]) + ")",
-                        $select: ORDER_FIELDS,
-                        // ponytail: newest 200 per query; page through BC if a customer's searches ever need more.
-                        $orderby: "orderDate desc,salesOrderNo desc",
-                        $top: SEARCH_CAP
-                    })
+        var clauses = terms.map((term) => "contains(" + term[0] + "," + odataLiteral(term[1]) + ")");
+        var found = await Promise.all([
+            Promise.all(
+                (invoiced ? [] : clauses).map((clause) =>
+                    bcGet(
+                        scope,
+                        "mcrmSalesOrders",
+                        odataQuery({
+                            $filter: liveFilter(scope, liveStatus) + " and " + clause,
+                            $select: ORDER_FIELDS,
+                            // ponytail: newest 200 per query; page through BC if a customer's searches ever need more.
+                            $orderby: "orderDate desc,salesOrderNo desc",
+                            $top: SEARCH_CAP
+                        })
+                    )
                 )
-            )
-        );
+            ),
+            readArchive ? invoicedOrders(scope, clauses.map((clause) => (narrow ? narrow + " and " : "") + clause), ARCHIVE_FIELDS) : []
+        ]);
         var merged = [];
-        results.forEach((res) => {
+        found[0].forEach((res) => {
             ((res && res.value) || []).forEach((row) => {
                 if (owned(row, scope) && !merged.some((seen) => seen.salesOrderNo === row.salesOrderNo)) {
                     merged.push(row);
                 }
             });
         });
-        merged.sort(newestFirst);
-        var start = (page - 1) * PAGE_SIZE;
-        return { orders: merged.slice(start, start + PAGE_SIZE).map(toSummary), total: merged.length, page: page, pageSize: PAGE_SIZE };
+        merged = merged.concat(found[1]).sort(newestOrderFirst);
+        return pageOf(merged, merged.length, page);
     }
 
     Server.Logger.Log("orders GET called");

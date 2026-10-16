@@ -20,6 +20,9 @@ function fakeServer({
   bcDown = false,
   cardDown = false,
   noCount = false,
+  // Archived orders; SOR3 is partly posted and still live, so it isn't Invoiced.
+  archive = [{ salesOrderNo: 'SOR2', sellToCustomerNo: 'C00000002', documentType: 'Order', orderDate: '2026-09-01' },
+    { salesOrderNo: 'SOR3', sellToCustomerNo: 'C00000002', documentType: 'Order', orderDate: '2026-09-02' }] as unknown[],
 } = {}) {
   const http: string[] = []
   const server = {
@@ -45,6 +48,8 @@ function fakeServer({
           if (plain.includes('/mcrmCustomers')) {
             return cardDown ? JSON.stringify({ StatusCode: 400, IsSuccessStatusCode: false, ReasonPhrase: 'Bad Request', Body: '' }) : ok({ value: card })
           }
+          if (plain.includes('/mcrmSalesOrderArchives')) return ok({ value: archive })
+          if (plain.includes('$select=salesOrderNo&$top=1000')) return ok({ value: [{ salesOrderNo: 'SOR1' }, { salesOrderNo: 'SOR3' }] })
           if (noCount) return ok({ value: [] })
           const status = Object.keys(RULES).find((s) => plain.includes(RULES[s]))!
           return ok({ value: [{ salesOrderNo: 'SOR1' }], '@odata.count': COUNTS[status] })
@@ -55,12 +60,12 @@ function fakeServer({
   return { server, http }
 }
 
-const orderCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrders?'))
+const orderCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrders?') && !u.includes('$top=1000'))
 
 test('counts each status with exactly the Orders filter rule, and reads the credit limit', async () => {
   const { server, http } = fakeServer()
   expect(JSON.parse(await load(server).get())).toEqual({
-    counts: { open: 7, pendingPrepayment: 1, readyForDispatch: 2, completelyShipped: 0, invoiced: null },
+    counts: { open: 7, pendingPrepayment: 1, readyForDispatch: 2, completelyShipped: 0, invoiced: 1 },
     account: { balance: null, balanceDue: null, overdue: null, creditLimit: 750000, availableCredit: null },
   })
   const calls = orderCalls(http)
@@ -108,7 +113,7 @@ test('every business role can call it', () => {
 test('a count BC does not return is null, never a made-up 0', async () => {
   const { server } = fakeServer({ noCount: true })
   expect(JSON.parse(await load(server).get()).counts).toEqual({
-    open: null, pendingPrepayment: null, readyForDispatch: null, completelyShipped: null, invoiced: null,
+    open: null, pendingPrepayment: null, readyForDispatch: null, completelyShipped: null, invoiced: 1,
   })
 })
 
@@ -118,4 +123,15 @@ test('a failing customer-card read leaves the counts and gives no credit limit',
   const dto = JSON.parse(await load(server).get())
   expect(dto.counts.open).toBe(7)
   expect(dto.account.creditLimit).toBeNull()
+})
+
+// Invoiced = archived and no longer live (probed 2026-10-16), the same rule as the Orders Invoiced filter.
+test('Invoiced counts archived orders that are no longer live, for the session customer only', async () => {
+  const { server, http } = fakeServer({ archive: [
+    { salesOrderNo: 'SOR2', sellToCustomerNo: 'C00000002', documentType: 'Order', orderDate: '2026-09-01' },
+    { salesOrderNo: 'SOR4', sellToCustomerNo: 'C00000002', documentType: 'Order', orderDate: '2026-09-03' },
+    { salesOrderNo: 'SOR9', sellToCustomerNo: 'C1', documentType: 'Order', orderDate: '2026-09-03' },
+  ] })
+  expect(JSON.parse(await load(server).get()).counts.invoiced).toBe(2)
+  expect(http.some((u) => u.includes("/mcrmSalesOrderArchives?$filter=sellToCustomerNo eq 'C00000002' and documentType eq 'Order'&"))).toBe(true)
 })

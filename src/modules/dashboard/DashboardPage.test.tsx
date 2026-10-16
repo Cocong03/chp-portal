@@ -102,7 +102,7 @@ test.skip('nothing overdue is green; figures BC has not provided yet show a dash
   expect(within(overview).queryByText('Nothing past due — account in good standing')).not.toBeInTheDocument()
 })
 
-test('Sales Orders tiles link to the filtered Orders list for roles that can open Orders; Invoiced shows a dash', async () => {
+test('Sales Orders tiles link to the filtered Orders list for roles that can open Orders, Invoiced included', async () => {
   renderApp(<DashboardPage />)
   const orders = await region('Sales Orders')
   const open = await within(orders).findByRole('link', { name: /Open/ })
@@ -111,6 +111,17 @@ test('Sales Orders tiles link to the filtered Orders list for roles that can ope
   expect(within(orders).getByRole('link', { name: /Pending prepayment/ })).toHaveAttribute('href', '/orders?status=Pending%20Prepayment')
   expect(within(orders).getByRole('link', { name: /Ready for dispatch/ })).toHaveAttribute('href', '/orders?status=Ready%20for%20Dispatch')
   expect(within(orders).getByRole('link', { name: /Completely shipped/ })).toHaveTextContent('4')
+  const invoiced = within(orders).getByRole('link', { name: /Invoiced/ })
+  expect(invoiced).toHaveAttribute('href', '/orders?status=Invoiced')
+  expect(invoiced).toHaveTextContent('7')
+})
+
+test('a count BC did not send shows a dash and is not a link', async () => {
+  const base = dashboardMock()
+  answer('dashboard', { ...base, counts: { ...base.counts, invoiced: null } } satisfies DashboardDto)
+  renderApp(<DashboardPage />)
+  const orders = await region('Sales Orders')
+  await within(orders).findByRole('link', { name: /Open/ })
   expect(within(orders).queryByRole('link', { name: /Invoiced/ })).not.toBeInTheDocument()
   expect(within(orders).getByText('Invoiced').parentElement).toHaveTextContent('—')
 })

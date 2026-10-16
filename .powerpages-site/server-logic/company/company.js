@@ -120,13 +120,52 @@ async function get() {
     }
 
     // Portal status → mcrmSalesOrders filter clause (confirmed mapping 2026-09-14; Completely Shipped wins over Status).
-    // Shared so the Orders filter and the Dashboard counts can't drift. Invoiced lives in BC's archive (S2-03).
+    // Shared so the Orders filter and the Dashboard counts can't drift. Invoiced lives in BC's archive: see invoicedOrders.
     var ORDER_STATUS_FILTER = {
         "Open": "status eq 'Open' and completelyShipped eq false",
         "Pending Prepayment": "status eq 'Pending Prepayment' and completelyShipped eq false",
         "Ready for Dispatch": "status eq 'Released' and completelyShipped eq false",
         "Completely Shipped": "completelyShipped eq true"
     };
+
+    function newestOrderFirst(a, b) {
+        if (a.orderDate !== b.orderDate) {
+            return a.orderDate < b.orderDate ? 1 : -1;
+        }
+        return a.salesOrderNo < b.salesOrderNo ? 1 : a.salesOrderNo > b.salesOrderNo ? -1 : 0;
+    }
+
+    // The session customer's Invoiced orders, newest first (S2-03, probed 2026-10-16). BC archives an order when it's posted
+    // and deletes it from mcrmSalesOrders once fully invoiced, so an archived order that's no longer live is Invoiced; the
+    // archive row's status, ship and invoice fields are a copy from before posting and can't tell. One archive query per
+    // extra filter clause ("" for none), merged. select must include salesOrderNo, sellToCustomerNo, documentType, orderDate.
+    // ponytail: newest 500 archived orders per clause and 1000 live order numbers; page through BC if a customer outgrows that.
+    async function invoicedOrders(scope, clauses, select) {
+        var base = "sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq 'Order'";
+        var results = await Promise.all(
+            clauses.map((clause) =>
+                bcGet(
+                    scope,
+                    "mcrmSalesOrderArchives",
+                    odataQuery({ $filter: base + (clause ? " and " + clause : ""), $select: select, $orderby: "orderDate desc,salesOrderNo desc", $top: "500" })
+                )
+            )
+        );
+        var archived = [];
+        results.forEach((res) => {
+            ((res && res.value) || []).forEach((row) => {
+                if (row.sellToCustomerNo === scope.customerNo && row.documentType === "Order" && !archived.some((seen) => seen.salesOrderNo === row.salesOrderNo)) {
+                    archived.push(row);
+                }
+            });
+        });
+        if (archived.length === 0) {
+            return [];
+        }
+        var live = await bcGet(scope, "mcrmSalesOrders", odataQuery({ $filter: base, $select: "salesOrderNo", $top: "1000" }));
+        var liveNos = ((live && live.value) || []).map((row) => row.salesOrderNo);
+        return archived.filter((row) => liveNos.indexOf(row.salesOrderNo) === -1).sort(newestOrderFirst);
+    }
 
     // OData string literal with single quotes doubled (architecture rule 4).
     function odataLiteral(value) {

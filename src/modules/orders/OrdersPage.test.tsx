@@ -98,6 +98,29 @@ test('Next and Prev change pages; Clear filters resets everything', async () => 
   expect(await screen.findByText('Showing 11–14 of 14 orders')).toBeInTheDocument()
 })
 
+test.each([
+  ['Next', (user: ReturnType<typeof userEvent.setup>) => user.click(screen.getByRole('button', { name: 'Next →' }))],
+  ['a search', (user: ReturnType<typeof userEvent.setup>) => user.type(screen.getByRole('searchbox', { name: 'Search orders' }), 'PO-8841')],
+])('after %s the table shows skeleton rows until the new page arrives', async (_case, act) => {
+  const user = userEvent.setup()
+  let release = () => {}
+  vi.mocked(serverLogic).mockImplementation(async (name, options) => {
+    // Only the first orders call answers at once; the next waits until released.
+    if (name === 'orders' && vi.mocked(serverLogic).mock.calls.filter(([n]) => n === 'orders').length > 1) {
+      await new Promise<void>((resolve) => (release = resolve))
+    }
+    return actualServerLogic(name, options)
+  })
+  renderApp(<OrdersPage />, { route: '/orders' })
+  const orders = await table()
+  await within(orders).findByRole('row', { name: /SO-100482/ })
+  await act(user)
+  await waitFor(() => expect(orders).toHaveAttribute('aria-busy', 'true'))
+  expect(within(orders).queryByRole('row', { name: /SO-100482/ })).not.toBeInTheDocument()
+  release()
+  await waitFor(() => expect(orders).toHaveAttribute('aria-busy', 'false'))
+})
+
 test('a page past the end jumps back to the last page', async () => {
   renderApp(<OrdersPage />, { route: '/orders?page=9' })
   // Final review 2026-10-12: while it jumps back, the table must not claim there are no orders next to "14 orders".

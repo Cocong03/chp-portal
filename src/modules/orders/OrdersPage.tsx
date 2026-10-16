@@ -120,8 +120,6 @@ export function OrdersPage() {
   const filtered = FILTER_KEYS.some((key) => key !== "page" && filters[key as keyof OrderFilters]);
   const tableColumns = useMemo(() => columns(sites, setViewing), [sites]);
 
-  console.log(data);
-
   return (
     <>
       <PageHeader title="Orders" />
@@ -172,8 +170,9 @@ export function OrdersPage() {
               label="Orders"
               columns={tableColumns}
               data={rows}
-              // Also while jumping back from a page past the end, so the table never says "no orders" next to "14 orders".
-              loading={orders.isPending || filters.page > lastPage}
+              // Skeleton rows while a search, filter or page change loads (the pager keeps the last total), and while jumping
+              // back from a page past the end, so the table never says "no orders" next to "14 orders".
+              loading={orders.isPending || orders.isPlaceholderData || filters.page > lastPage}
               emptyMessage={filtered ? "No orders match your filters." : "You don't have any orders yet."}
               className="shadow-none"
             />

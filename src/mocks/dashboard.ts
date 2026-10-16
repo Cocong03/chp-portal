@@ -14,7 +14,7 @@ export function dashboardMock(): DashboardDto {
       pendingPrepayment: count('Pending Prepayment'),
       readyForDispatch: count('Ready for Dispatch'),
       completelyShipped: count('Completely Shipped'),
-      invoiced: null,
+      invoiced: count('Invoiced'),
     },
     account: SAMPLE_ACCOUNT,
   }
