@@ -206,6 +206,24 @@ test('a contact BC has switched off sees only the access-turned-off card', async
   expect(document.title).toBe('Access turned off — Concreat Connect')
 })
 
+// 2026-10-18: on Dev every endpoint answers blocked; the page's blocked answer re-checked `me`, which reset it to loading,
+// which rendered the hidden page again, so the card flickered in a loop.
+test('a blocked contact whose page data is also blocked sees the card steadily, without re-checking in a loop', async () => {
+  // `me` answers after the hidden page has asked for its data, as on Dev (me ~2 s).
+  let pageAsked = () => {}
+  const pageGate = new Promise<void>((resolve) => (pageAsked = resolve))
+  vi.mocked(serverLogic).mockImplementation(async (name) => {
+    if (name === 'me') await pageGate
+    else pageAsked()
+    throw new BlockedError()
+  })
+  signInAs('full@test.ph')
+  expect(await screen.findByRole('heading', { name: 'Your access has been turned off' })).toBeInTheDocument()
+  await act(() => new Promise((resolve) => setTimeout(resolve, 50)))
+  expect(screen.getByRole('heading', { name: 'Your access has been turned off' })).toBeInTheDocument()
+  expect(vi.mocked(serverLogic).mock.calls.filter(([name]) => name === 'me')).toHaveLength(1)
+})
+
 test('cached account data plus a blocked refetch shows the card, not the old nav', async () => {
   const { client } = signInAs('full@test.ph')
   await navLabels()
