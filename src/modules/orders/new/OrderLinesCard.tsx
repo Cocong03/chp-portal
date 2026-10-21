@@ -72,7 +72,7 @@ export function OrderLinesCard({ options }: { options: OrderOptionsDto }) {
                       min={1}
                       step={1}
                       aria-label={`Quantity, line ${index + 1}`}
-                      className={`w-24 ${num}`}
+                      className={`ml-auto w-24 ${num}`}
                       {...register(`lines.${index}.qty`, { valueAsNumber: true })}
                     />
                   </td>
