@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { useSearchParams } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { serverLogic } from "@/api/serverLogic";
 import type { OrderSummaryDto, OrdersPageDto, SiteDto } from "@/api/types";
@@ -166,7 +166,11 @@ export function OrdersPage() {
 
   return (
     <>
-      <PageHeader title="Orders" />
+      <PageHeader title="Orders">
+        <Button asChild>
+          <Link to="/orders/new">+ New Order</Link>
+        </Button>
+      </PageHeader>
       <SectionCard title="Orders">
         <Toolbar
           onClear={() => {

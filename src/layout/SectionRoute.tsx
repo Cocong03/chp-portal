@@ -9,7 +9,7 @@ import { PageErrorBoundary } from './PageErrorBoundary'
 // Built modules, one chunk each. Sections not listed here show the placeholder until their sub-project lands.
 const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
   dashboard: lazy(() => import('@/modules/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage }))),
-  orders: lazy(() => import('@/modules/orders/OrdersPage').then((m) => ({ default: m.OrdersPage }))),
+  orders: lazy(() => import('@/modules/orders/OrdersSection').then((m) => ({ default: m.OrdersSection }))),
   ledger: lazy(() => import('@/modules/ledger/LedgerPage').then((m) => ({ default: m.LedgerPage }))),
   sites: lazy(() => import('@/modules/sites/SitesPage').then((m) => ({ default: m.SitesPage }))),
   account: lazy(() => import('@/modules/account/AccountPage').then((m) => ({ default: m.AccountPage }))),

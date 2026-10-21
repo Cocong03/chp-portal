@@ -26,7 +26,8 @@ export default function App() {
     <Routes>
       <Route element={<AppShell />}>
         {SECTIONS.map((section) => (
-          <Route key={section.key} path={section.path} element={<SectionRoute section={section} />} />
+          // Sections own their subpaths (/orders/new); the Dashboard is exactly "/".
+          <Route key={section.key} path={section.path === '/' ? '/' : `${section.path}/*`} element={<SectionRoute section={section} />} />
         ))}
       </Route>
       <Route path="*" element={<Navigate to="/" replace />} />
