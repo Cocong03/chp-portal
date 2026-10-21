@@ -20,13 +20,13 @@ function Row({ label, value, total }: { label: string; value: ReactNode; total?:
   )
 }
 
-/** Disabled until Drafts (S3-12) and Submit (S3-10). A disabled button gets no hover, so the tooltip sits on a wrapper. */
-function Soon({ children, primary }: { children: string; primary?: boolean }) {
+/** Disabled until Submit (S3-10). A disabled button gets no hover, so the tooltip sits on a wrapper. */
+function Soon({ children }: { children: string }) {
   return (
     <Tooltip>
       <TooltipTrigger asChild>
         <span tabIndex={0} className="flex-1">
-          <Button type="button" variant={primary ? 'default' : 'outline'} disabled className="w-full">
+          <Button type="button" disabled className="w-full">
             {children}
           </Button>
         </span>
@@ -37,7 +37,17 @@ function Soon({ children, primary }: { children: string; primary?: boolean }) {
 }
 
 /** Credit standing and Order summary. Figures are display sums only; the real quote is S3-06. */
-export function SummaryCards({ options, sites }: { options: OrderOptionsDto; sites: SiteDto[] }) {
+export function SummaryCards({
+  options,
+  sites,
+  onSaveDraft,
+  saving,
+}: {
+  options: OrderOptionsDto
+  sites: SiteDto[]
+  onSaveDraft: () => void
+  saving: boolean
+}) {
   const { control, register } = useFormContext<NewOrderForm>()
   const [lines, shipmentMethod, siteCode] = useWatch({ control, name: ['lines', 'shipmentMethod', 'site'] })
   const amounts = lines.map((line) => lineAmount(line, options.items)).filter((amount): amount is number => amount !== null)
@@ -96,8 +106,10 @@ export function SummaryCards({ options, sites }: { options: OrderOptionsDto; sit
         )}
         <TooltipProvider>
           <div className="mt-4 flex gap-2.5">
-            <Soon>Save as draft</Soon>
-            <Soon primary>Submit for approval</Soon>
+            <Button type="button" variant="outline" className="flex-1" onClick={onSaveDraft} disabled={saving}>
+              {saving ? 'Saving…' : 'Save as draft'}
+            </Button>
+            <Soon>Submit for approval</Soon>
           </div>
         </TooltipProvider>
       </SectionCard>

@@ -91,7 +91,11 @@ test('the helpers define the Orders status filter rules once', () => {
 test('no endpoint writes its own status clauses outside the shared helpers', () => {
   for (const file of endpointFiles) {
     const text = readFileSync(file, 'utf8')
-    const own = text.slice(0, text.indexOf(START)) + text.slice(text.indexOf(END))
+    // Every helpers region removed: an endpoint with several methods (drafts) carries one per method.
+    const own = text
+      .split(START)
+      .map((part, index) => (index === 0 ? part : part.slice(part.indexOf(END))))
+      .join('')
     expect(own, file).not.toMatch(/completelyShipped eq/)
   }
 })

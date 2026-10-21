@@ -1,9 +1,16 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { format } from 'date-fns'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
+import { Route, Routes } from 'react-router-dom'
+import { toast } from 'sonner'
 import { ApiError, serverLogic } from '@/api/serverLogic'
+import type { DraftPayload } from '@/api/types'
+import { draftsMock, resetDraftsMock } from '@/mocks/drafts'
 import { renderApp } from '@/test/render'
+import { OrdersSection } from '../OrdersSection'
 import { NewOrderPage } from './NewOrderPage'
+
+vi.mock('sonner', async (importOriginal) => ({ ...(await importOriginal<typeof import('sonner')>()), toast: { error: vi.fn() } }))
 
 vi.mock('@/api/serverLogic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/serverLogic')>()
@@ -133,13 +140,13 @@ test.each([
   expect(summary('Subtotal')).toHaveTextContent('₱245.00')
 })
 
-test('Blanket Order, Save as draft and Submit for approval are disabled', async () => {
+test('Blanket Order and Submit for approval are disabled', async () => {
   const user = userEvent.setup()
   await openForm()
   expect(screen.getByRole('radio', { name: 'Single Order' })).toHaveAttribute('aria-checked', 'true')
   expect(screen.getByRole('radio', { name: 'Blanket Order' })).toBeDisabled()
   expect(screen.getByText('For orders with agreed pricing, choose Blanket Order.')).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Save as draft' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Save as draft' })).toBeEnabled()
   const submit = screen.getByRole('button', { name: 'Submit for approval' })
   expect(submit).toBeDisabled()
   await user.hover(submit.parentElement!)
@@ -262,4 +269,120 @@ test('the requested delivery date is picked from a calendar', async () => {
   await user.click(await screen.findByRole('button', { name: /25th/ }))
   const today = new Date()
   expect(field).toHaveTextContent(format(new Date(today.getFullYear(), today.getMonth(), 25), 'MMM d, yyyy'))
+})
+
+describe('drafts (S3-12)', () => {
+  const SEED_ID = '6f1c2a3e-5b7d-4e8f-9a0b-1c2d3e4f5a01'
+  const SAVED = 'Saved as draft. You may go to the Drafts tab to edit, or delete.'
+
+  beforeEach(() => {
+    resetDraftsMock()
+    vi.mocked(serverLogic).mockImplementation(actualServerLogic)
+    vi.mocked(toast.error).mockClear()
+  })
+
+  const draftCalls = () =>
+    vi.mocked(serverLogic).mock.calls.filter(([name, options]) => name === 'drafts' && options?.method && options.method !== 'GET')
+  const lastSaved = () => (draftCalls().at(-1)![1]!.body as { payload: DraftPayload }).payload
+  const qty = () => screen.getByRole('spinbutton', { name: 'Quantity, line 1' })
+  const siteSelect = () => screen.getByRole('combobox', { name: 'Delivery site' })
+  async function openDraft(id = SEED_ID) {
+    renderApp(<NewOrderPage />, { route: `/orders/new?draft=${id}` })
+    await screen.findByRole('table', { name: 'Order lines' })
+  }
+
+  test('Save as draft creates a draft and shows the saved note', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    expect(await screen.findByText(SAVED)).toBeInTheDocument()
+    expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST'])
+    expect(lastSaved().form.lines).toEqual([{ code: 'CEM-T1-40KG', qty: 1 }])
+  })
+
+  test('saving again updates the same draft', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await screen.findByText(SAVED)
+    await setQty(user, 1, '7')
+    await user.click(await screen.findByRole('button', { name: 'Save as draft' }))
+    await waitFor(() => expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST', 'PUT']))
+    expect((draftsMock({ method: 'GET' }) as unknown[]).length).toBe(2)
+    expect(lastSaved().form.lines[0].qty).toBe(7)
+  })
+
+  test('Continue fills every field from the draft', async () => {
+    await openDraft()
+    expect(await screen.findByText('Continuing Draft #1, saved Oct 20, 2026.')).toBeInTheDocument()
+    expect(qty()).toHaveValue(10)
+    expect(screen.getByRole('combobox', { name: 'Item, line 1' })).toHaveTextContent('CEM-T1-40KG')
+    expect(screen.getByRole('radio', { name: 'Delivery' })).toHaveAttribute('aria-checked', 'true')
+    expect(siteSelect()).toHaveTextContent('PLANT2 — Plant 2 — North Depot')
+    expect(screen.getByLabelText('Your PO reference (optional)')).toHaveValue('PO-8915')
+    expect(screen.getByLabelText('Receiving person')).toHaveValue('Ramon Cruz')
+  })
+
+  test('a draft without a site is not given the default', async () => {
+    const seed = draftsMock({ method: 'GET', query: { id: SEED_ID } }) as { payload: DraftPayload }
+    draftsMock({ method: 'PUT', query: { id: SEED_ID }, body: { payload: { ...seed.payload, form: { ...seed.payload.form, site: '' } } } })
+    await openDraft()
+    await screen.findByText(/Continuing Draft #1/)
+    expect(siteSelect()).not.toHaveTextContent('PLANT1')
+  })
+
+  test('keeps the saved site when sites fail', async () => {
+    const user = userEvent.setup()
+    answer('sites', new ApiError(500, 'x'))
+    await openDraft()
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await screen.findByText(SAVED)
+    expect(lastSaved().form.site).toBe('PLANT2')
+  })
+
+  test('a missing draft opens an empty form with a note', async () => {
+    await openDraft('00000000-0000-4000-8000-000000000000')
+    expect(await screen.findByText('This draft is no longer available.')).toBeInTheDocument()
+    expect(qty()).toHaveValue(1)
+  })
+
+  test('saving a draft deleted elsewhere creates a new one', async () => {
+    const user = userEvent.setup()
+    await openDraft()
+    draftsMock({ method: 'DELETE', query: { id: SEED_ID } })
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    expect(await screen.findByText(SAVED)).toBeInTheDocument()
+    expect(draftCalls().map(([, options]) => options!.method)).toEqual(['PUT', 'POST'])
+    expect(draftsMock({ method: 'GET' })).toEqual([expect.objectContaining({ label: 'Draft #1' })])
+  })
+
+  test('a failed save keeps the form and shows the toast', async () => {
+    const user = userEvent.setup()
+    answer('drafts', new ApiError(500, 'x'))
+    await openForm()
+    await setQty(user, 1, '4')
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith("We couldn't save this draft. Please try again."))
+    expect(qty()).toHaveValue(4)
+    expect(screen.queryByText(SAVED)).not.toBeInTheDocument()
+  })
+
+  test('the New Order tab starts a fresh form', async () => {
+    const user = userEvent.setup()
+    renderApp(
+      <Routes>
+        <Route path="/orders/*" element={<OrdersSection />} />
+      </Routes>,
+      { route: `/orders/new?draft=${SEED_ID}` },
+    )
+    await screen.findByText(/Continuing Draft #1/)
+    expect(qty()).toHaveValue(10)
+    await user.click(within(screen.getByRole('navigation', { name: 'Orders sections' })).getByRole('link', { name: 'New Order' }))
+    await waitFor(() => expect(qty()).toHaveValue(1))
+    expect(screen.queryByText(/Continuing Draft #1/)).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await screen.findByText(SAVED)
+    expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST'])
+  })
 })
