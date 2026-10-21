@@ -38,3 +38,21 @@ test('order drafts: own drafts only, with the append rights the lookups need', (
   expect(drafts.field('contactrelationship')).toBe('chp_contact_chp_orderdraft')
   for (const privilege of ['read', 'create', 'write', 'delete', 'append', 'appendto']) expect(drafts.field(privilege), privilege).toBe('true')
 })
+
+// Seen on Dev 2026-10-21 (after AppendTo): "Permission denied for (contact, Append)". The draft's contact and account
+// lookups need Append on the user's own contact and account, granted only to the roles that can order.
+test.each([
+  ['Contact - self (append, order drafts)', 'contact', '756150004', undefined],
+  ['Account - own account (append, order drafts)', 'account', '756150001', 'contact_customer_accounts'],
+])('%s: Append only, own record only, ordering roles only', (name, table, scope, relationship) => {
+  const p = named(name)
+  expect(p, `missing ${name}`).toBeDefined()
+  expect(p!.field('entitylogicalname')).toBe(table)
+  expect(p!.field('scope')).toBe(scope)
+  expect(p!.field('contactrelationship')).toBe(relationship)
+  expect(p!.field('append')).toBe('true')
+  for (const privilege of ['read', 'create', 'write', 'delete', 'appendto']) expect(p!.field(privilege), privilege).toBe('false')
+  expect(p!.text).toContain('- 56b29291-b981-4ef0-865b-41c1e9523a97') // Full Access
+  expect(p!.text).toContain('- 11bb7218-55fb-4cae-b8a1-5af2f41237c5') // Orders & Delivery
+  expect(p!.text).not.toContain('b2780841-e908-44f8-b7d8-dfd367bfeeb2') // never all Authenticated Users
+})

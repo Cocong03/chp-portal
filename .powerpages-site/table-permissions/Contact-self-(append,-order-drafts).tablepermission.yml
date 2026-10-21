@@ -1,0 +1,13 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+append: true
+appendto: false
+create: false
+delete: false
+entitylogicalname: contact
+entityname: Contact - self (append, order drafts)
+id: 70f56957-5da1-494c-952e-a778fce3f735
+read: false
+scope: 756150004
+write: false
