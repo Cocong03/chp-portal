@@ -1,0 +1,106 @@
+import type { ReactNode } from 'react'
+import { Controller, useFormContext, useWatch } from 'react-hook-form'
+import type { OrderOptionsDto, SiteDto } from '@/api/types'
+import { peso } from '@/lib/format'
+import { cn } from '@/lib/utils'
+import { Button } from '@/ui/button'
+import { Input } from '@/ui/input'
+import { Label } from '@/ui/label'
+import { SectionCard } from '@/ui/SectionCard'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/tooltip'
+import { lineAmount, type NewOrderForm } from './form'
+
+function Row({ label, value, total }: { label: string; value: ReactNode; total?: boolean }) {
+  return (
+    <div className={cn('flex justify-between gap-3 py-1.5 text-[13px]', total && 'mt-1 border-t pt-2.5 font-bold')}>
+      <span>{label}</span>
+      <span className="font-mono tabular-nums">{value}</span>
+    </div>
+  )
+}
+
+/** Disabled until Drafts (S3-12) and Submit (S3-10). A disabled button gets no hover, so the tooltip sits on a wrapper. */
+function Soon({ children, primary }: { children: string; primary?: boolean }) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <span tabIndex={0} className="flex-1">
+          <Button type="button" variant={primary ? 'default' : 'outline'} disabled className="w-full">
+            {children}
+          </Button>
+        </span>
+      </TooltipTrigger>
+      <TooltipContent>Available soon.</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** Credit standing and Order summary. Figures are display sums only; the real quote is S3-06. */
+export function SummaryCards({ options, sites }: { options: OrderOptionsDto; sites: SiteDto[] }) {
+  const { control, register } = useFormContext<NewOrderForm>()
+  const [lines, shipmentMethod, siteCode] = useWatch({ control, name: ['lines', 'shipmentMethod', 'site'] })
+  const amounts = lines.map((line) => lineAmount(line, options.items)).filter((amount): amount is number => amount !== null)
+  const subtotal = amounts.reduce((sum, amount) => sum + amount, 0)
+  const freight = options.freight[shipmentMethod]
+  const total = subtotal + freight + options.otherCharges
+  const site = sites.find((each) => each.code === siteCode)
+  return (
+    <>
+      <SectionCard title="Credit standing">
+        <Row label="Credit limit" value={peso(options.credit.limit)} />
+        <Row label="Current exposure" value={peso(options.credit.exposure)} />
+        <Row label="Available credit" value={peso(options.credit.available)} total />
+        <p className="mt-2 text-[12.5px] text-muted-foreground">Exposure = outstanding balance plus orders already placed but not yet invoiced.</p>
+      </SectionCard>
+      <SectionCard title="Order summary">
+        <div className="mb-3 flex flex-col gap-1.5">
+          <Label htmlFor="delivery-site">Delivery site</Label>
+          <Controller
+            control={control}
+            name="site"
+            render={({ field }) => (
+              <Select value={field.value} onValueChange={field.onChange} disabled={sites.length === 0}>
+                <SelectTrigger id="delivery-site" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {sites.map((each) => (
+                    <SelectItem key={each.code} value={each.code}>
+                      {each.code} — {each.name}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          />
+          {site && (
+            <p className="text-[12.5px] text-muted-foreground">
+              {site.name} — {site.address}, {site.city}
+            </p>
+          )}
+        </div>
+        <div className="mb-3 flex flex-col gap-1.5">
+          <Label htmlFor="po-ref">Your PO reference (optional)</Label>
+          <Input id="po-ref" placeholder="e.g. PO-8915" {...register('poRef')} />
+        </div>
+        <Row label="Lines" value={amounts.length} />
+        <Row label="Subtotal" value={peso(subtotal)} />
+        <Row label="Transport / Freight" value={peso(freight)} />
+        <Row label="Other charges" value={peso(options.otherCharges)} />
+        <Row label="Order total" value={peso(total)} total />
+        {total > options.credit.available && (
+          <p className="mt-2 text-[12.5px] font-medium text-warning">
+            ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.
+          </p>
+        )}
+        <TooltipProvider>
+          <div className="mt-4 flex gap-2.5">
+            <Soon>Save as draft</Soon>
+            <Soon primary>Submit for approval</Soon>
+          </div>
+        </TooltipProvider>
+      </SectionCard>
+    </>
+  )
+}
