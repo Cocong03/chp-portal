@@ -1,4 +1,5 @@
-import { screen, waitFor, within } from '@testing-library/react'
+import { act, screen, waitFor, within } from '@testing-library/react'
+import { format } from 'date-fns'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { ApiError, serverLogic } from '@/api/serverLogic'
 import { renderApp } from '@/test/render'
@@ -215,4 +216,50 @@ test('Source lists the plants with the wireframe note', async () => {
   await openForm()
   expect(screen.getByRole('combobox', { name: 'Source' })).toHaveTextContent('PLANT1 — Plant 1 — Main Yard')
   expect(screen.getByText('Choose your preferred source plant.')).toBeInTheDocument()
+})
+
+// Final review 2026-10-21 (Important 1): once order-options is live (S3-05), a failed background refetch must not
+// replace the form and lose what the customer typed.
+test('a failed background refresh of the options keeps the form and its values', async () => {
+  const user = userEvent.setup()
+  const { client } = await openForm()
+  await user.type(screen.getByLabelText('Your PO reference (optional)'), 'PO-1')
+  answer('order-options', new ApiError(500, 'x'))
+  await act(() => client.refetchQueries({ queryKey: ['order-options'] }))
+  // TanStack notifies observers on a setTimeout; flush it so the failed refetch reaches the UI.
+  await act(() => new Promise((resolve) => setTimeout(resolve, 10)))
+  expect(client.getQueryState(['order-options'])?.status).toBe('error')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(screen.getByLabelText('Your PO reference (optional)')).toHaveValue('PO-1')
+})
+
+// Final review 2026-10-21 (Important 2): DESIGN.md maps the wireframe toggles to ToggleGroup and dates to Popover + Calendar.
+test('arrow keys move between the shipment methods and Space picks one', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  screen.getByRole('radio', { name: 'Pick up' }).focus()
+  await user.keyboard('{ArrowRight}')
+  const delivery = screen.getByRole('radio', { name: 'Delivery' })
+  expect(delivery).toHaveFocus()
+  await user.keyboard(' ')
+  expect(delivery).toHaveAttribute('aria-checked', 'true')
+})
+
+test('clicking the chosen shipment method again keeps it chosen', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await user.click(screen.getByRole('radio', { name: 'Pick up' }))
+  expect(screen.getByRole('radio', { name: 'Pick up' })).toHaveAttribute('aria-checked', 'true')
+  expect(screen.getByLabelText('Pick up date')).toBeVisible()
+})
+
+test('the requested delivery date is picked from a calendar', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  const field = screen.getByLabelText('Requested delivery date')
+  await user.click(field)
+  await user.click(await screen.findByRole('button', { name: /25th/ }))
+  const today = new Date()
+  expect(field).toHaveTextContent(format(new Date(today.getFullYear(), today.getMonth(), 25), 'MMM d, yyyy'))
 })

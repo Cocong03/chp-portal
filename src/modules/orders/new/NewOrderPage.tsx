@@ -23,10 +23,11 @@ export function NewOrderPage() {
   return (
     <>
       <PageHeader title="New Order" />
-      {options.isError ? (
-        <QueryError onRetry={() => void options.refetch()} />
-      ) : options.data ? (
+      {/* Data first: a failed background refetch keeps the form (and what the customer typed) on screen. */}
+      {options.data ? (
         <OrderForm options={options.data} sites={sites} />
+      ) : options.isError ? (
+        <QueryError onRetry={() => void options.refetch()} />
       ) : (
         <div role="status" className="grid gap-5 lg:grid-cols-[1fr_340px]">
           <span className="sr-only">Loading…</span>

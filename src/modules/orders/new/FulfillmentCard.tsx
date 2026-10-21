@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react'
 import { Controller, useFormContext, useWatch } from 'react-hook-form'
 import type { OrderOptionsDto } from '@/api/types'
+import { DateField } from '@/ui/DateField'
 import { Input } from '@/ui/input'
 import { Label } from '@/ui/label'
 import { SectionCard } from '@/ui/SectionCard'
@@ -87,7 +88,7 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
           <p className={note}>Choose your preferred source plant.</p>
         </Field>
         <Field id="pickup-date" label="Pick up date" hidden={!pickup}>
-          <Input id="pickup-date" type="date" {...register('pickupDate')} />
+          <Controller control={control} name="pickupDate" render={({ field }) => <DateField id="pickup-date" value={field.value} onChange={field.onChange} />} />
         </Field>
         <Field id="recv-person" label="Receiving person" hidden={pickup}>
           <Input id="recv-person" placeholder="Name" {...register('receivingPerson')} />
@@ -99,7 +100,7 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
           <Input id="recv-email" type="email" placeholder="e.g. logistics@customer.com" {...register('receivingEmail')} />
         </Field>
         <Field id="req-date" label="Requested delivery date" hidden={pickup}>
-          <Input id="req-date" type="date" {...register('requestedDate')} />
+          <Controller control={control} name="requestedDate" render={({ field }) => <DateField id="req-date" value={field.value} onChange={field.onChange} />} />
         </Field>
         <Field id="time-window" label="Receiving time window" hidden={pickup}>
           <Choice id="time-window" name="timeWindow" items={asItems(TIME_WINDOWS)} />

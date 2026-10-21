@@ -1,6 +1,9 @@
-import { cn } from '@/lib/utils'
+import { ToggleGroup, ToggleGroupItem } from '@/ui/toggle-group'
 
-/** The wireframe's `.ordertype-toggle`: a row of radio buttons (Single / Blanket, Pick up / Delivery). */
+/**
+ * The wireframe's `.ordertype-toggle` (Single / Blanket, Pick up / Delivery) as DESIGN.md's ToggleGroup: radio items with
+ * arrow-key focus. A single ToggleGroup lets a click clear the choice; these always keep one.
+ */
 export function SegmentedToggle<T extends string>({
   label,
   value,
@@ -13,23 +16,21 @@ export function SegmentedToggle<T extends string>({
   onChange: (value: T) => void
 }) {
   return (
-    <div role="radiogroup" aria-label={label} className="inline-flex gap-0.5 self-start rounded-lg border bg-muted p-0.5">
+    <ToggleGroup
+      type="single"
+      variant="outline"
+      aria-label={label}
+      value={value}
+      onValueChange={(picked) => {
+        if (picked) onChange(picked as T)
+      }}
+      className="self-start rounded-lg"
+    >
       {options.map((option) => (
-        <button
-          key={option.value}
-          type="button"
-          role="radio"
-          aria-checked={value === option.value}
-          disabled={option.disabled}
-          onClick={() => onChange(option.value)}
-          className={cn(
-            'rounded-md px-3.5 py-1.5 text-[13px] font-semibold text-muted-foreground disabled:cursor-not-allowed disabled:opacity-50',
-            value === option.value && 'bg-card text-foreground shadow-sm',
-          )}
-        >
+        <ToggleGroupItem key={option.value} value={option.value} disabled={option.disabled} className="px-3.5 text-[13px] font-semibold">
           {option.label}
-        </button>
+        </ToggleGroupItem>
       ))}
-    </div>
+    </ToggleGroup>
   )
 }
