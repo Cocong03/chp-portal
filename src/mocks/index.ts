@@ -1,6 +1,7 @@
 import type { AnnouncementDto, CompanyDto, MeDto, SiteDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
 import { dashboardMock } from './dashboard'
+import { draftsMock } from './drafts'
 import { ledgerMock } from './ledger'
 import { ORDER_OPTIONS_SAMPLE } from './orderOptions'
 import { ordersMock } from './orders'
@@ -59,6 +60,7 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
     message: 'Submit orders before 3:00 PM to lock in next-business-day confirmation over the upcoming holiday period.',
   }),
   dashboard: dashboardMock,
+  drafts: draftsMock,
   ledger: ledgerMock,
   orders: ordersMock,
   'order-options': () => ORDER_OPTIONS_SAMPLE,

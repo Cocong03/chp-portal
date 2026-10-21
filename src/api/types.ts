@@ -1,3 +1,5 @@
+import type { NewOrderForm } from '@/modules/orders/new/form'
+
 /** GET /_api/serverlogics/me. Field names follow the wireframe (ACCOUNTS[], CURRENT_USER). */
 export interface MeDto {
   contact: { name: string; email: string }
@@ -128,4 +130,19 @@ export interface OrderOptionsDto {
   credit: { limit: number; exposure: number; available: number }
   freight: { delivery: number; pickup: number }
   otherCharges: number
+}
+
+/** chp_payload of a draft (S3-12): the New Order form's choices. No prices, freight or credit; they're current on Continue. */
+export interface DraftPayload {
+  version: 1
+  orderType: 'single' | 'blanket'
+  form: NewOrderForm
+}
+
+/** One row of GET /_api/serverlogics/drafts. Only the signed-in contact's own drafts. */
+export interface DraftDto {
+  id: string
+  label: string
+  savedAt: string
+  payload: DraftPayload
 }
