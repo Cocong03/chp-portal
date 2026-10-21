@@ -9,7 +9,7 @@
 
 ## 1. Recommendation in one paragraph
 
-Keep **Business Central as the only system of record for business data** and **do not copy BC data into Dataverse**. The React code site calls a thin **Server Logic "backend-for-frontend" (BFF)** layer on the Power Pages runtime. Server Logic calls the BC team's custom APIs **live**, using an app identity (OAuth client credentials). It always scopes each call to the signed-in customer's account, which it resolves on the server, never from browser input. **Dataverse holds only what the portal owns**: identity (Contact ↔ BC customer link, web roles), drafts, and the customer-submitted requests (Requests, Complaints, delivery-site requests, Excel uploads) with their taxonomies. The SPA reads and writes those through the standard **Portal Web API with table permissions**. **Power Automate is reserved for asynchronous back-office work**: the activation email (already built), routing submissions to the service center and Credit team, and notifications. It is never on the read path.
+Keep **Business Central as the only system of record for business data** and **do not copy BC data into Dataverse**. The React code site calls a thin **Server Logic "backend-for-frontend" (BFF)** layer on the Power Pages runtime. Server Logic calls the BC team's custom APIs **live**, using an app identity (OAuth client credentials). It always scopes each call to the signed-in customer's account, which it resolves on the server, never from browser input. **Dataverse holds only what the portal owns**: identity (Contact ↔ BC customer link, web roles), drafts, and the customer-submitted requests (Requests, Complaints, delivery-site requests, Excel uploads) with their taxonomies. The SPA reads and writes those through the standard **Portal Web API with table permissions** (drafts go through a `drafts` Server Logic endpoint instead, still behind table permissions; see the S3-B drafts spec). **Power Automate is reserved for asynchronous back-office work**: the activation email (already built), routing submissions to the service center and Credit team, and notifications. It is never on the read path.
 
 Why this shape fits the requirements:
 
@@ -177,7 +177,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **New Order — quote** (priced lines, freight ₱3,500/₱0, other charges, credit check) | BC price calc + freight ext + credit ext | – | `order-quote` POST |
 | **New Order — submit** | – | BC Sales Order incl. receiving details, freight/other-charge lines | `orders` POST (re-quotes + re-checks credit server-side) |
 | **Pending Approval tab** | BC (SOs pending credit approval + reason) | – | `orders?view=pending` (see decision D1) |
-| **Drafts tab** | Dataverse `Order Draft` (JSON payload) | Dataverse | Web API (Contact scope) |
+| **Drafts tab** | Dataverse `Order Draft` (JSON payload) | Dataverse | `drafts` Server Logic (Dataverse connector, Contact-scope table permission; S3-B spec 2026-10-21) |
 | **+ New Multiple Order (Excel)** | – | Dataverse `Excel Order Upload` (file + notes) | Web API → flow notifies service center |
 | **Customer Ledger** | BC Customer Ledger Entries | – | `ledger` |
 | **Document Center list / search / download** | BC posted invoices, credit memos, posted whse. shipments (Delivery Receipt), payments (Acknowledgement Receipt) + PDFs | – | `documents`, `document-file` (base64 JSON) |
@@ -293,7 +293,7 @@ Publisher **Concreat Holdings**, prefix `chp_`, solution `ConcreatHub` (created 
 | Account *(standard)* | `chp_bccustomerno`, `chp_bccompanyid`, `chp_bccompanyname` | read: Self/Account via contact (for `me`) |
 | Contact *(standard)* | `parentcustomerid` = active account | Self read |
 | `chp_accountlink` | contact, account | Contact scope read (Phase 2 picker) |
-| `chp_orderdraft` | contact, account, name, `chp_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal) |
+| `chp_orderdraft` | contact, account, name, `chp_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal), used through the `drafts` Server Logic, which sets contact and account from the session |
 | `chp_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
 | `chp_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
 | `chp_request` | account, submitted by, category, request type, assigned group, contact method/value/person, details, category fields, status, attachments | Account scope create/read |
