@@ -117,3 +117,15 @@ export interface DashboardDto {
   counts: { open: number | null; pendingPrepayment: number | null; readyForDispatch: number | null; completelyShipped: number | null; invoiced: number | null }
   account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; availableCredit: number | null }
 }
+
+/** New Order options (S3-05 `order-options`). Sample until BC delivers items/prices (S3-01), credit (S2-09) and freight (S3-02). */
+export interface OrderOptionsDto {
+  items: { code: string; description: string; uom: string; unitPrice: number }[]
+  plants: { code: string; label: string }[]
+  paymentMethod: 'cash' | 'terms'
+  paymentTerms: string
+  prepaymentTerms: string
+  credit: { limit: number; exposure: number; available: number }
+  freight: { delivery: number; pickup: number }
+  otherCharges: number
+}

@@ -2,7 +2,7 @@ import type { OrderDto, OrdersPageDto, OrderStatus } from '@/api/types'
 import type { MockRequest } from './index'
 
 // Wireframe CATALOG and ORDERS (Mockup-chp-v2.html). Totals here are mock data only; the real ones come from BC.
-const CATALOG: Record<string, { desc: string; uom: string; price: number }> = {
+export const CATALOG: Record<string, { desc: string; uom: string; price: number }> = {
   'CEM-T1-40KG': { desc: 'Portland Cement Type I — 40kg Bag', uom: 'BAG', price: 245 },
   'CEM-T2-BULK': { desc: 'Portland Cement Type II — Bulk', uom: 'MT', price: 4850 },
   'CEM-T1-BULK': { desc: 'Portland Cement Type I — Bulk', uom: 'MT', price: 4700 },
