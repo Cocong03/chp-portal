@@ -6,7 +6,7 @@ import { toast } from 'sonner'
 import type { DraftDto, OrderOptionsDto, SiteDto } from '@/api/types'
 import { formatDate } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { fromDraft } from '@/modules/orders/drafts/draftPayload'
+import { fromDraft, toPayload } from '@/modules/orders/drafts/draftPayload'
 import { saveDraft, useDraft } from '@/modules/orders/drafts/useDrafts'
 import { useSites } from '@/modules/sites/useSites'
 import { PageHeader } from '@/ui/PageHeader'
@@ -101,10 +101,12 @@ function OrderForm({
     mutationFn: () => {
       const { instructions, loadingType, callBefore } = form.getValues()
       form.setValue('instructions', withAutoLine(instructions, loadingType, callBefore))
-      return saveDraft(draftId, form.getValues())
+      // A draft that couldn't be found is saved as a new one, never over its old id.
+      return saveDraft(draft ? draftId : null, form.getValues())
     },
     onSuccess: (saved) => {
-      client.setQueryData(['drafts', saved.id], saved)
+      // Seeded with the form as it is now, so anything typed while the save was on its way survives the remount.
+      client.setQueryData(['drafts', saved.id], { ...saved, payload: toPayload(form.getValues()) })
       void client.invalidateQueries({ queryKey: ['drafts'], exact: true })
       // A new draft (or one recreated after it was removed elsewhere) moves the URL to it, so later saves update it and
       // a refresh keeps it. The key change remounts the form from the cache just seeded, with the same values.

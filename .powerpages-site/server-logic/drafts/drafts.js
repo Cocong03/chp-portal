@@ -293,6 +293,9 @@ async function get() {
     // #endregion bc-helpers
 
     var GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Only a missing record is "not found"; a throttled or failed read must not look like one (it would let a save
+    // replace the real draft or create a duplicate).
+    var NOT_FOUND = /404|does not exist|not found/i;
     var COLUMNS = "chp_orderdraftid,chp_name,chp_payload,modifiedon,_chp_contact_value";
 
     function toDto(row) {
@@ -308,10 +311,13 @@ async function get() {
     // The session contact's draft, or null (missing, unreadable or someone else's).
     function ownDraft(scope, id) {
         try {
-            var row = parseResult(Server.Connector.Dataverse.RetrieveRecord("chp_orderdrafts", id, "$select=" + COLUMNS), "dataverse");
+            var row = parseResult(Server.Connector.Dataverse.RetrieveRecord("chp_orderdrafts", id, "$select=" + COLUMNS, true), "dataverse");
             return row && String(row._chp_contact_value).toLowerCase() === String(scope.contactId).toLowerCase() ? row : null;
         } catch (err) {
-            return null;
+            if (NOT_FOUND.test(String((err && err.message) || err))) {
+                return null;
+            }
+            throw err;
         }
     }
 
@@ -326,7 +332,8 @@ async function get() {
         var result = parseResult(
             Server.Connector.Dataverse.RetrieveMultipleRecords(
                 "chp_orderdrafts",
-                "$select=" + COLUMNS + "&$filter=_chp_contact_value eq " + scope.contactId + " and _chp_account_value eq " + scope.accountId + "&$orderby=modifiedon desc"
+                "$select=" + COLUMNS + "&$filter=_chp_contact_value eq " + scope.contactId + " and _chp_account_value eq " + scope.accountId + "&$orderby=modifiedon desc",
+                true
             ),
             "dataverse"
         );
@@ -622,6 +629,11 @@ async function post() {
     }
     // #endregion bc-helpers
 
+    // A write's answer may be empty (undocumented); a non-empty one is checked for an error status.
+    function written(result) {
+        return result ? parseResult(result, "dataverse") : null;
+    }
+
     var COLUMNS = "chp_orderdraftid,chp_name,chp_payload,modifiedon,_chp_contact_value";
 
     function toDto(row) {
@@ -648,7 +660,7 @@ async function post() {
 
     function contactDrafts(scope, options) {
         var result = parseResult(
-            Server.Connector.Dataverse.RetrieveMultipleRecords("chp_orderdrafts", options + "&$filter=_chp_contact_value eq " + scope.contactId),
+            Server.Connector.Dataverse.RetrieveMultipleRecords("chp_orderdrafts", options + "&$filter=_chp_contact_value eq " + scope.contactId, true),
             "dataverse"
         );
         return (result && result.value) || [];
@@ -666,7 +678,7 @@ async function post() {
             var match = /^Draft #(\d+)$/.exec(row.chp_name || "");
             return match ? Math.max(max, Number(match[1])) : max;
         }, 0);
-        parseResult(
+        written(
             Server.Connector.Dataverse.CreateRecord(
                 "chp_orderdrafts",
                 JSON.stringify({
@@ -675,8 +687,7 @@ async function post() {
                     "chp_Contact@odata.bind": "/contacts(" + scope.contactId + ")",
                     "chp_Account@odata.bind": "/accounts(" + scope.accountId + ")"
                 })
-            ),
-            "dataverse"
+            )
         );
         // ponytail: reads back the contact's newest draft instead of relying on the create answer's shape; two saves in
         // the same instant could return the other one. Use the created id if Dev logs show the connector returns it.
@@ -976,7 +987,15 @@ async function put() {
     }
     // #endregion bc-helpers
 
+    // A write's answer may be empty (undocumented); a non-empty one is checked for an error status.
+    function written(result) {
+        return result ? parseResult(result, "dataverse") : null;
+    }
+
     var GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Only a missing record is "not found"; a throttled or failed read must not look like one (it would let a save
+    // replace the real draft or create a duplicate).
+    var NOT_FOUND = /404|does not exist|not found/i;
     var COLUMNS = "chp_orderdraftid,chp_name,chp_payload,modifiedon,_chp_contact_value";
 
     function toDto(row) {
@@ -991,10 +1010,13 @@ async function put() {
 
     function ownDraft(scope, id) {
         try {
-            var row = parseResult(Server.Connector.Dataverse.RetrieveRecord("chp_orderdrafts", id, "$select=" + COLUMNS), "dataverse");
+            var row = parseResult(Server.Connector.Dataverse.RetrieveRecord("chp_orderdrafts", id, "$select=" + COLUMNS, true), "dataverse");
             return row && String(row._chp_contact_value).toLowerCase() === String(scope.contactId).toLowerCase() ? row : null;
         } catch (err) {
-            return null;
+            if (NOT_FOUND.test(String((err && err.message) || err))) {
+                return null;
+            }
+            throw err;
         }
     }
 
@@ -1020,7 +1042,7 @@ async function put() {
         if (!text) {
             return { invalid: true };
         }
-        parseResult(Server.Connector.Dataverse.UpdateRecord("chp_orderdrafts", id, JSON.stringify({ chp_payload: text })), "dataverse");
+        written(Server.Connector.Dataverse.UpdateRecord("chp_orderdrafts", id, JSON.stringify({ chp_payload: text })));
         var saved = ownDraft(scope, id);
         if (!saved) {
             throw new Error("draft updated but not found");
@@ -1317,14 +1339,25 @@ async function del() {
     }
     // #endregion bc-helpers
 
+    // A write's answer may be empty (undocumented); a non-empty one is checked for an error status.
+    function written(result) {
+        return result ? parseResult(result, "dataverse") : null;
+    }
+
     var GUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+    // Only a missing record is "not found"; a throttled or failed read must not look like one (it would let a save
+    // replace the real draft or create a duplicate).
+    var NOT_FOUND = /404|does not exist|not found/i;
 
     function ownDraft(scope, id) {
         try {
-            var row = parseResult(Server.Connector.Dataverse.RetrieveRecord("chp_orderdrafts", id, "$select=chp_orderdraftid,_chp_contact_value"), "dataverse");
+            var row = parseResult(Server.Connector.Dataverse.RetrieveRecord("chp_orderdrafts", id, "$select=chp_orderdraftid,_chp_contact_value", true), "dataverse");
             return row && String(row._chp_contact_value).toLowerCase() === String(scope.contactId).toLowerCase() ? row : null;
         } catch (err) {
-            return null;
+            if (NOT_FOUND.test(String((err && err.message) || err))) {
+                return null;
+            }
+            throw err;
         }
     }
 
@@ -1335,7 +1368,7 @@ async function del() {
         if (!GUID.test(id) || !ownDraft(scope, id)) {
             return { notFound: true };
         }
-        parseResult(Server.Connector.Dataverse.DeleteRecord("chp_orderdrafts", id), "dataverse");
+        written(Server.Connector.Dataverse.DeleteRecord("chp_orderdrafts", id));
         return { removed: true };
     });
 }

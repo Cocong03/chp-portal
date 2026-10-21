@@ -347,6 +347,31 @@ describe('drafts (S3-12)', () => {
     expect(qty()).toHaveValue(1)
   })
 
+  test('a draft that could not be found saves as a new one, never over the old id', async () => {
+    const user = userEvent.setup()
+    await openDraft('00000000-0000-4000-8000-000000000000')
+    await screen.findByText('This draft is no longer available.')
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await screen.findByText(SAVED)
+    expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST'])
+  })
+
+  test('typing while the first save is on its way is kept', async () => {
+    const user = userEvent.setup()
+    let release = () => {}
+    const gate = new Promise<void>((resolve) => (release = resolve))
+    vi.mocked(serverLogic).mockImplementation(async (name, options) => {
+      if (name === 'drafts' && options?.method === 'POST') await gate
+      return actualServerLogic(name, options)
+    })
+    await openForm()
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await user.type(screen.getByLabelText('Your PO reference (optional)'), 'PO-77')
+    release()
+    await screen.findByText(SAVED)
+    expect(screen.getByLabelText('Your PO reference (optional)')).toHaveValue('PO-77')
+  })
+
   test('saving a draft deleted elsewhere creates a new one', async () => {
     const user = userEvent.setup()
     await openDraft()
