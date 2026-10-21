@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+description: 'Signed-in contact''s own New Order drafts in Dataverse: list, read, create, update, remove (S3-12)'
+display_name: 'Drafts (New Order)'
+id: 0bb460bd-ba78-4886-b894-2a1a15a5bbb2
+name: drafts
