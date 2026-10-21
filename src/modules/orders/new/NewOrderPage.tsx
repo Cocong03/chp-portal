@@ -108,6 +108,10 @@ function OrderForm({
       // Seeded with the form as it is now, so anything typed while the save was on its way survives the remount.
       client.setQueryData(['drafts', saved.id], { ...saved, payload: toPayload(form.getValues()) })
       void client.invalidateQueries({ queryKey: ['drafts'], exact: true })
+      toast.success(`${saved.label} saved`, {
+        description: 'You may go to the Drafts tab to edit, or delete.',
+        action: { label: 'View drafts', onClick: () => navigate('/orders/drafts') },
+      })
       // A new draft (or one recreated after it was removed elsewhere) moves the URL to it, so later saves update it and
       // a refresh keeps it. The key change remounts the form from the cache just seeded, with the same values.
       if (saved.id !== draftId) navigate({ search: `?draft=${saved.id}` }, { replace: true, state: { saved: true } })

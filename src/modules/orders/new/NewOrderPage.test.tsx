@@ -10,7 +10,7 @@ import { renderApp } from '@/test/render'
 import { OrdersSection } from '../OrdersSection'
 import { NewOrderPage } from './NewOrderPage'
 
-vi.mock('sonner', async (importOriginal) => ({ ...(await importOriginal<typeof import('sonner')>()), toast: { error: vi.fn() } }))
+vi.mock('sonner', async (importOriginal) => ({ ...(await importOriginal<typeof import('sonner')>()), toast: { error: vi.fn(), success: vi.fn() } }))
 
 vi.mock('@/api/serverLogic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/serverLogic')>()
@@ -279,6 +279,7 @@ describe('drafts (S3-12)', () => {
     resetDraftsMock()
     vi.mocked(serverLogic).mockImplementation(actualServerLogic)
     vi.mocked(toast.error).mockClear()
+    vi.mocked(toast.success).mockClear()
   })
 
   const draftCalls = () =>
@@ -299,6 +300,10 @@ describe('drafts (S3-12)', () => {
     expect(await screen.findByText(SAVED)).toBeInTheDocument()
     expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST'])
     expect(lastSaved().form.lines).toEqual([{ code: 'CEM-T1-40KG', qty: 1 }])
+    expect(toast.success).toHaveBeenCalledWith('Draft #2 saved', {
+      description: 'You may go to the Drafts tab to edit, or delete.',
+      action: { label: 'View drafts', onClick: expect.any(Function) },
+    })
   })
 
   test('saving again updates the same draft', async () => {
