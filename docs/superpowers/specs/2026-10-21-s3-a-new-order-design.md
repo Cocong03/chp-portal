@@ -12,7 +12,7 @@ The **New Order** tab of the Orders section, built to `docs/Mockup-chp-v2.html` 
 |---|---|---|
 | 1 | Purpose until BC delivers | **Client demo on a real base:** real BC delivery sites; sample items, prices, plants, payment terms, credit and freight (like the Ledger and Dashboard tiles), no on-screen notice. Save as draft and Submit visible but disabled |
 | 2 | Items and plants | **Sample** (wireframe `CATALOG`, PLANT1–3) until S3-01. `mcrmItems` returns 0 rows; BC's standard API has items and `locations`, but which items and plants customers may pick is BC's rule (S3-01), not the portal's guess |
-| 3 | Data source | **No new Server Logic now.** `useOrderOptions()` returns a sample `OrderOptionsDto`; S3-05 changes only its `queryFn` to `serverLogic('order-options')` |
+| 3 | Data source | **No new Server Logic now.** `useOrderOptions()` calls `serverLogic('order-options')`, answered by the sample through `SAMPLE_ONLY` on every build (the Ledger's pattern); S3-05 removes it from `SAMPLE_ONLY` |
 | 4 | Credit standing | The **same sample figures as the Dashboard** (`SAMPLE_ACCOUNT`), per the architecture's tie-out rule (one source for Dashboard and New Order credit) |
 | 5 | Tabs | Tab strip **Orders** (`/orders`) and **New Order** (`/orders/new`) as links; Blanket Orders, Drafts and Pending Approval appear when built (as agreed in S2-B) |
 | 6 | Roles | No extra check: both roles that see Orders (Full Access, Orders & Delivery) may order. Server-side security comes with submit (S3-10) |
@@ -49,7 +49,7 @@ export interface OrderOptionsDto {
 
 `src/mocks/orderOptions.ts` builds the sample from the wireframe: `CATALOG` (exported from `src/mocks/orders.ts`, so Orders and New Order share one catalog), PLANT1–3 labels, the wireframe `CUSTOMER` terms, freight ₱3,500 / ₱0, other charges ₱0, and `credit` from `SAMPLE_ACCOUNT` (`limit` = `creditLimit`, `available` = `availableCredit`, `exposure` = their difference).
 
-`src/modules/orders/new/useOrderOptions.ts`: `useQuery({ queryKey: ['order-options'], queryFn: async () => ORDER_OPTIONS_SAMPLE, staleTime: 5 * 60_000 })`. Delivery sites come from the existing `useSites()`.
+`src/modules/orders/new/useOrderOptions.ts`: `useQuery({ queryKey: ['order-options'], queryFn: () => serverLogic<OrderOptionsDto>('order-options'), staleTime: 5 * 60_000 })`, with `'order-options'` registered in `src/mocks/index.ts` and listed in `SAMPLE_ONLY` (`src/api/serverLogic.ts`). Delivery sites come from the existing `useSites()`.
 
 ## 2. Routing and tabs
 
@@ -117,7 +117,7 @@ Blanket Order entry and delivery schedule (S3-16) · Save as draft / Drafts tab 
 
 | BC delivers | Change |
 |---|---|
-| S3-01 items + prices, plants; S3-05 | `useOrderOptions` `queryFn` → `serverLogic('order-options')`; delete `ORDER_OPTIONS_SAMPLE` |
+| S3-01 items + prices, plants; S3-05 | Build the `order-options` Server Logic; remove `'order-options'` from `SAMPLE_ONLY` (the mock stays for local dev) |
 | S2-09 available credit | `order-options` (and `dashboard`) return BC credit; Dashboard drops `SAMPLE_ACCOUNT` at the same time |
 | S3-02 freight / S3-06 quote | Freight, other charges and totals from `order-quote` instead of the sample rule |
 | S3-03 receiving time codes | Time window options from BC's list |
