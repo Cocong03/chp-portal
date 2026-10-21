@@ -28,3 +28,13 @@ test('no table permission grants Global access to powerpagecomponent', () => {
     expect(p.field('scope'), p.file).not.toBe('756150000')
   }
 })
+
+// Seen on Dev 2026-10-21: drafts POST failed with "Permission denied for (chp_orderdraft, AppendTo)" — binding the
+// contact and account lookups on create needs Append and AppendTo on the draft's own (Contact-scope) permission.
+test('order drafts: own drafts only, with the append rights the lookups need', () => {
+  const drafts = named('Order draft - own (CRUD)')!
+  expect(drafts.field('entitylogicalname')).toBe('chp_orderdraft')
+  expect(drafts.field('scope')).toBe('756150001') // Contact: never Global or Account — drafts are personal
+  expect(drafts.field('contactrelationship')).toBe('chp_contact_chp_orderdraft')
+  for (const privilege of ['read', 'create', 'write', 'delete', 'append', 'appendto']) expect(drafts.field(privilege), privilege).toBe('true')
+})
