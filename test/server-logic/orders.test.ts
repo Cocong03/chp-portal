@@ -308,6 +308,28 @@ test('page 2 of All statuses is cut from the merged list', async () => {
   expect(page.total).toBe(12)
 })
 
+// S3-14 Export to Excel: every order matching the filters, not just one page.
+test('all=true returns every matching order unpaged, live and invoiced merged, with the filters kept', async () => {
+  const live = Array.from({ length: 12 }, (_, i) => ({ ...ORDER, salesOrderNo: `SOR1${String(i).padStart(2, '0')}`, orderDate: '2026-10-10' }))
+  const { server, http } = fakeServer({ query: { all: 'true', page: '3', site: '65072350' }, orders: live, count: 12, archive: [ARCHIVED] })
+  const answer = JSON.parse(await load(server).get())
+  expect(answer.orders).toHaveLength(13)
+  expect(answer.orders.at(-1)).toMatchObject({ so: 'SOR0000000003', status: 'Invoiced' })
+  expect(answer).toMatchObject({ total: 13, page: 1, pageSize: 13 })
+  const [call] = orderCalls(http)
+  expect(call).toContain(`$filter=${BASE} and shiptoCode eq '65072350'&`)
+  expect(call).toContain('$top=5000')
+  expect(archiveCalls(http)[0]).toContain("shiptoCode eq '65072350'")
+})
+
+test('all=true with a search returns every match unpaged', async () => {
+  const found = Array.from({ length: 11 }, (_, i) => ({ ...ORDER, salesOrderNo: `SOR2${String(i).padStart(2, '0')}` }))
+  const { server } = fakeServer({ query: { all: 'true', q: 'SOR2' }, search: { "contains(salesOrderNo,'SOR2')": found, "contains(externalDocumentNo,'SOR2')": [] } })
+  const answer = JSON.parse(await load(server).get())
+  expect(answer.orders).toHaveLength(11)
+  expect(answer.total).toBe(11)
+})
+
 test('a live status filter never reads the archive', async () => {
   const { server, http } = fakeServer({ query: { status: 'Open' }, archive: [ARCHIVED] })
   await load(server).get()

@@ -299,6 +299,8 @@ async function get() {
     var SHIP_FROM_BC = { "PICKUP": "Pickup", "DELIVERY": "Delivery" };
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
+    // ponytail: Export to Excel (all=true) reads the newest 5,000 live orders; page through BC if a customer outgrows that.
+    var EXPORT_CAP = 5000;
     var ORDER_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,status,blanketOrderNo,completelyShipped";
     var ARCHIVE_FIELDS = "salesOrderNo,sellToCustomerNo,orderDate,externalDocumentNo,shiptoCode,shipmentMethodCode,tripEntryNo,requestDeliveryDate,totalAmountInclVAT,documentType,versionNo,docNoOccurrence";
     var LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,AmountIncludingVAT";
@@ -418,13 +420,18 @@ async function get() {
         return dto;
     }
 
-    function pageOf(rows, total, page) {
+    // all=true (Export to Excel): every row in one answer.
+    function pageOf(rows, total, page, all) {
+        if (all) {
+            return { orders: rows.map(toSummary), total: total, page: 1, pageSize: rows.length };
+        }
         var start = (page - 1) * PAGE_SIZE;
         return { orders: rows.slice(start, start + PAGE_SIZE).map(toSummary), total: total, page: page, pageSize: PAGE_SIZE };
     }
 
     // Invoiced orders come from the archive, the other statuses from the live orders; All statuses merges both.
     async function list(scope, page) {
+        var all = param("all") === "true";
         var status = param("status");
         var invoiced = status === "Invoiced";
         if (status && !invoiced && Object.keys(ORDER_STATUS_FILTER).indexOf(status) === -1) {
@@ -437,7 +444,7 @@ async function get() {
         if (!q) {
             if (invoiced) {
                 var only = await invoicedOrders(scope, [narrow], ARCHIVE_FIELDS);
-                return pageOf(only, only.length, page);
+                return pageOf(only, only.length, page, all);
             }
             // The first `page` pages of live orders, so the merge with the invoiced ones can cut out any page.
             // ponytail: up to 10,000 live rows on page 1000; switch to $skip per source if deep pages get slow.
@@ -449,7 +456,7 @@ async function get() {
                         $filter: liveFilter(scope, liveStatus),
                         $select: ORDER_FIELDS,
                         $orderby: "orderDate desc,salesOrderNo desc",
-                        $top: String(page * PAGE_SIZE),
+                        $top: String(all ? EXPORT_CAP : page * PAGE_SIZE),
                         $count: "true"
                     })
                 ),
@@ -457,7 +464,7 @@ async function get() {
             ]);
             var rows = ((both[0] && both[0].value) || []).filter((row) => owned(row, scope));
             var count = Number(both[0] && both[0]["@odata.count"]);
-            return pageOf(rows.concat(both[1]).sort(newestOrderFirst), (isNaN(count) ? rows.length : count) + both[1].length, page);
+            return pageOf(rows.concat(both[1]).sort(newestOrderFirst), (isNaN(count) ? rows.length : count) + both[1].length, page, all);
         }
         // BC can't "or" two fields and contains() is case-sensitive: search the SO number (upper case) and the PO
         // reference (as typed and upper case) separately, then merge.
@@ -494,7 +501,7 @@ async function get() {
             });
         });
         merged = merged.concat(found[1]).sort(newestOrderFirst);
-        return pageOf(merged, merged.length, page);
+        return pageOf(merged, merged.length, page, all);
     }
 
     Server.Logger.Log("orders GET called");

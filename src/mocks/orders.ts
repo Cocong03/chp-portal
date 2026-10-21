@@ -54,7 +54,9 @@ export function ordersMock({ query = {} }: MockRequest): OrdersPageDto | OrderDt
       (!query.from || o.date >= query.from) &&
       (!query.to || o.date <= query.to),
   )
+  const toSummary = ({ lines: _lines, ...summary }: OrderDto) => summary
+  // all=true (Export to Excel): every match in one answer.
+  if (query.all === 'true') return { orders: rows.map(toSummary), total: rows.length, page: 1, pageSize: rows.length }
   const page = Math.max(1, Number(query.page) || 1)
-  const orders = rows.slice((page - 1) * 10, page * 10).map(({ lines: _lines, ...summary }) => summary)
-  return { orders, total: rows.length, page, pageSize: 10 }
+  return { orders: rows.slice((page - 1) * 10, page * 10).map(toSummary), total: rows.length, page, pageSize: 10 }
 }

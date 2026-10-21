@@ -4,7 +4,13 @@ import { ApiError, serverLogic } from '@/api/serverLogic'
 import type { OrdersPageDto } from '@/api/types'
 import { MOCK_ORDERS } from '@/mocks/orders'
 import { renderApp } from '@/test/render'
+import { format } from 'date-fns'
+import { toast } from 'sonner'
+import * as XLSX from 'xlsx'
 import { OrdersPage } from './OrdersPage'
+
+vi.mock('xlsx', async (importOriginal) => ({ ...(await importOriginal<typeof import('xlsx')>()), writeFile: vi.fn() }))
+vi.mock('sonner', async (importOriginal) => ({ ...(await importOriginal<typeof import('sonner')>()), toast: { error: vi.fn() } }))
 
 vi.mock('@/api/serverLogic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/serverLogic')>()
@@ -147,4 +153,36 @@ test('a failed load shows the error and Try again reloads', async () => {
   vi.mocked(serverLogic).mockImplementation(actualServerLogic)
   await user.click(screen.getByRole('button', { name: 'Try again' }))
   expect(await within(await table()).findByRole('row', { name: /SO-100482/ })).toBeInTheDocument()
+})
+
+// S3-14: the export reads every order matching the active filters (all=true), not just the page on screen.
+test('CSV / Excel downloads every order matching the filters as an .xlsx, one row per order', async () => {
+  const user = userEvent.setup()
+  renderApp(<OrdersPage />, { route: '/orders?status=Invoiced&site=PLANT3&page=2' })
+  await table()
+  const button = screen.getByRole('button', { name: /CSV \/ Excel/ })
+  await user.click(button)
+  await waitFor(() => expect(XLSX.writeFile).toHaveBeenCalled())
+  const exportCall = vi.mocked(serverLogic).mock.calls.find(([name, options]) => name === 'orders' && options?.query?.all)
+  expect(exportCall?.[1]?.query).toEqual({ status: 'Invoiced', site: 'PLANT3', all: 'true' })
+  const [book, fileName] = vi.mocked(XLSX.writeFile).mock.calls[0]
+  expect(fileName).toBe(`Orders-${format(new Date(), 'yyyy-MM-dd')}.xlsx`)
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets.Orders)
+  expect(rows.map((row) => row['Sales Order #'])).toEqual(['SO-100482', 'SO-100405', 'SO-100371', 'SO-100338'])
+  expect(Object.keys(rows[0])).toEqual([
+    'Sales Order #', 'Order date', 'PO reference', 'Delivery site', 'Site name', 'Ship', 'Blanket SO #', 'Trip ID', 'Expected delivery', 'Total', 'Status',
+  ])
+  expect(rows[0]).toMatchObject({ 'Delivery site': 'PLANT3', 'Site name': 'Plant 3 — Warehouse A', Status: 'Invoiced', Total: MOCK_ORDERS[0].total })
+  await waitFor(() => expect(button).toBeEnabled())
+})
+
+test('a failed export says so and the button works again', async () => {
+  const user = userEvent.setup()
+  renderApp(<OrdersPage />, { route: '/orders' })
+  await table()
+  vi.mocked(serverLogic).mockRejectedValueOnce(new ApiError(500, 'x'))
+  await user.click(screen.getByRole('button', { name: /CSV \/ Excel/ }))
+  await waitFor(() => expect(toast.error).toHaveBeenCalledWith("We couldn't download your orders. Please try again."))
+  expect(XLSX.writeFile).not.toHaveBeenCalled()
+  await waitFor(() => expect(screen.getByRole('button', { name: /CSV \/ Excel/ })).toBeEnabled())
 })

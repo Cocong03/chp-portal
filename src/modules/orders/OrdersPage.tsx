@@ -1,9 +1,15 @@
+import { format, parseISO } from "date-fns";
+import { useQueryClient } from "@tanstack/react-query";
+import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
-import type { OrderSummaryDto, SiteDto } from "@/api/types";
+import { toast } from "sonner";
+import { serverLogic } from "@/api/serverLogic";
+import type { OrderSummaryDto, OrdersPageDto, SiteDto } from "@/api/types";
+import { downloadXlsx } from "@/lib/excel";
 import { formatDate, peso } from "@/lib/format";
 import { usePageTitle } from "@/lib/usePageTitle";
-import { useSites } from "@/modules/sites/useSites";
+import { sitesQuery, useSites } from "@/modules/sites/useSites";
 import { Button } from "@/ui/button";
 import { DataTable, type DataColumn } from "@/ui/DataTable";
 import { DatePicker } from "@/ui/DatePicker";
@@ -14,10 +20,10 @@ import { SearchField } from "@/ui/SearchField";
 import { SectionCard } from "@/ui/SectionCard";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/ui/select";
 import { Toolbar } from "@/ui/Toolbar";
-import { TooltipProvider } from "@/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 import { OrderDialog } from "./OrderDialog";
 import { ORDER_STATUSES, OrderStatusPill, ShipBadge } from "./orderDisplay";
-import { useOrders, type OrderFilters } from "./useOrders";
+import { ordersQuery, useOrders, type OrderFilters } from "./useOrders";
 
 const NO_ORDERS: OrderSummaryDto[] = [];
 const NO_SITES: SiteDto[] = [];
@@ -70,6 +76,25 @@ function columns(sites: SiteDto[], onView: (so: string) => void): DataColumn<Ord
   ];
 }
 
+const EXPORT_COLUMNS = ["Sales Order #", "Order date", "PO reference", "Delivery site", "Site name", "Ship", "Blanket SO #", "Trip ID", "Expected delivery", "Total", "Status"];
+
+// One spreadsheet row per order: real dates and a numeric Total, so Excel can sort and sum them.
+function exportRow(order: OrderSummaryDto, sites: SiteDto[]) {
+  return {
+    "Sales Order #": order.so,
+    "Order date": order.date ? parseISO(order.date) : "",
+    "PO reference": order.po,
+    "Delivery site": order.site,
+    "Site name": sites.find((s) => s.code === order.site)?.name ?? "",
+    Ship: order.ship ?? "",
+    "Blanket SO #": order.bso ?? "",
+    "Trip ID": order.trip?.id ?? "",
+    "Expected delivery": order.edd ? parseISO(order.edd) : "",
+    Total: order.total,
+    Status: order.status ?? "",
+  };
+}
+
 export function OrdersPage() {
   usePageTitle("Orders");
   const [params, setParams] = useSearchParams();
@@ -85,6 +110,25 @@ export function OrdersPage() {
   const sites = useSites().data ?? NO_SITES;
   const [search, setSearch] = useState(filters.q);
   const [viewing, setViewing] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+  const queryClient = useQueryClient();
+
+  // S3-14: every order matching the filters (all=true), not just this page.
+  async function exportOrders() {
+    setExporting(true);
+    try {
+      // Site names need the site list, which may still be loading; without it the export still runs, codes only.
+      const [all, siteList] = await Promise.all([
+        serverLogic<OrdersPageDto>("orders", { query: { ...ordersQuery({ ...filters, page: 1 }), all: "true" } }),
+        queryClient.ensureQueryData(sitesQuery).catch(() => NO_SITES),
+      ]);
+      await downloadXlsx(`Orders-${format(new Date(), "yyyy-MM-dd")}.xlsx`, "Orders", EXPORT_COLUMNS, all.orders.map((order) => exportRow(order, siteList)));
+    } catch {
+      toast.error("We couldn't download your orders. Please try again.");
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function update(changes: Partial<Record<(typeof FILTER_KEYS)[number], string>>) {
     setParams(
@@ -129,6 +173,19 @@ export function OrdersPage() {
             setSearch("");
             setParams(new URLSearchParams(), { replace: true });
           }}
+          actions={
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button variant="outline" onClick={() => void exportOrders()} disabled={exporting}>
+                    <Download aria-hidden />
+                    {exporting ? "Preparing…" : "CSV / Excel"}
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Downloads all orders matching your filters.</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+          }
         >
           <SearchField label="Search orders" placeholder="Search SO number or PO reference" value={search} onChange={(event) => setSearch(event.target.value)} className="max-w-[220px]" />
           {showStatus && (
