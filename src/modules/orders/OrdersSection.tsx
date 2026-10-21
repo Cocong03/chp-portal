@@ -1,16 +1,20 @@
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { DraftsPage } from './drafts/DraftsPage'
+import { useDrafts } from './drafts/useDrafts'
 import { NewOrderPage } from './new/NewOrderPage'
 import { OrdersPage } from './OrdersPage'
 
-// Wireframe `.tabs` / `.tab`. Blanket Orders, Drafts and Pending Approval join when they're built (S3-11, S3-12, S3-16).
+// Wireframe `.tabs` / `.tab`. Blanket Orders and Pending Approval join when they're built (S3-16, S3-11).
 const TABS = [
   { label: 'Orders', to: '/orders', end: true },
   { label: 'New Order', to: '/orders/new', end: false },
+  { label: 'Drafts', to: '/orders/drafts', end: false },
 ]
 
 /** The Orders section: its tab strip, then the tab's page. */
 export function OrdersSection() {
+  const drafts = useDrafts().data?.length ?? 0
   return (
     <>
       <nav aria-label="Orders sections" className="mb-6 flex gap-[22px] overflow-x-auto border-b">
@@ -27,12 +31,22 @@ export function OrdersSection() {
             }
           >
             {tab.label}
+            {tab.to === '/orders/drafts' && drafts > 0 && (
+              // Wireframe `.tab-badge`; the space keeps the link's name "Drafts 2", not "Drafts2"
+              <>
+                {' '}
+                <span className="ml-1 inline-flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-primary px-[5px] text-[11px] text-primary-foreground">
+                  {drafts}
+                </span>
+              </>
+            )}
           </NavLink>
         ))}
       </nav>
       <Routes>
         <Route index element={<OrdersPage />} />
         <Route path="new" element={<NewOrderPage />} />
+        <Route path="drafts" element={<DraftsPage />} />
         <Route path="*" element={<Navigate to="/orders" replace />} />
       </Routes>
     </>
