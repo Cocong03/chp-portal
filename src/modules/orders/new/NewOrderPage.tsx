@@ -7,6 +7,7 @@ import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { Skeleton } from '@/ui/skeleton'
 import { defaultSite, newOrderDefaults, type NewOrderForm } from './form'
+import { FulfillmentCard } from './FulfillmentCard'
 import { OrderLinesCard } from './OrderLinesCard'
 import { SummaryCards } from './SummaryCards'
 import { useOrderOptions } from './useOrderOptions'
@@ -48,6 +49,7 @@ function OrderForm({ options, sites }: { options: OrderOptionsDto; sites: SiteDt
       <form onSubmit={(event) => event.preventDefault()} className="grid items-start gap-x-5 lg:grid-cols-[1fr_340px]">
         <div>
           <OrderLinesCard options={options} />
+          <FulfillmentCard options={options} />
         </div>
         <div>
           <SummaryCards options={options} sites={sites} />

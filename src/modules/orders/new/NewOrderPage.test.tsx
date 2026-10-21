@@ -159,3 +159,60 @@ test('the page title is set', async () => {
   await openForm()
   expect(document.title).toBe('New Order — Concreat Connect')
 })
+
+// S3-08 Delivery & fulfillment (wireframe row 42: Pick up hides the five receiving fields, Delivery hides Pick up date).
+const RECEIVING = ['Receiving person', 'Receiving contact number', 'Receiving email', 'Requested delivery date', 'Receiving time window']
+
+test('Delivery shows the receiving fields and hides Pick up date; freight follows', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  expect(screen.getByLabelText('Pick up date')).toBeVisible()
+  for (const label of RECEIVING) expect(screen.getByLabelText(label)).not.toBeVisible()
+  expect(summary('Transport / Freight')).toHaveTextContent('₱0.00')
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  for (const label of RECEIVING) expect(screen.getByLabelText(label)).toBeVisible()
+  expect(screen.getByLabelText('Pick up date')).not.toBeVisible()
+  expect(summary('Transport / Freight')).toHaveTextContent('₱3,500.00')
+})
+
+test('fields hidden by the toggle keep their values', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  await user.type(screen.getByLabelText('Receiving person'), 'Juan Dela Cruz')
+  await user.click(screen.getByRole('radio', { name: 'Pick up' }))
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  expect(screen.getByLabelText('Receiving person')).toHaveValue('Juan Dela Cruz')
+})
+
+test('Cash shows Prepayment terms, Terms shows Payment terms', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  const prepay = screen.getByLabelText('Prepayment terms')
+  expect(prepay).toHaveValue('100% advance payment before dispatch')
+  expect(prepay).toHaveAttribute('readonly')
+  expect(screen.queryByLabelText('Payment terms')).not.toBeInTheDocument()
+  await user.click(screen.getByRole('combobox', { name: 'Payment method' }))
+  await user.click(await screen.findByRole('option', { name: 'Terms' }))
+  expect(screen.getByLabelText('Payment terms')).toHaveValue('30 Days from Invoice Date')
+  expect(screen.queryByLabelText('Prepayment terms')).not.toBeInTheDocument()
+})
+
+test('loading type and call before delivery rewrite the first instructions line', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  const instructions = screen.getByLabelText('Special delivery instructions')
+  expect(instructions).toHaveValue('Loading type: Loose pile. Call before delivery: No.')
+  await user.click(instructions)
+  await user.keyboard('{Control>}{End}{/Control}{Enter}Gate 2')
+  await user.click(screen.getByRole('combobox', { name: 'Loading type' }))
+  await user.click(await screen.findByRole('option', { name: 'Palletized' }))
+  await user.click(screen.getByRole('checkbox', { name: 'Call before delivery' }))
+  expect(instructions).toHaveValue('Loading type: Palletized. Call before delivery: Yes.\nGate 2')
+})
+
+test('Source lists the plants with the wireframe note', async () => {
+  await openForm()
+  expect(screen.getByRole('combobox', { name: 'Source' })).toHaveTextContent('PLANT1 — Plant 1 — Main Yard')
+  expect(screen.getByText('Choose your preferred source plant.')).toBeInTheDocument()
+})
