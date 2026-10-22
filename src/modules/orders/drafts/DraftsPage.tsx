@@ -31,7 +31,9 @@ export function DraftsPage() {
   }
   const confirmDelete = () => {
     if (!pending) return
+    const { label } = pending
     remove.mutate(pending.id, {
+      onSuccess: () => toast.success(`${label} deleted`),
       onError: () => toast.error("We couldn't delete this draft. Please try again."),
       onSettled: () => setPending(null),
     })

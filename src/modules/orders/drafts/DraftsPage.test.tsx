@@ -7,7 +7,7 @@ import { draftsMock, resetDraftsMock } from '@/mocks/drafts'
 import { renderApp } from '@/test/render'
 import { OrdersSection } from '../OrdersSection'
 
-vi.mock('sonner', async (importOriginal) => ({ ...(await importOriginal<typeof import('sonner')>()), toast: { error: vi.fn() } }))
+vi.mock('sonner', async (importOriginal) => ({ ...(await importOriginal<typeof import('sonner')>()), toast: { error: vi.fn(), success: vi.fn() } }))
 vi.mock('@/api/serverLogic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/serverLogic')>()
   return { ...actual, serverLogic: vi.fn(actual.serverLogic) }
@@ -29,6 +29,7 @@ beforeEach(() => {
   resetDraftsMock()
   vi.mocked(serverLogic).mockImplementation(actualServerLogic)
   vi.mocked(toast.error).mockClear()
+  vi.mocked(toast.success).mockClear()
 })
 
 function openDrafts() {
@@ -102,6 +103,7 @@ test('Delete draft removes it and updates the badge', async () => {
   await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete draft' }))
   expect(await screen.findByText(/No saved drafts/)).toBeInTheDocument()
   expect(within(tabs()).getByRole('link', { name: 'Drafts' })).toBeInTheDocument()
+  expect(toast.success).toHaveBeenCalledWith('Draft #1 deleted')
 })
 
 test('a failed delete keeps the row and shows the toast', async () => {
@@ -112,6 +114,7 @@ test('a failed delete keeps the row and shows the toast', async () => {
   await user.click(screen.getByRole('button', { name: 'Delete' }))
   await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Delete draft' }))
   await waitFor(() => expect(toast.error).toHaveBeenCalledWith("We couldn't delete this draft. Please try again."))
+  expect(toast.success).not.toHaveBeenCalled()
   expect(screen.getByText('Draft #1')).toBeInTheDocument()
 })
 
