@@ -118,7 +118,7 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
             name="paymentMethod"
             items={[
               { value: 'cash', label: 'Cash' },
-              { value: 'terms', label: 'Credit' },
+              { value: 'credit', label: 'Credit' },
             ]}
           />
         </Field>

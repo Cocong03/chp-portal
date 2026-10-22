@@ -45,7 +45,7 @@
 
 **Interfaces:**
 - Produces:
-  - `OrderOptionsDto` exactly as in spec §1 (`items`, `plants`, `paymentMethod: 'cash' | 'terms'`, `paymentTerms`, `prepaymentTerms`, `credit: { limit, exposure, available }`, `freight: { delivery, pickup }`, `otherCharges`).
+  - `OrderOptionsDto` exactly as in spec §1 (`items`, `plants`, `paymentMethod: 'cash' | 'credit'`, `paymentTerms`, `prepaymentTerms`, `credit: { limit, exposure, available }`, `freight: { delivery, pickup }`, `otherCharges`).
   - `export const CATALOG: Record<string, { desc: string; uom: string; price: number }>` in `src/mocks/orders.ts` (unchanged contents).
   - `export const ORDER_OPTIONS_SAMPLE: OrderOptionsDto` in `src/mocks/orderOptions.ts`.
   - `mocks['order-options'] = () => ORDER_OPTIONS_SAMPLE`; `SAMPLE_ONLY = new Set(['ledger', 'order-options'])` with a comment: remove when S3-05 lands.
@@ -157,7 +157,7 @@ test('an unknown Orders path lands on the Orders list', async () => {
 **Interfaces:**
 - Consumes: `useOrderOptions()` (Task 1), `useSites()`, `OrderOptionsDto`, `SiteDto`, `peso`, `SectionCard`, `QueryError`, `Skeleton`, shadcn `Select`, `Input`, `Button`, `Tooltip`.
 - Produces in `form.ts`:
-  - `export interface NewOrderForm { orderType: 'single' | 'blanket'; lines: { code: string; qty: number }[]; shipmentMethod: 'pickup' | 'delivery'; source: string; pickupDate: string; receivingPerson: string; receivingContact: string; receivingEmail: string; requestedDate: string; timeWindow: string; loadingType: string; callBefore: boolean; paymentMethod: 'cash' | 'terms'; instructions: string; site: string; poRef: string }`
+  - `export interface NewOrderForm { orderType: 'single' | 'blanket'; lines: { code: string; qty: number }[]; shipmentMethod: 'pickup' | 'delivery'; source: string; pickupDate: string; receivingPerson: string; receivingContact: string; receivingEmail: string; requestedDate: string; timeWindow: string; loadingType: string; callBefore: boolean; paymentMethod: 'cash' | 'credit'; instructions: string; site: string; poRef: string }`
   - `export const LOADING_TYPES = ['Loose pile', 'Palletized', 'Jumbo Bag']`, `export const TIME_WINDOWS = ['7:00 – 9:00 AM', '9:00 AM – 12:00 NN', '1:00 – 3:00 PM', '3:00 – 5:00 PM', 'Other — see instructions below']`
   - `export function newOrderDefaults(options: OrderOptionsDto, sites: SiteDto[]): NewOrderForm` — one empty line `{ code: '', qty: 1 }`, `single`, `pickup`, first plant, Loose pile, call-before false, `paymentMethod` from options, `instructions = withAutoLine('', 'Loose pile', false)`, site = the `isDefault` site's code else the first site's else `''`, `timeWindow` = first window, other strings `''`.
 - `NewOrderPage` waits for options (skeleton while pending; `QueryError` with Try again on error), then mounts the form with `useForm({ defaultValues: newOrderDefaults(...) })` inside `FormProvider`; sites loading/failing never blocks the form (they're passed as `[]`, and the site default is set when they arrive if still empty). Layout: `grid gap-5 lg:grid-cols-[1fr_340px]`, main column `OrderLinesCard` (+ Task 5's `FulfillmentCard` slot), side column `SummaryCards`.

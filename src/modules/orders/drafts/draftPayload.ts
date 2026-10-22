@@ -28,7 +28,7 @@ export function fromDraft(payload: DraftPayload, options: OrderOptionsDto, sites
   const site = typeof saved.site === 'string' ? saved.site : ''
   result.site = !sites || sites.some((each) => each.code === site) ? site : ''
   if (!options.plants.some((plant) => plant.code === result.source)) result.source = ''
-  if (result.paymentMethod !== 'cash' && result.paymentMethod !== 'terms') result.paymentMethod = defaults.paymentMethod
+  if (result.paymentMethod !== 'cash' && result.paymentMethod !== 'credit') result.paymentMethod = defaults.paymentMethod
   if (result.shipmentMethod !== 'pickup' && result.shipmentMethod !== 'delivery') result.shipmentMethod = defaults.shipmentMethod
   return result
 }

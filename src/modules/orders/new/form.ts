@@ -15,7 +15,7 @@ export interface NewOrderForm {
   timeWindow: string
   loadingType: string
   callBefore: boolean
-  paymentMethod: 'cash' | 'terms'
+  paymentMethod: 'cash' | 'credit'
   instructions: string
   site: string
   poRef: string

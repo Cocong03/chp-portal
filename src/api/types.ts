@@ -124,7 +124,7 @@ export interface DashboardDto {
 export interface OrderOptionsDto {
   items: { code: string; description: string; uom: string; unitPrice: number }[]
   plants: { code: string; label: string }[]
-  paymentMethod: 'cash' | 'terms'
+  paymentMethod: 'cash' | 'credit'
   paymentTerms: string
   prepaymentTerms: string
   credit: { limit: number; exposure: number; available: number }

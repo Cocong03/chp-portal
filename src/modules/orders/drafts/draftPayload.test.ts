@@ -22,7 +22,7 @@ const saved: NewOrderForm = {
   timeWindow: '1:00 – 3:00 PM',
   loadingType: 'Palletized',
   callBefore: true,
-  paymentMethod: 'terms',
+  paymentMethod: 'credit',
   instructions: 'Loading type: Palletized · Call before delivery\nUse side gate',
   site: 'PLANT2',
   poRef: 'PO-8915',

@@ -38,7 +38,7 @@ The **New Order** tab of the Orders section, built to `docs/Mockup-chp-v2.html` 
 export interface OrderOptionsDto {
   items: { code: string; description: string; uom: string; unitPrice: number }[]
   plants: { code: string; label: string }[]
-  paymentMethod: 'cash' | 'terms'
+  paymentMethod: 'cash' | 'credit'
   paymentTerms: string
   prepaymentTerms: string
   credit: { limit: number; exposure: number; available: number }

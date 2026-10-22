@@ -108,7 +108,7 @@ test('toPayload wraps the form with version 1 and its orderType')
 
 - [ ] **Step 2: Run** `npx vitest run src/modules/orders/drafts/draftPayload.test.ts` — Expected: FAIL (module not found).
 
-- [ ] **Step 3: Implement `draftPayload.ts`.** `fromDraft`: start from `newOrderDefaults(options, sites ?? [])`; take each saved key whose `typeof` matches the default's; then lines (array of `{code, qty}`; unknown code → `''`; empty → default line), `site` (sites undefined → saved value; else saved if in `sites`, else `''`; never the default), `source` (in `options.plants` or `''`), `paymentMethod` (`'cash' | 'terms'` or default). `estTotal` uses `lineAmount` from `form.ts` plus `options.freight[shipmentMethod]` and `options.otherCharges`.
+- [ ] **Step 3: Implement `draftPayload.ts`.** `fromDraft`: start from `newOrderDefaults(options, sites ?? [])`; take each saved key whose `typeof` matches the default's; then lines (array of `{code, qty}`; unknown code → `''`; empty → default line), `site` (sites undefined → saved value; else saved if in `sites`, else `''`; never the default), `source` (in `options.plants` or `''`), `paymentMethod` (`'cash' | 'credit'` or default). `estTotal` uses `lineAmount` from `form.ts` plus `options.freight[shipmentMethod]` and `options.otherCharges`.
 
 - [ ] **Step 4: Run** the same command — Expected: 9 passed.
 
