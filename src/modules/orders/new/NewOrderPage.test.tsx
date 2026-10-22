@@ -193,7 +193,7 @@ test('fields hidden by the toggle keep their values', async () => {
   expect(screen.getByLabelText('Receiving person')).toHaveValue('Juan Dela Cruz')
 })
 
-test('Cash shows Prepayment terms, Terms shows Payment terms', async () => {
+test('Cash shows Prepayment terms, Credit shows Payment terms', async () => {
   const user = userEvent.setup()
   await openForm()
   const prepay = screen.getByLabelText('Prepayment terms')
@@ -201,7 +201,8 @@ test('Cash shows Prepayment terms, Terms shows Payment terms', async () => {
   expect(prepay).toHaveAttribute('readonly')
   expect(screen.queryByLabelText('Payment terms')).not.toBeInTheDocument()
   await user.click(screen.getByRole('combobox', { name: 'Payment method' }))
-  await user.click(await screen.findByRole('option', { name: 'Terms' }))
+  await user.click(await screen.findByRole('option', { name: 'Credit' }))
+  expect(screen.queryByRole('option', { name: 'Terms' })).not.toBeInTheDocument()
   expect(screen.getByLabelText('Payment terms')).toHaveValue('30 Days from Invoice Date')
   expect(screen.queryByLabelText('Prepayment terms')).not.toBeInTheDocument()
 })
