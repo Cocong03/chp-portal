@@ -83,11 +83,11 @@ describe('on the deployed site', () => {
     return fetchMock
   }
 
-  test('the Customer Ledger answers from the sample entries until BC has a ledger API (S2-07)', async () => {
-    const fetchMock = stubFetch(new Response('{}'))
+  test('the Customer Ledger calls its Server Logic now that BC has the ledger API (S2-07)', async () => {
+    const fetchMock = stubFetch(new Response(JSON.stringify({ Success: true, Data: JSON.stringify({ total: 7 }) })))
     const data = await serverLogic<{ total: number }>('ledger', { query: { show: 'all' } })
-    expect(data.total).toBe(9)
-    expect(fetchMock).not.toHaveBeenCalled()
+    expect(data.total).toBe(7)
+    expect(fetchMock.mock.calls[1][0]).toBe('/_api/serverlogics/ledger?show=all')
   })
 
   test('GET calls /_api/serverlogics/<name> with the query and CSRF headers and unwraps Data', async () => {

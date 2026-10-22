@@ -27,7 +27,7 @@ function renderRoute() {
   )
 }
 
-// Until BC's ledger API exists (S2-07), the deployed site shows the page on the sample entries (client request 2026-10-15).
+// The deployed build shows the Customer Ledger page (live from BC's ledger API since S2-07, 2026-10-22).
 test('the deployed build shows the Customer Ledger page', async () => {
   vi.stubEnv('DEV', false)
   renderRoute()

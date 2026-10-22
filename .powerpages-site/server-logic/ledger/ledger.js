@@ -2,7 +2,7 @@
 // Purpose: the signed-in customer's BC Customer Ledger Entries — filtered, searched and paged in BC.
 // API URL: https://<site>/_api/serverlogics/ledger?q=&type=&show=all&from=&to=&page=
 // Customer and company come only from the session's Account; request values only narrow the list.
-// The BC entity and fields are the S2-07 request (docs/superpowers/specs/2026-10-13-s2-c-ledger-design.md) until BC confirms them.
+// BC entity mcrmCustLedgerEntries (S2-07, delivered 2026-10-22; every field used here is filterable).
 
 async function get() {
     // #region bc-helpers (generated from server-logic-src/bc-helpers.js — do not edit)
@@ -292,13 +292,13 @@ async function get() {
     }
     // #endregion bc-helpers
 
-    var ENTITY = "customerLedgerEntries";
+    var ENTITY = "mcrmCustLedgerEntries";
     var TYPES = ["Invoice", "Credit Memo", "Payment"];
     var PAGE_SIZE = 10;
     var SEARCH_CAP = "200";
-    var FIELDS = "customerNo,entryNo,postingDate,documentType,documentNo,externalDocumentNo,description,dueDate,amount,remainingAmount,open";
+    var FIELDS = "Customer_No,Entry_No,Posting_Date,Document_Type,Document_No,External_Document_No,Description,Due_Date,Amount,Remaining_Amount,Open";
     // Entry No. is unique: one payment can post several entries with the same type, number and date.
-    var ORDER_BY = "postingDate desc,entryNo desc";
+    var ORDER_BY = "Posting_Date desc,Entry_No desc";
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
 
     function param(name) {
@@ -322,40 +322,40 @@ async function get() {
 
     function toEntry(row) {
         return {
-            docNo: row.documentNo || "",
-            refPo: row.externalDocumentNo || null,
-            type: String(row.documentType || "").split("_x0020_").join(" "),
-            desc: row.description || "",
-            postingDate: row.postingDate || "",
-            dueDate: bcDate(row.dueDate),
-            original: Number(row.amount) || 0,
-            remaining: Number(row.remainingAmount) || 0,
-            status: row.open ? "Open" : "Closed"
+            docNo: row.Document_No || "",
+            refPo: row.External_Document_No || null,
+            type: String(row.Document_Type || "").split("_x0020_").join(" "),
+            desc: row.Description || "",
+            postingDate: row.Posting_Date || "",
+            dueDate: bcDate(row.Due_Date),
+            original: Number(row.Amount) || 0,
+            remaining: Number(row.Remaining_Amount) || 0,
+            status: row.Open ? "Open" : "Closed"
         };
     }
 
     function newestFirst(a, b) {
-        if (a.postingDate !== b.postingDate) {
-            return a.postingDate < b.postingDate ? 1 : -1;
+        if (a.Posting_Date !== b.Posting_Date) {
+            return a.Posting_Date < b.Posting_Date ? 1 : -1;
         }
-        return (Number(b.entryNo) || 0) - (Number(a.entryNo) || 0);
+        return (Number(b.Entry_No) || 0) - (Number(a.Entry_No) || 0);
     }
 
     function listFilter(scope, type) {
-        var parts = ["customerNo eq " + odataLiteral(scope.customerNo)];
+        var parts = ["Customer_No eq " + odataLiteral(scope.customerNo)];
         var from = param("from");
         var to = param("to");
         if (param("show") !== "all") {
-            parts.push("open eq true");
+            parts.push("Open eq true");
         }
         if (type) {
-            parts.push("documentType eq " + odataLiteral(type));
+            parts.push("Document_Type eq " + odataLiteral(type));
         }
         if (isoDate(from)) {
-            parts.push("postingDate ge " + from);
+            parts.push("Posting_Date ge " + from);
         }
         if (isoDate(to)) {
-            parts.push("postingDate le " + to);
+            parts.push("Posting_Date le " + to);
         }
         return parts.join(" and ");
     }
@@ -365,10 +365,10 @@ async function get() {
     function searchTerms(q) {
         var upper = q.toUpperCase();
         var lower = q.toLowerCase();
-        var terms = [["documentNo", upper], ["externalDocumentNo", upper]];
+        var terms = [["Document_No", upper], ["External_Document_No", upper]];
         [q, lower, upper.charAt(0) + lower.slice(1)].forEach((variant) => {
-            if (!terms.some((term) => term[0] === "description" && term[1] === variant)) {
-                terms.push(["description", variant]);
+            if (!terms.some((term) => term[0] === "Description" && term[1] === variant)) {
+                terms.push(["Description", variant]);
             }
         });
         return terms;
@@ -380,7 +380,7 @@ async function get() {
             return { entries: [], total: 0, page: page, pageSize: PAGE_SIZE };
         }
         var filter = listFilter(scope, type);
-        var mine = (row) => row.customerNo === scope.customerNo;
+        var mine = (row) => row.Customer_No === scope.customerNo;
         var q = param("q").slice(0, 50);
         if (!q) {
             var result = await bcGet(
@@ -418,7 +418,7 @@ async function get() {
         var seen = {};
         results.forEach((res) => {
             ((res && res.value) || []).filter(mine).forEach((row) => {
-                var key = String(row.entryNo);
+                var key = String(row.Entry_No);
                 if (!seen[key]) {
                     seen[key] = true;
                     merged.push(row);
