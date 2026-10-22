@@ -317,38 +317,48 @@ async function get() {
         return raw === undefined || raw === null || isNaN(count) ? null : count;
     }
 
-    // The credit limit isn't on the deployed Dashboard yet: a failed read gives null instead of failing the live counts.
-    async function creditLimit(scope) {
+    var NO_ACCOUNT = { balance: null, balanceDue: null, overdue: null, creditLimit: null, availableCredit: null };
+
+    // Account overview tiles from BC's credit overview (S2-09, 2026-10-22). A failed read shows "—" instead of failing the
+    // live counts.
+    async function accountOverview(scope) {
         var result;
         try {
             result = await bcGet(
                 scope,
-                "mcrmCustomers",
-                odataQuery({ $filter: "Customer_No eq " + odataLiteral(scope.customerNo), $select: "Customer_No,CreditLimit", $top: "1" })
+                "mcrmCustCreditOverviews",
+                odataQuery({
+                    $filter: "customerNo eq " + odataLiteral(scope.customerNo),
+                    $select: "customerNo,outstandingBalance,balanceDueToday,overdueAmount,creditLimit,availableCredit",
+                    $top: "1"
+                })
             );
         } catch (err) {
-            Server.Logger.Warn("dashboard credit limit read failed: " + safeDetail(err));
-            return null;
+            Server.Logger.Warn("dashboard credit overview read failed: " + safeDetail(err));
+            return NO_ACCOUNT;
         }
-        var card = ((result && result.value) || []).find((row) => row.Customer_No === scope.customerNo);
-        return card ? Number(card.CreditLimit) || 0 : null;
+        var row = ((result && result.value) || []).find((each) => each.customerNo === scope.customerNo);
+        if (!row) return NO_ACCOUNT;
+        return {
+            balance: Number(row.outstandingBalance) || 0,
+            balanceDue: Number(row.balanceDueToday) || 0,
+            overdue: Number(row.overdueAmount) || 0,
+            creditLimit: Number(row.creditLimit) || 0,
+            availableCredit: Number(row.availableCredit) || 0
+        };
     }
 
     Server.Logger.Log("dashboard GET called");
     return respond(() => scopedRead(async (scope) => {
         var statuses = Object.keys(COUNT_KEYS);
         var results = await Promise.all(
-            statuses.map((status) => countOrders(scope, status)).concat([creditLimit(scope), invoicedOrders(scope, [""], "salesOrderNo,sellToCustomerNo,documentType,orderDate")])
+            statuses.map((status) => countOrders(scope, status)).concat([accountOverview(scope), invoicedOrders(scope, [""], "salesOrderNo,sellToCustomerNo,documentType,orderDate")])
         );
         // ponytail: counts at most the newest 500 invoiced orders (invoicedOrders' cap).
         var counts = { invoiced: results[statuses.length + 1].length };
         statuses.forEach((status, i) => {
             counts[COUNT_KEYS[status]] = results[i];
         });
-        return {
-            counts: counts,
-            // Balance, balance due and overdue will come from BC's customer card, available credit from S2-09: null until then.
-            account: { balance: null, balanceDue: null, overdue: null, creditLimit: results[statuses.length], availableCredit: null }
-        };
+        return { counts: counts, account: results[statuses.length] };
     }));
 }

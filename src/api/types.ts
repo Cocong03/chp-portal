@@ -114,7 +114,7 @@ export interface LedgerPageDto {
   pageSize: number
 }
 
-/** GET /_api/serverlogics/dashboard. null = BC doesn't provide it yet (balances: S2-07; available credit: S2-09) or sent no count. */
+/** GET /_api/serverlogics/dashboard. null = BC sent no count, or its credit overview (S2-09) could not be read. */
 export interface DashboardDto {
   counts: { open: number | null; pendingPrepayment: number | null; readyForDispatch: number | null; completelyShipped: number | null; invoiced: number | null }
   account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; availableCredit: number | null }

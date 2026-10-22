@@ -4,7 +4,6 @@ import { canSee } from '@/auth/access'
 import { useMe } from '@/auth/useMe'
 import { peso } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
-import { SAMPLE_ACCOUNT } from '@/mocks/dashboard'
 import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { Skeleton } from '@/ui/skeleton'
@@ -42,8 +41,7 @@ export function DashboardPage() {
   const canOpenOrders = canSee(roles, 'orders')
   const data = dashboard.data
   const money = (value: number | null | undefined) => (data ? (value == null ? '—' : peso(value)) : <Skeleton className="h-7 w-32" />)
-  // ponytail: sample balances until BC has them (S2-07) and available credit (S2-09); then data?.account.
-  const account = data && SAMPLE_ACCOUNT
+  const account = data?.account
   const overdue = account?.overdue ?? null
   const overdueTone: TileTone = overdue == null ? 'neutral' : overdue > 0 ? 'alert' : 'clear'
   const overdueCaption =

@@ -16,9 +16,9 @@ const COUNTS: Record<string, number> = { Open: 7, 'Pending Prepayment': 1, 'Read
 
 function fakeServer({
   query = {} as Record<string, string>,
-  card = [{ Customer_No: 'C00000002', CreditLimit: 750000 }] as unknown[],
+  credit = [{ customerNo: 'C00000002', outstandingBalance: 174000, balanceDueToday: 24750, overdueAmount: 24750, creditLimit: 500000, currentExposure: 203220, availableCredit: 296780 }] as unknown[],
   bcDown = false,
-  cardDown = false,
+  creditDown = false,
   noCount = false,
   // Archived orders; SOR3 is partly posted and still live, so it isn't Invoiced.
   archive = [{ salesOrderNo: 'SOR2', sellToCustomerNo: 'C00000002', documentType: 'Order', orderDate: '2026-09-01' },
@@ -45,8 +45,8 @@ function fakeServer({
           if (plain.includes('/MCRMContacts')) return ok({ value: [{ companyNo: 'CT1', name: 'ERLINDA' }] })
           if (plain.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: 'C00000002' }] })
           if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
-          if (plain.includes('/mcrmCustomers')) {
-            return cardDown ? JSON.stringify({ StatusCode: 400, IsSuccessStatusCode: false, ReasonPhrase: 'Bad Request', Body: '' }) : ok({ value: card })
+          if (plain.includes('/mcrmCustCreditOverviews')) {
+            return creditDown ? JSON.stringify({ StatusCode: 400, IsSuccessStatusCode: false, ReasonPhrase: 'Bad Request', Body: '' }) : ok({ value: credit })
           }
           if (plain.includes('/mcrmSalesOrderArchives')) return ok({ value: archive })
           if (plain.includes('$select=salesOrderNo&$top=1000')) return ok({ value: [{ salesOrderNo: 'SOR1' }, { salesOrderNo: 'SOR3' }] })
@@ -62,11 +62,11 @@ function fakeServer({
 
 const orderCalls = (http: string[]) => http.filter((u) => u.includes('/mcrmSalesOrders?') && !u.includes('$top=1000'))
 
-test('counts each status with exactly the Orders filter rule, and reads the credit limit', async () => {
+test('counts each status with exactly the Orders filter rule, and reads the credit overview', async () => {
   const { server, http } = fakeServer()
   expect(JSON.parse(await load(server).get())).toEqual({
     counts: { open: 7, pendingPrepayment: 1, readyForDispatch: 2, completelyShipped: 0, invoiced: 1 },
-    account: { balance: null, balanceDue: null, overdue: null, creditLimit: 750000, availableCredit: null },
+    account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, availableCredit: 296780 },
   })
   const calls = orderCalls(http)
   expect(calls).toHaveLength(4)
@@ -76,13 +76,13 @@ test('counts each status with exactly the Orders filter rule, and reads the cred
     expect(call).toContain('$top=1')
     expect(call).toContain('$count=true')
   }
-  expect(http.some((u) => u.includes("/mcrmCustomers?$filter=Customer_No eq 'C00000002'"))).toBe(true)
+  expect(http.some((u) => u.includes("/mcrmCustCreditOverviews?$filter=customerNo eq 'C00000002'"))).toBe(true)
 })
 
-test("no customer-card row, or another customer's row, gives no credit limit", async () => {
-  for (const card of [[], [{ Customer_No: 'C99', CreditLimit: 1 }]]) {
-    const { server } = fakeServer({ card })
-    expect(JSON.parse(await load(server).get()).account.creditLimit).toBeNull()
+test("no credit overview row, or another customer's row, gives no figures", async () => {
+  for (const credit of [[], [{ customerNo: 'C99', outstandingBalance: 1, balanceDueToday: 1, overdueAmount: 1, creditLimit: 1, availableCredit: 1 }]]) {
+    const { server } = fakeServer({ credit })
+    expect(JSON.parse(await load(server).get()).account).toEqual({ balance: null, balanceDue: null, overdue: null, creditLimit: null, availableCredit: null })
   }
 })
 
@@ -117,12 +117,12 @@ test('a count BC does not return is null, never a made-up 0', async () => {
   })
 })
 
-// Final review 2026-10-15: the credit limit isn't shown on the deployed site yet; its failure must not take down the live counts.
-test('a failing customer-card read leaves the counts and gives no credit limit', async () => {
-  const { server } = fakeServer({ cardDown: true })
+// A failing credit overview must not take down the live counts: its tiles show "—".
+test('a failing credit overview read leaves the counts and gives no figures', async () => {
+  const { server } = fakeServer({ creditDown: true })
   const dto = JSON.parse(await load(server).get())
   expect(dto.counts.open).toBe(7)
-  expect(dto.account.creditLimit).toBeNull()
+  expect(dto.account).toEqual({ balance: null, balanceDue: null, overdue: null, creditLimit: null, availableCredit: null })
 })
 
 // Invoiced = archived and no longer live (probed 2026-10-16), the same rule as the Orders Invoiced filter.
