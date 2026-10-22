@@ -66,7 +66,7 @@ test('counts each status with exactly the Orders filter rule, and reads the cred
   const { server, http } = fakeServer()
   expect(JSON.parse(await load(server).get())).toEqual({
     counts: { open: 7, pendingPrepayment: 1, readyForDispatch: 2, completelyShipped: 0, invoiced: 1 },
-    account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, availableCredit: 296780 },
+    account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, exposure: 203220, availableCredit: 296780 },
   })
   const calls = orderCalls(http)
   expect(calls).toHaveLength(4)
@@ -82,7 +82,7 @@ test('counts each status with exactly the Orders filter rule, and reads the cred
 test("no credit overview row, or another customer's row, gives no figures", async () => {
   for (const credit of [[], [{ customerNo: 'C99', outstandingBalance: 1, balanceDueToday: 1, overdueAmount: 1, creditLimit: 1, availableCredit: 1 }]]) {
     const { server } = fakeServer({ credit })
-    expect(JSON.parse(await load(server).get()).account).toEqual({ balance: null, balanceDue: null, overdue: null, creditLimit: null, availableCredit: null })
+    expect(JSON.parse(await load(server).get()).account).toEqual({ balance: null, balanceDue: null, overdue: null, creditLimit: null, exposure: null, availableCredit: null })
   }
 })
 
@@ -122,7 +122,7 @@ test('a failing credit overview read leaves the counts and gives no figures', as
   const { server } = fakeServer({ creditDown: true })
   const dto = JSON.parse(await load(server).get())
   expect(dto.counts.open).toBe(7)
-  expect(dto.account).toEqual({ balance: null, balanceDue: null, overdue: null, creditLimit: null, availableCredit: null })
+  expect(dto.account).toEqual({ balance: null, balanceDue: null, overdue: null, creditLimit: null, exposure: null, availableCredit: null })
 })
 
 // Invoiced = archived and no longer live (probed 2026-10-16), the same rule as the Orders Invoiced filter.

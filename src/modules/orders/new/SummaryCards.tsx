@@ -3,11 +3,13 @@ import { Controller, useFormContext, useWatch } from 'react-hook-form'
 import type { OrderOptionsDto, SiteDto } from '@/api/types'
 import { peso } from '@/lib/format'
 import { cn } from '@/lib/utils'
+import { useDashboard } from '@/modules/dashboard/useDashboard'
 import { Button } from '@/ui/button'
 import { Input } from '@/ui/input'
 import { Label } from '@/ui/label'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
+import { Skeleton } from '@/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/tooltip'
 import { lineAmount, type NewOrderForm } from './form'
 
@@ -36,7 +38,7 @@ function Soon({ children }: { children: string }) {
   )
 }
 
-/** Credit standing and Order summary. Figures are display sums only; the real quote is S3-06. */
+/** Credit standing (BC's credit overview, via the dashboard endpoint) and Order summary. Display sums only; the real quote is S3-06. */
 export function SummaryCards({
   options,
   sites,
@@ -55,12 +57,17 @@ export function SummaryCards({
   const freight = options.freight[shipmentMethod]
   const total = subtotal + freight + options.otherCharges
   const site = sites.find((each) => each.code === siteCode)
+  const dashboard = useDashboard()
+  const credit = dashboard.data?.account
+  const money = (value: number | null | undefined) =>
+    credit ? (value == null ? '—' : peso(value)) : dashboard.isError ? '—' : <Skeleton className="h-4 w-24" />
+  const available = credit?.availableCredit ?? null
   return (
     <>
       <SectionCard title="Credit standing">
-        <Row label="Credit limit" value={peso(options.credit.limit)} />
-        <Row label="Current exposure" value={peso(options.credit.exposure)} />
-        <Row label="Available credit" value={peso(options.credit.available)} total />
+        <Row label="Credit limit" value={money(credit?.creditLimit)} />
+        <Row label="Current exposure" value={money(credit?.exposure)} />
+        <Row label="Available credit" value={money(available)} total />
         <p className="mt-2 text-[12.5px] text-muted-foreground">Exposure = outstanding balance plus orders already placed but not yet invoiced.</p>
       </SectionCard>
       <SectionCard title="Order summary">
@@ -99,7 +106,7 @@ export function SummaryCards({
         <Row label="Transport / Freight" value={peso(freight)} />
         <Row label="Other charges" value={peso(options.otherCharges)} />
         <Row label="Order total" value={peso(total)} total />
-        {total > options.credit.available && (
+        {available !== null && total > available && (
           <p className="mt-2 text-[12.5px] font-medium text-warning">
             ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.
           </p>

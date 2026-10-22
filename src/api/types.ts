@@ -117,17 +117,16 @@ export interface LedgerPageDto {
 /** GET /_api/serverlogics/dashboard. null = BC sent no count, or its credit overview (S2-09) could not be read. */
 export interface DashboardDto {
   counts: { open: number | null; pendingPrepayment: number | null; readyForDispatch: number | null; completelyShipped: number | null; invoiced: number | null }
-  account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; availableCredit: number | null }
+  account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; exposure: number | null; availableCredit: number | null }
 }
 
-/** New Order options (S3-05 `order-options`). Sample until BC delivers items/prices (S3-01), credit (S2-09) and freight (S3-02). */
+/** New Order options (S3-05 `order-options`). Sample until BC delivers items/prices (S3-01) and freight (S3-02). Credit is the dashboard's. */
 export interface OrderOptionsDto {
   items: { code: string; description: string; uom: string; unitPrice: number }[]
   plants: { code: string; label: string }[]
   paymentMethod: 'cash' | 'credit'
   paymentTerms: string
   prepaymentTerms: string
-  credit: { limit: number; exposure: number; available: number }
   freight: { delivery: number; pickup: number }
   otherCharges: number
 }

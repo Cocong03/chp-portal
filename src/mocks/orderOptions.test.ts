@@ -1,12 +1,10 @@
 import { serverLogic } from '@/api/serverLogic'
-import { SAMPLE_ACCOUNT } from './dashboard'
 import { ORDER_OPTIONS_SAMPLE } from './orderOptions'
 import { CATALOG } from './orders'
 
-test('the sample options carry the wireframe catalog and the Dashboard credit figures', () => {
+test('the sample options carry the wireframe catalog', () => {
   expect(ORDER_OPTIONS_SAMPLE.items).toContainEqual({ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', uom: 'BAG', unitPrice: 245 })
   expect(ORDER_OPTIONS_SAMPLE.items).toHaveLength(Object.keys(CATALOG).length)
-  expect(ORDER_OPTIONS_SAMPLE.credit).toEqual({ limit: SAMPLE_ACCOUNT.creditLimit, available: SAMPLE_ACCOUNT.availableCredit, exposure: 335750 })
   expect(ORDER_OPTIONS_SAMPLE.plants.map((p) => `${p.code} — ${p.label}`)).toEqual([
     'PLANT1 — Plant 1 — Main Yard',
     'PLANT2 — Plant 2 — North Depot',

@@ -93,7 +93,7 @@ test('nothing overdue is green; figures BC has not provided yet show a dash and 
   const first = renderApp(<DashboardPage />)
   expect(await within(await region('Account overview')).findByText('Nothing past due — account in good standing')).toBeInTheDocument()
   first.unmount()
-  answer('dashboard', { ...base, account: { balance: null, balanceDue: null, overdue: null, creditLimit: 750000, availableCredit: null } } satisfies DashboardDto)
+  answer('dashboard', { ...base, account: { balance: null, balanceDue: null, overdue: null, creditLimit: 750000, exposure: null, availableCredit: null } } satisfies DashboardDto)
   renderApp(<DashboardPage />)
   const overview = await region('Account overview')
   expect(await within(overview).findAllByText('—')).toHaveLength(4)
@@ -157,7 +157,7 @@ test('a failed load shows the error with Try again; the greeting and announcemen
 test('the deployed build shows the Account overview from BC', async () => {
   vi.stubEnv('DEV', false)
   const me: MeDto = { contact: { name: 'J.D. Santos', email: 'full@test.ph' }, account: null, roles: ['Full Access'] }
-  const live: DashboardDto = { ...dashboardMock(), account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, availableCredit: 296780 } }
+  const live: DashboardDto = { ...dashboardMock(), account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, exposure: 203220, availableCredit: 296780 } }
   vi.mocked(serverLogic).mockImplementation(async (name) => (name === 'me' ? me : name === 'dashboard' ? live : null) as never)
   renderApp(<DashboardPage />)
   const overview = await region('Account overview')

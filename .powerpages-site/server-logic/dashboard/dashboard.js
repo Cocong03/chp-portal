@@ -317,10 +317,10 @@ async function get() {
         return raw === undefined || raw === null || isNaN(count) ? null : count;
     }
 
-    var NO_ACCOUNT = { balance: null, balanceDue: null, overdue: null, creditLimit: null, availableCredit: null };
+    var NO_ACCOUNT = { balance: null, balanceDue: null, overdue: null, creditLimit: null, exposure: null, availableCredit: null };
 
-    // Account overview tiles from BC's credit overview (S2-09, 2026-10-22). A failed read shows "—" instead of failing the
-    // live counts.
+    // Account overview tiles (and New Order's credit standing) from BC's credit overview (S2-09, 2026-10-22). A failed read
+    // shows "—" instead of failing the live counts.
     async function accountOverview(scope) {
         var result;
         try {
@@ -329,7 +329,7 @@ async function get() {
                 "mcrmCustCreditOverviews",
                 odataQuery({
                     $filter: "customerNo eq " + odataLiteral(scope.customerNo),
-                    $select: "customerNo,outstandingBalance,balanceDueToday,overdueAmount,creditLimit,availableCredit",
+                    $select: "customerNo,outstandingBalance,balanceDueToday,overdueAmount,creditLimit,currentExposure,availableCredit",
                     $top: "1"
                 })
             );
@@ -344,6 +344,7 @@ async function get() {
             balanceDue: Number(row.balanceDueToday) || 0,
             overdue: Number(row.overdueAmount) || 0,
             creditLimit: Number(row.creditLimit) || 0,
+            exposure: Number(row.currentExposure) || 0,
             availableCredit: Number(row.availableCredit) || 0
         };
     }

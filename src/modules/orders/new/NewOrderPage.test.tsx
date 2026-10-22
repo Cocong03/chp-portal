@@ -4,7 +4,8 @@ import userEvent, { type UserEvent } from '@testing-library/user-event'
 import { Route, Routes } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ApiError, serverLogic } from '@/api/serverLogic'
-import type { DraftPayload } from '@/api/types'
+import type { DashboardDto, DraftPayload } from '@/api/types'
+import { dashboardMock } from '@/mocks/dashboard'
 import { draftsMock, resetDraftsMock } from '@/mocks/drafts'
 import { renderApp } from '@/test/render'
 import { OrdersSection } from '../OrdersSection'
@@ -114,10 +115,36 @@ test('the credit warning shows only when the order total exceeds available credi
 
 test('credit standing shows the Dashboard figures', async () => {
   await openForm()
-  expect(summary('Credit limit')).toHaveTextContent('₱750,000.00')
+  await waitFor(() => expect(summary('Credit limit')).toHaveTextContent('₱750,000.00'))
   expect(summary('Current exposure')).toHaveTextContent('₱335,750.00')
   expect(summary('Available credit')).toHaveTextContent('₱414,250.00')
   expect(screen.getByText('Exposure = outstanding balance plus orders already placed but not yet invoiced.')).toBeInTheDocument()
+})
+
+// S2-09: credit standing is BC's credit overview, read through the dashboard endpoint (order-options stays sample until S3-05).
+test("credit standing is BC's figures, and the warning compares against BC's available credit", async () => {
+  const user = userEvent.setup()
+  answer('dashboard', { ...dashboardMock(), account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, exposure: 203220, availableCredit: 2000 } } satisfies DashboardDto)
+  await openForm()
+  expect(await screen.findByText('₱500,000.00')).toBeInTheDocument()
+  expect(summary('Current exposure')).toHaveTextContent('₱203,220.00')
+  expect(summary('Available credit')).toHaveTextContent('₱2,000.00')
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  expect(screen.getByText(WARNING)).toBeInTheDocument()
+})
+
+test('credit BC could not give shows dashes and never the warning', async () => {
+  const user = userEvent.setup()
+  const nulls = { balance: null, balanceDue: null, overdue: null, creditLimit: null, exposure: null, availableCredit: null }
+  answer('dashboard', { ...dashboardMock(), account: nulls } satisfies DashboardDto)
+  await openForm()
+  await waitFor(() => expect(summary('Credit limit')).toHaveTextContent('—'))
+  expect(summary('Current exposure')).toHaveTextContent('—')
+  expect(summary('Available credit')).toHaveTextContent('—')
+  await pickItem(user, 1, T2_BULK)
+  await setQty(user, 1, '100')
+  expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
 })
 
 test('the delivery site defaults to the customer default and shows its address', async () => {
