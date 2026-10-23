@@ -68,8 +68,7 @@ test('BC down → only the customer-safe error', async () => {
 test('only the ordering roles can call it', () => {
   const yml = readFileSync(resolve('.powerpages-site/server-logic/portal-items/portal-items.serverlogic.yml'), 'utf8')
   expect(yml).toContain('name: portal-items')
-  expect(yml.split('
-').map((line) => line.trim()).filter((line) => /^- [0-9a-f-]{36}$/.test(line))).toEqual([
+  expect(yml.split('\n').map((line) => line.trim()).filter((line) => /^- [0-9a-f-]{36}$/.test(line))).toEqual([
     '- 56b29291-b981-4ef0-865b-41c1e9523a97',
     '- 11bb7218-55fb-4cae-b8a1-5af2f41237c5',
   ])
