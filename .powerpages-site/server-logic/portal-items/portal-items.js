@@ -297,14 +297,14 @@ async function get() {
         var result = await bcGet(
             scope,
             "mcrmPortalItems",
-            odataQuery({ $select: "itemNo,description,baseUnitOfMeasure,salesUnitOfMeasure", $orderby: "itemNo" })
+            odataQuery({ $select: "itemNo,description,salesUnitOfMeasure", $orderby: "itemNo" })
         );
         return ((result && result.value) || [])
             .filter((row) => row.itemNo)
             .map((row) => ({
                 code: row.itemNo,
                 description: row.description || "",
-                uom: row.salesUnitOfMeasure || row.baseUnitOfMeasure || "",
+                uom: row.salesUnitOfMeasure || "", // always the sales unit (confirmed 2026-10-23); the quote prices in it
                 unitPrice: null
             }))
             .sort((a, b) => (a.code < b.code ? -1 : a.code > b.code ? 1 : 0));

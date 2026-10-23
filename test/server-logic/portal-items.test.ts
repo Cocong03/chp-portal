@@ -45,14 +45,14 @@ function fakeServer({ items = ITEMS as unknown[], bcDown = false } = {}) {
   return { server, http }
 }
 
-test("lists BC's portal items by item no. in the sales unit, with no price until the quote (S3-06)", async () => {
+test("lists BC's portal items by item no. in the sales unit only (never the base unit), with no price until the quote (S3-06)", async () => {
   const { server, http } = fakeServer()
   expect(JSON.parse(await load(server).get())).toEqual([
     { code: '100014', description: 'APO PORTLAND TERNARY T1T 40 KGS', uom: 'BAG/40', unitPrice: null },
     { code: '100016', description: 'ISLAND PORTLAND CEMENT TYPE 1 40 KGS', uom: 'BAG/40', unitPrice: null },
-    { code: '100017', description: 'ISLAND PORTLAND CEMENT TYPE 1 BULK', uom: 'TN', unitPrice: null },
+    { code: '100017', description: 'ISLAND PORTLAND CEMENT TYPE 1 BULK', uom: '', unitPrice: null },
   ])
-  expect(http.find((u) => u.includes('/mcrmPortalItems?'))).toContain('/companies(co-1)/mcrmPortalItems?$select=itemNo,description,baseUnitOfMeasure,salesUnitOfMeasure')
+  expect(http.find((u) => u.includes('/mcrmPortalItems?'))).toContain('/companies(co-1)/mcrmPortalItems?$select=itemNo,description,salesUnitOfMeasure&')
 })
 
 test('rows without an item no. are dropped', async () => {
