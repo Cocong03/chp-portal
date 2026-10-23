@@ -120,10 +120,17 @@ export interface DashboardDto {
   account: { balance: number | null; balanceDue: number | null; overdue: number | null; creditLimit: number | null; exposure: number | null; availableCredit: number | null }
 }
 
+/** GET /_api/serverlogics/source-plants: BC's Source Plant List. */
+export interface SourcePlantDto {
+  code: string
+  name: string
+}
+
 /** New Order options (S3-05 `order-options`). Sample until BC delivers items/prices (S3-01) and freight (S3-02). Credit is the dashboard's. */
 export interface OrderOptionsDto {
   items: { code: string; description: string; uom: string; unitPrice: number }[]
-  plants: { code: string; label: string }[]
+  /** From `source-plants` (BC's mcrmSourcePlants), merged in by useOrderOptions. */
+  plants: SourcePlantDto[]
   paymentMethod: 'cash' | 'credit'
   paymentTerms: string
   prepaymentTerms: string

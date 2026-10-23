@@ -3,7 +3,7 @@ import { getPortalUser } from '@/auth/session'
 import { dashboardMock } from './dashboard'
 import { draftsMock } from './drafts'
 import { ledgerMock } from './ledger'
-import { ORDER_OPTIONS_SAMPLE } from './orderOptions'
+import { ORDER_OPTIONS_SAMPLE, SOURCE_PLANTS_SAMPLE } from './orderOptions'
 import { ordersMock } from './orders'
 
 export interface MockRequest {
@@ -64,6 +64,7 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
   ledger: ledgerMock,
   orders: ordersMock,
   'order-options': () => ORDER_OPTIONS_SAMPLE,
+  'source-plants': () => SOURCE_PLANTS_SAMPLE,
   // Wireframe SITES
   sites: (): SiteDto[] => [
     { code: 'PLANT1', name: 'Plant 1 — Main Yard', address: 'Km 19 Marcos Highway, Brgy. San Roque', city: 'Antipolo City, Rizal', contact: 'Ramon Cruz', phone: '(02) 8531-4420', email: 'ramon.cruz@sample-customer.ph', isDefault: true },

@@ -84,7 +84,7 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
           />
         </div>
         <Field id="source-plant" label="Source">
-          <Choice id="source-plant" name="source" items={options.plants.map((plant) => ({ value: plant.code, label: `${plant.code} — ${plant.label}` }))} />
+          <Choice id="source-plant" name="source" items={options.plants.map((plant) => ({ value: plant.code, label: `${plant.code} — ${plant.name}` }))} />
           <p className={note}>Choose your preferred source plant.</p>
         </Field>
         <Field id="pickup-date" label="Pick up date" hidden={!pickup}>

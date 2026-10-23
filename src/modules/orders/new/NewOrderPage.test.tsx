@@ -253,6 +253,15 @@ test('Source lists the plants with the wireframe note', async () => {
   expect(screen.getByText('Choose your preferred source plant.')).toBeInTheDocument()
 })
 
+// 2026-10-23: Source lists BC's plants (mcrmSourcePlants) while the rest of order-options is still sample.
+test("Source lists BC's plants as code — name", async () => {
+  const user = userEvent.setup()
+  answer('source-plants', [{ code: 'CAVITE', name: 'CAVITE WAREHOUSE' }, { code: 'SOLID', name: 'SOLID PLANT' }])
+  await openForm()
+  await user.click(screen.getByRole('combobox', { name: 'Source' }))
+  expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['CAVITE — CAVITE WAREHOUSE', 'SOLID — SOLID PLANT'])
+})
+
 // Final review 2026-10-21 (Important 1): once order-options is live (S3-05), a failed background refetch must not
 // replace the form and lose what the customer typed.
 test('a failed background refresh of the options keeps the form and its values', async () => {
