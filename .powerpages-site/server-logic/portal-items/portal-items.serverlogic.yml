@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+description: 'BC portal items for the New Order item dropdown'
+display_name: 'Portal items (BC)'
+id: 42b32b82-8b76-4aaf-9cd2-d3f3c1da890c
+name: portal-items

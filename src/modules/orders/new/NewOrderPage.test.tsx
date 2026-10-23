@@ -253,6 +253,21 @@ test('Source lists the plants with the wireframe note', async () => {
   expect(screen.getByText('Choose your preferred source plant.')).toBeInTheDocument()
 })
 
+// 2026-10-23: BC's portal items have no price until the quote endpoint (S3-06): every amount is "—", never ₱0, and no warning.
+test('BC items without a price show dashes for every amount and never the credit warning', async () => {
+  const user = userEvent.setup()
+  answer('portal-items', [{ code: '100014', description: 'APO PORTLAND TERNARY T1T 40 KGS', uom: 'BAG/40', unitPrice: null }])
+  await openForm()
+  await pickItem(user, 1, '100014 — APO PORTLAND TERNARY T1T 40 KGS')
+  await setQty(user, 1, '100000')
+  const row = lineRow(1)
+  expect(within(row).getByText('BAG/40')).toBeInTheDocument()
+  expect(within(row).getAllByText('—')).toHaveLength(2)
+  expect(summary('Lines')).toHaveTextContent('1')
+  for (const label of ['Subtotal', 'Transport / Freight', 'Other charges', 'Order total']) expect(summary(label)).toHaveTextContent('—')
+  expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
+})
+
 // 2026-10-23: Source lists BC's plants (mcrmSourcePlants) while the rest of order-options is still sample.
 test("Source lists BC's plants as code — name", async () => {
   const user = userEvent.setup()

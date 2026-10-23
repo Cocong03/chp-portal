@@ -11,7 +11,7 @@ import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/tooltip'
-import { lineAmount, type NewOrderForm } from './form'
+import { chosenLines, lineAmount, type NewOrderForm } from './form'
 
 function Row({ label, value, total }: { label: string; value: ReactNode; total?: boolean }) {
   return (
@@ -52,10 +52,12 @@ export function SummaryCards({
 }) {
   const { control, register } = useFormContext<NewOrderForm>()
   const [lines, shipmentMethod, siteCode] = useWatch({ control, name: ['lines', 'shipmentMethod', 'site'] })
-  const amounts = lines.map((line) => lineAmount(line, options.items)).filter((amount): amount is number => amount !== null)
-  const subtotal = amounts.reduce((sum, amount) => sum + amount, 0)
+  const { count, priced } = chosenLines(lines, options.items)
+  const subtotal = lines.reduce((sum, line) => sum + (lineAmount(line, options.items) ?? 0), 0)
   const freight = options.freight[shipmentMethod]
   const total = subtotal + freight + options.otherCharges
+  // BC items have no price until the quote (S3-06): every amount is "—", never a partial or made-up total.
+  const amount = (value: number) => (priced ? peso(value) : '—')
   const site = sites.find((each) => each.code === siteCode)
   const dashboard = useDashboard()
   const credit = dashboard.data?.account
@@ -101,12 +103,12 @@ export function SummaryCards({
           <Label htmlFor="po-ref">Your PO reference (optional)</Label>
           <Input id="po-ref" placeholder="e.g. PO-8915" {...register('poRef')} />
         </div>
-        <Row label="Lines" value={amounts.length} />
-        <Row label="Subtotal" value={peso(subtotal)} />
-        <Row label="Transport / Freight" value={peso(freight)} />
-        <Row label="Other charges" value={peso(options.otherCharges)} />
-        <Row label="Order total" value={peso(total)} total />
-        {available !== null && total > available && (
+        <Row label="Lines" value={count} />
+        <Row label="Subtotal" value={amount(subtotal)} />
+        <Row label="Transport / Freight" value={amount(freight)} />
+        <Row label="Other charges" value={amount(options.otherCharges)} />
+        <Row label="Order total" value={amount(total)} total />
+        {priced && available !== null && total > available && (
           <p className="mt-2 text-[12.5px] font-medium text-warning">
             ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.
           </p>

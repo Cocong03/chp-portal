@@ -128,7 +128,8 @@ export interface SourcePlantDto {
 
 /** New Order options (S3-05 `order-options`). Sample until BC delivers items/prices (S3-01) and freight (S3-02). Credit is the dashboard's. */
 export interface OrderOptionsDto {
-  items: { code: string; description: string; uom: string; unitPrice: number }[]
+  /** From `portal-items` (BC's mcrmPortalItems), merged in by useOrderOptions. unitPrice null = no price until the quote (S3-06). */
+  items: { code: string; description: string; uom: string; unitPrice: number | null }[]
   /** From `source-plants` (BC's mcrmSourcePlants), merged in by useOrderOptions. */
   plants: SourcePlantDto[]
   paymentMethod: 'cash' | 'credit'

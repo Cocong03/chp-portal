@@ -77,7 +77,7 @@ export function OrderLinesCard({ options }: { options: OrderOptionsDto }) {
                     />
                   </td>
                   <td className="py-2 pr-2 font-mono">{item?.uom ?? '—'}</td>
-                  <td className={`py-2 pr-2 ${num}`}>{item ? peso(item.unitPrice) : '—'}</td>
+                  <td className={`py-2 pr-2 ${num}`}>{item && item.unitPrice !== null ? peso(item.unitPrice) : '—'}</td>
                   <td className={`py-2 pr-2 ${num}`}>{amount === null ? '—' : peso(amount)}</td>
                   <td className="py-2">
                     <Button type="button" variant="ghost" size="sm" aria-label={`Remove line ${index + 1}`} onClick={() => remove(index)}>

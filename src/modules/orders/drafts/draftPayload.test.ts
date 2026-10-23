@@ -70,6 +70,11 @@ test('estTotal skips lines whose item no longer exists', () => {
   expect(estTotal(payload({ lines: [{ code: 'CEM-T1-40KG', qty: 10 }, { code: 'GONE', qty: 3 }], shipmentMethod: 'pickup' }), options)).toBe(2450)
 })
 
+test('estTotal is null while a chosen item has no price yet (BC items before the quote, S3-06)', () => {
+  const unpriced = { ...options, items: [...options.items, { code: '100014', description: 'APO', uom: 'BAG/40', unitPrice: null }] }
+  expect(estTotal(payload({ lines: [{ code: '100014', qty: 5 }], shipmentMethod: 'pickup' }), unpriced)).toBeNull()
+})
+
 test('toPayload wraps the form with version 1 and its orderType', () => {
   expect(toPayload(saved)).toEqual({ version: 1, orderType: 'single', form: saved })
 })

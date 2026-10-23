@@ -29,6 +29,10 @@ export function DraftsPage() {
     const site = sites?.find((each) => each.code === code)
     return site ? `${site.code} — ${site.name}` : '—'
   }
+  const total = (draft: DraftDto) => {
+    const value = options ? estTotal(draft.payload, options) : null
+    return value === null ? '—' : peso(value)
+  }
   const confirmDelete = () => {
     if (!pending) return
     const { label } = pending
@@ -84,7 +88,7 @@ export function DraftsPage() {
                     </TableCell>
                     <TableCell>{formatDate(draft.savedAt)}</TableCell>
                     <TableCell>{draft.payload.form?.site ? siteLabel(draft.payload.form.site) : '—'}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{options ? peso(estTotal(draft.payload, options)) : '—'}</TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">{total(draft)}</TableCell>
                     <TableCell>
                       <div className="flex flex-col items-start gap-0.5">
                         <Button asChild variant="ghost" size="sm">

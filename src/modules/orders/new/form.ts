@@ -51,9 +51,15 @@ export function newOrderDefaults(options: OrderOptionsDto, sites: SiteDto[]): Ne
   }
 }
 
-/** Display only (the real quote is S3-06): qty × the item's price, or null for a line without an item or a positive qty. */
+/** Display only (the real quote is S3-06): qty × the item's price, or null for a line without an item, a price or a positive qty. */
 export function lineAmount(line: { code: string; qty: number }, items: OrderOptionsDto['items']): number | null {
   const item = items.find((each) => each.code === line.code)
   const qty = Number(line.qty)
-  return item && Number.isFinite(qty) && qty > 0 ? item.unitPrice * qty : null
+  return item && item.unitPrice !== null && Number.isFinite(qty) && qty > 0 ? item.unitPrice * qty : null
+}
+
+/** Lines with an item and a positive qty, and whether every one of them has a price yet. */
+export function chosenLines(lines: { code: string; qty: number }[], items: OrderOptionsDto['items']) {
+  const chosen = lines.filter((line) => items.some((item) => item.code === line.code) && Number(line.qty) > 0)
+  return { count: chosen.length, priced: chosen.every((line) => lineAmount(line, items) !== null) }
 }
