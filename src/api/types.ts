@@ -126,17 +126,34 @@ export interface SourcePlantDto {
   name: string
 }
 
-/** New Order options (S3-05 `order-options`). Sample until BC delivers items/prices (S3-01) and freight (S3-02). Credit is the dashboard's. */
+/** New Order options (S3-05 `order-options`). Payment terms are sample until BC confirms them; prices are `order-quote`'s, credit the dashboard's. */
 export interface OrderOptionsDto {
-  /** From `portal-items` (BC's mcrmPortalItems), merged in by useOrderOptions. unitPrice null = no price until the quote (S3-06). */
-  items: { code: string; description: string; uom: string; unitPrice: number | null }[]
+  /** From `portal-items` (BC's mcrmPortalItems), merged in by useOrderOptions. uom is the item's sales unit. */
+  items: { code: string; description: string; uom: string }[]
   /** From `source-plants` (BC's mcrmSourcePlants), merged in by useOrderOptions. */
   plants: SourcePlantDto[]
   paymentMethod: 'cash' | 'credit'
   paymentTerms: string
   prepaymentTerms: string
-  freight: { delivery: number; pickup: number }
+}
+
+/** POST /_api/serverlogics/order-quote body: the chosen lines (item, sales unit, qty > 0) and how they're fulfilled. */
+export interface OrderQuoteRequest {
+  shipmentMethod: 'pickup' | 'delivery'
+  source: string
+  /** The delivery site's code; "" for pick up. */
+  site: string
+  lines: { code: string; uom: string; qty: number }[]
+}
+
+/** BC's price quote (S3-06), one entry per request line in order; totals are BC's lines summed on the server. */
+export interface OrderQuoteDto {
+  /** otherCharges = fuel surcharge + port charges. message is BC's note for the customer, "" when none. */
+  lines: { unitPrice: number; lineAmount: number; freight: number; otherCharges: number; total: number; message: string }[]
+  subtotal: number
+  freight: number
   otherCharges: number
+  total: number
 }
 
 /** chp_payload of a draft (S3-12): the New Order form's choices. No prices, freight or credit; they're current on Continue. */

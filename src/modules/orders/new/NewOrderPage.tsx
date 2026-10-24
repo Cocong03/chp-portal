@@ -18,6 +18,7 @@ import { withAutoLine } from './instructions'
 import { OrderLinesCard } from './OrderLinesCard'
 import { SummaryCards } from './SummaryCards'
 import { useOrderOptions } from './useOrderOptions'
+import { useOrderQuote } from './useOrderQuote'
 
 const NO_SITES: SiteDto[] = []
 const SAVED_NOTE = 'Saved as draft. You may go to the Drafts tab to edit, or delete.'
@@ -95,6 +96,7 @@ function OrderForm({
     if (!draftId && !form.getValues('site') && sites?.length) form.setValue('site', defaultSite(sites))
   }, [form, sites, draftId])
 
+  const quote = useOrderQuote(form.control, options.items)
   const client = useQueryClient()
   const navigate = useNavigate()
   const save = useMutation({
@@ -129,11 +131,11 @@ function OrderForm({
       )}
       <form onSubmit={(event) => event.preventDefault()} className="grid items-start gap-x-5 lg:grid-cols-[1fr_340px]">
         <div>
-          <OrderLinesCard options={options} />
+          <OrderLinesCard options={options} quote={quote} />
           <FulfillmentCard options={options} />
         </div>
         <div>
-          <SummaryCards options={options} sites={sites ?? NO_SITES} onSaveDraft={() => save.mutate()} saving={save.isPending} />
+          <SummaryCards quote={quote} sites={sites ?? NO_SITES} onSaveDraft={() => save.mutate()} saving={save.isPending} />
         </div>
       </form>
     </FormProvider>

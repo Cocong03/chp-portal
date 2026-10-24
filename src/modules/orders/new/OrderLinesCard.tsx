@@ -5,16 +5,20 @@ import { Button } from '@/ui/button'
 import { Input } from '@/ui/input'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
-import { lineAmount, type NewOrderForm } from './form'
+import { Skeleton } from '@/ui/skeleton'
+import type { NewOrderForm } from './form'
 import { SegmentedToggle } from './SegmentedToggle'
+import type { OrderQuote } from './useOrderQuote'
 
 const num = 'text-right font-mono tabular-nums'
 
-/** Order type and the lines table. Blanket Order stays off until S3-16. */
-export function OrderLinesCard({ options }: { options: OrderOptionsDto }) {
+/** Order type and the lines table, priced by BC's quote. Blanket Order stays off until S3-16. */
+export function OrderLinesCard({ options, quote }: { options: OrderOptionsDto; quote: OrderQuote }) {
   const { control, register } = useFormContext<NewOrderForm>()
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
   const lines = useWatch({ control, name: 'lines' })
+  const price = (index: number, value: number | undefined) =>
+    value !== undefined ? peso(value) : quote.status === 'pending' && quote.chosen(index) ? <Skeleton className="ml-auto h-4 w-16" /> : '—'
   return (
     <SectionCard title="Order lines">
       <SegmentedToggle
@@ -43,7 +47,7 @@ export function OrderLinesCard({ options }: { options: OrderOptionsDto }) {
             {fields.map((field, index) => {
               const line = lines[index] ?? field
               const item = options.items.find((each) => each.code === line.code)
-              const amount = lineAmount(line, options.items)
+              const priced = quote.line(index)
               return (
                 <tr key={field.id} className="border-t">
                   <td className="py-2 pr-2">
@@ -65,6 +69,7 @@ export function OrderLinesCard({ options }: { options: OrderOptionsDto }) {
                         </Select>
                       )}
                     />
+                    {priced?.message && <p className="mt-1 max-w-[280px] text-[12px] text-warning">{priced.message}</p>}
                   </td>
                   <td className="py-2 pr-2">
                     <Input
@@ -77,8 +82,8 @@ export function OrderLinesCard({ options }: { options: OrderOptionsDto }) {
                     />
                   </td>
                   <td className="py-2 pr-2 font-mono">{item?.uom ?? '—'}</td>
-                  <td className={`py-2 pr-2 ${num}`}>{item && item.unitPrice !== null ? peso(item.unitPrice) : '—'}</td>
-                  <td className={`py-2 pr-2 ${num}`}>{amount === null ? '—' : peso(amount)}</td>
+                  <td className={`py-2 pr-2 ${num}`}>{price(index, priced?.unitPrice)}</td>
+                  <td className={`py-2 pr-2 ${num}`}>{price(index, priced?.lineAmount)}</td>
                   <td className="py-2">
                     <Button type="button" variant="ghost" size="sm" aria-label={`Remove line ${index + 1}`} onClick={() => remove(index)}>
                       ✕

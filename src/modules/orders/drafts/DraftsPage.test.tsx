@@ -52,7 +52,9 @@ test('lists drafts newest first with label, Single tag, last saved, site and Est
   expect(within(rows[1]).getByText('Single')).toBeInTheDocument()
   expect(rows[1]).toHaveTextContent('Oct 20, 2026')
   expect(await within(rows[1]).findByText('PLANT2 — Plant 2 — North Depot')).toBeInTheDocument()
-  expect(await within(rows[1]).findByText('₱5,950.00')).toBeInTheDocument()
+  // BC's quote at today's prices (S3-06; dev mock: 10 × ₱245 + ₱10 freight and ₱5 fuel per bag for delivery).
+  expect(await within(rows[1]).findByText('₱2,600.00')).toBeInTheDocument()
+  expect(rows[0]).toHaveTextContent('—')
 })
 
 test('a site that no longer exists shows —', async () => {

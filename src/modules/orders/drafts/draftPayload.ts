@@ -1,5 +1,5 @@
 import type { DraftPayload, OrderOptionsDto, SiteDto } from '@/api/types'
-import { chosenLines, lineAmount, newOrderDefaults, type NewOrderForm } from '../new/form'
+import { newOrderDefaults, type NewOrderForm } from '../new/form'
 
 export function toPayload(form: NewOrderForm): DraftPayload {
   return { version: 1, orderType: form.orderType, form }
@@ -31,12 +31,4 @@ export function fromDraft(payload: DraftPayload, options: OrderOptionsDto, sites
   if (result.paymentMethod !== 'cash' && result.paymentMethod !== 'credit') result.paymentMethod = defaults.paymentMethod
   if (result.shipmentMethod !== 'pickup' && result.shipmentMethod !== 'delivery') result.shipmentMethod = defaults.shipmentMethod
   return result
-}
-
-/** Drafts tab Est. total, display only (rule 5): current prices × qty, plus current freight and other charges; null while an item has no price. */
-export function estTotal(payload: DraftPayload, options: OrderOptionsDto): number | null {
-  const form = payload.form
-  if (!chosenLines(form.lines ?? [], options.items).priced) return null
-  const subtotal = (form.lines ?? []).reduce((sum, line) => sum + (lineAmount(line, options.items) ?? 0), 0)
-  return subtotal + (options.freight[form.shipmentMethod] ?? 0) + options.otherCharges
 }

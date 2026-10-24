@@ -1,7 +1,8 @@
 import { useState } from 'react'
+import { useQuery } from '@tanstack/react-query'
 import { Link } from 'react-router-dom'
 import { toast } from 'sonner'
-import type { DraftDto } from '@/api/types'
+import type { DraftDto, OrderOptionsDto } from '@/api/types'
 import { formatDate, peso } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { useSites } from '@/modules/sites/useSites'
@@ -12,9 +13,19 @@ import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Skeleton } from '@/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
+import { quoteRequest } from '../new/form'
 import { useOrderOptions } from '../new/useOrderOptions'
-import { estTotal } from './draftPayload'
+import { quoteQuery } from '../new/useOrderQuote'
 import { useDeleteDraft, useDrafts } from './useDrafts'
+
+/** A draft's Est. total: BC's quote at today's prices (S3-06), shared with New Order's cache; "—" when it can't be priced. */
+function EstTotal({ draft, items }: { draft: DraftDto; items: OrderOptionsDto['items'] }) {
+  const { request } = quoteRequest({ ...draft.payload.form }, items)
+  const key = request && JSON.stringify(request)
+  const quote = useQuery({ ...quoteQuery(key ?? ''), enabled: key !== null })
+  if (key && quote.isPending) return <Skeleton className="ml-auto h-4 w-20" />
+  return quote.data && key ? peso(quote.data.total) : '—'
+}
 
 /** Drafts tab (S3-12), built to the wireframe's `#panel-drafts` and `#delete-draft-modal`. */
 export function DraftsPage() {
@@ -28,10 +39,6 @@ export function DraftsPage() {
   const siteLabel = (code: string) => {
     const site = sites?.find((each) => each.code === code)
     return site ? `${site.code} — ${site.name}` : '—'
-  }
-  const total = (draft: DraftDto) => {
-    const value = options ? estTotal(draft.payload, options) : null
-    return value === null ? '—' : peso(value)
   }
   const confirmDelete = () => {
     if (!pending) return
@@ -88,7 +95,9 @@ export function DraftsPage() {
                     </TableCell>
                     <TableCell>{formatDate(draft.savedAt)}</TableCell>
                     <TableCell>{draft.payload.form?.site ? siteLabel(draft.payload.form.site) : '—'}</TableCell>
-                    <TableCell className="text-right font-mono tabular-nums">{total(draft)}</TableCell>
+                    <TableCell className="text-right font-mono tabular-nums">
+                      {options ? <EstTotal draft={draft} items={options.items} /> : '—'}
+                    </TableCell>
                     <TableCell>
                       <div className="flex flex-col items-start gap-0.5">
                         <Button asChild variant="ghost" size="sm">

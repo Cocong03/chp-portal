@@ -1,17 +1,19 @@
 import type { ReactNode } from 'react'
 import { Controller, useFormContext, useWatch } from 'react-hook-form'
-import type { OrderOptionsDto, SiteDto } from '@/api/types'
+import type { SiteDto } from '@/api/types'
 import { peso } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDashboard } from '@/modules/dashboard/useDashboard'
 import { Button } from '@/ui/button'
 import { Input } from '@/ui/input'
 import { Label } from '@/ui/label'
+import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/tooltip'
-import { chosenLines, lineAmount, type NewOrderForm } from './form'
+import type { NewOrderForm } from './form'
+import type { OrderQuote } from './useOrderQuote'
 
 function Row({ label, value, total }: { label: string; value: ReactNode; total?: boolean }) {
   return (
@@ -38,26 +40,24 @@ function Soon({ children }: { children: string }) {
   )
 }
 
-/** Credit standing (BC's credit overview, via the dashboard endpoint) and Order summary. Display sums only; the real quote is S3-06. */
+/** Credit standing (BC's credit overview, via the dashboard endpoint) and Order summary (BC's quote, S3-06). */
 export function SummaryCards({
-  options,
+  quote,
   sites,
   onSaveDraft,
   saving,
 }: {
-  options: OrderOptionsDto
+  quote: OrderQuote
   sites: SiteDto[]
   onSaveDraft: () => void
   saving: boolean
 }) {
   const { control, register } = useFormContext<NewOrderForm>()
-  const [lines, shipmentMethod, siteCode] = useWatch({ control, name: ['lines', 'shipmentMethod', 'site'] })
-  const { count, priced } = chosenLines(lines, options.items)
-  const subtotal = lines.reduce((sum, line) => sum + (lineAmount(line, options.items) ?? 0), 0)
-  const freight = options.freight[shipmentMethod]
-  const total = subtotal + freight + options.otherCharges
-  // BC items have no price until the quote (S3-06): every amount is "—", never a partial or made-up total.
-  const amount = (value: number) => (priced ? peso(value) : '—')
+  const siteCode = useWatch({ control, name: 'site' })
+  // BC's quote only (S3-06): "—" with nothing to price or a failed quote, never a partial or made-up total.
+  const priced = quote.quote
+  const amount = (key: 'subtotal' | 'freight' | 'otherCharges' | 'total') =>
+    priced ? peso(priced[key]) : quote.status === 'pending' ? <Skeleton className="h-4 w-20" /> : '—'
   const site = sites.find((each) => each.code === siteCode)
   const dashboard = useDashboard()
   const credit = dashboard.data?.account
@@ -103,12 +103,17 @@ export function SummaryCards({
           <Label htmlFor="po-ref">Your PO reference (optional)</Label>
           <Input id="po-ref" placeholder="e.g. PO-8915" {...register('poRef')} />
         </div>
-        <Row label="Lines" value={count} />
-        <Row label="Subtotal" value={amount(subtotal)} />
-        <Row label="Transport / Freight" value={amount(freight)} />
-        <Row label="Other charges" value={amount(options.otherCharges)} />
-        <Row label="Order total" value={amount(total)} total />
-        {priced && available !== null && total > available && (
+        <Row label="Lines" value={quote.count} />
+        <Row label="Subtotal" value={amount('subtotal')} />
+        <Row label="Transport / Freight" value={amount('freight')} />
+        <Row label="Other charges" value={amount('otherCharges')} />
+        <Row label="Order total" value={amount('total')} total />
+        {quote.status === 'error' && (
+          <div className="mt-2">
+            <QueryError onRetry={quote.retry} />
+          </div>
+        )}
+        {priced && available !== null && priced.total > available && (
           <p className="mt-2 text-[12.5px] font-medium text-warning">
             ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.
           </p>

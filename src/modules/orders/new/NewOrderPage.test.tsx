@@ -50,20 +50,73 @@ async function setQty(user: UserEvent, line: number, qty: string) {
   if (qty) await user.type(input, qty)
 }
 
-test('choosing an item fills UOM and unit price; qty drives the line total and the summary', async () => {
+const quoteCalls = () => vi.mocked(serverLogic).mock.calls.filter(([name]) => name === 'order-quote')
+/** Waits for BC's quote (debounced 400 ms) to land in a summary row. */
+const quoted = (label: string, value: string) => waitFor(() => expect(summary(label)).toHaveTextContent(value))
+
+test('choosing an item fills UOM; BC quotes the unit price, line total and the summary', async () => {
   const user = userEvent.setup()
   await openForm()
   await pickItem(user, 1, T1_BAG)
   await setQty(user, 1, '10')
   const row = lineRow(1)
   expect(within(row).getByText('BAG')).toBeInTheDocument()
-  expect(within(row).getByText('₱245.00')).toBeInTheDocument()
+  expect(await within(row).findByText('₱245.00')).toBeInTheDocument()
   expect(within(row).getByText('₱2,450.00')).toBeInTheDocument()
   expect(summary('Lines')).toHaveTextContent('1')
   expect(summary('Subtotal')).toHaveTextContent('₱2,450.00')
   expect(summary('Transport / Freight')).toHaveTextContent('₱0.00')
   expect(summary('Other charges')).toHaveTextContent('₱0.00')
   expect(summary('Order total')).toHaveTextContent('₱2,450.00')
+})
+
+// S3-06: one request per order with every chosen line, in the item's sales unit; no customer number from the browser.
+test('the quote asks for the chosen lines with the source, and no site for pick up', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  await quoted('Order total', '₱2,450.00')
+  expect(quoteCalls().at(-1)).toEqual([
+    'order-quote',
+    { method: 'POST', body: { shipmentMethod: 'pickup', source: 'PLANT1', site: '', lines: [{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10 }] } },
+  ])
+})
+
+test('while a new quote is on its way the old prices are never shown', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  await quoted('Order total', '₱2,450.00')
+  await setQty(user, 1, '20')
+  expect(screen.queryByText('₱2,450.00')).not.toBeInTheDocument()
+  await quoted('Order total', '₱4,900.00')
+})
+
+test("BC's message for a line is shown under it", async () => {
+  const user = userEvent.setup()
+  const line = { unitPrice: 245, lineAmount: 2450, freight: 0, otherCharges: 0, total: 2450, message: 'Price valid until Oct 31.' }
+  answer('order-quote', { lines: [line], subtotal: 2450, freight: 0, otherCharges: 0, total: 2450 })
+  await openForm()
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  expect(await within(lineRow(1)).findByText('Price valid until Oct 31.')).toBeInTheDocument()
+})
+
+test('a failed quote shows dashes, Try again, and never the credit warning', async () => {
+  const user = userEvent.setup()
+  answer('order-quote', new ApiError(500, 'x'))
+  await openForm()
+  await pickItem(user, 1, T2_BULK)
+  await setQty(user, 1, '100')
+  expect(await screen.findByRole('alert')).toHaveTextContent("We couldn't load this information. Please try again.")
+  expect(within(lineRow(1)).getAllByText('—')).toHaveLength(2)
+  for (const label of ['Subtotal', 'Transport / Freight', 'Other charges', 'Order total']) expect(summary(label)).toHaveTextContent('—')
+  expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
+  vi.mocked(serverLogic).mockImplementation(actualServerLogic)
+  await user.click(screen.getByRole('button', { name: 'Try again' }))
+  await quoted('Order total', '₱485,000.00')
 })
 
 test('+ Add line and ✕ change the Lines count', async () => {
@@ -75,7 +128,7 @@ test('+ Add line and ✕ change the Lines count', async () => {
   expect(summary('Lines')).toHaveTextContent('2')
   await user.click(screen.getByRole('button', { name: 'Remove line 1' }))
   expect(summary('Lines')).toHaveTextContent('1')
-  expect(summary('Subtotal')).toHaveTextContent('₱4,850.00')
+  await quoted('Subtotal', '₱4,850.00')
 })
 
 test('a blank or zero quantity counts as nothing', async () => {
@@ -84,9 +137,9 @@ test('a blank or zero quantity counts as nothing', async () => {
   await pickItem(user, 1, T1_BAG)
   for (const qty of ['', '0']) {
     await setQty(user, 1, qty)
-    expect(within(lineRow(1)).getAllByText('—')).toHaveLength(1)
+    expect(within(lineRow(1)).getAllByText('—')).toHaveLength(2)
     expect(summary('Lines')).toHaveTextContent('0')
-    expect(summary('Subtotal')).toHaveTextContent('₱0.00')
+    expect(summary('Subtotal')).toHaveTextContent('—')
   }
   expect(document.body).not.toHaveTextContent('NaN')
 })
@@ -96,7 +149,7 @@ test('removing every line leaves an empty, working table', async () => {
   await openForm()
   await user.click(screen.getByRole('button', { name: 'Remove line 1' }))
   expect(summary('Lines')).toHaveTextContent('0')
-  expect(summary('Subtotal')).toHaveTextContent('₱0.00')
+  expect(summary('Subtotal')).toHaveTextContent('—')
   await user.click(screen.getByRole('button', { name: '+ Add line' }))
   expect(screen.getByRole('combobox', { name: 'Item, line 1' })).toBeInTheDocument()
 })
@@ -106,10 +159,11 @@ test('the credit warning shows only when the order total exceeds available credi
   await openForm()
   await pickItem(user, 1, T1_BAG)
   await setQty(user, 1, '10')
+  await quoted('Order total', '₱2,450.00')
   expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
   await pickItem(user, 1, T2_BULK)
   await setQty(user, 1, '100')
-  expect(summary('Order total')).toHaveTextContent('₱485,000.00')
+  await quoted('Order total', '₱485,000.00')
   expect(screen.getByText(WARNING)).toBeInTheDocument()
 })
 
@@ -131,7 +185,7 @@ test("credit standing is BC's figures, and the warning compares against BC's ava
   expect(summary('Available credit')).toHaveTextContent('₱2,000.00')
   await pickItem(user, 1, T1_BAG)
   await setQty(user, 1, '10')
-  expect(screen.getByText(WARNING)).toBeInTheDocument()
+  expect(await screen.findByText(WARNING)).toBeInTheDocument()
 })
 
 test('credit BC could not give shows dashes and never the warning', async () => {
@@ -144,6 +198,7 @@ test('credit BC could not give shows dashes and never the warning', async () => 
   expect(summary('Available credit')).toHaveTextContent('—')
   await pickItem(user, 1, T2_BULK)
   await setQty(user, 1, '100')
+  await quoted('Order total', '₱485,000.00')
   expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
 })
 
@@ -164,7 +219,7 @@ test.each([
   await waitFor(() => expect(vi.mocked(serverLogic).mock.calls.some(([name]) => name === 'sites')).toBe(true))
   expect(screen.getByRole('combobox', { name: 'Delivery site' })).toBeDisabled()
   await pickItem(user, 1, T1_BAG)
-  expect(summary('Subtotal')).toHaveTextContent('₱245.00')
+  await quoted('Subtotal', '₱245.00')
 })
 
 test('Blanket Order and Submit for approval are disabled', async () => {
@@ -198,16 +253,28 @@ test('the page title is set', async () => {
 // S3-08 Delivery & fulfillment (wireframe row 42: Pick up hides the five receiving fields, Delivery hides Pick up date).
 const RECEIVING = ['Receiving person', 'Receiving contact number', 'Receiving email', 'Requested delivery date', 'Receiving time window']
 
-test('Delivery shows the receiving fields and hides Pick up date; freight follows', async () => {
+test('Delivery shows the receiving fields and hides Pick up date', async () => {
   const user = userEvent.setup()
   await openForm()
   expect(screen.getByLabelText('Pick up date')).toBeVisible()
   for (const label of RECEIVING) expect(screen.getByLabelText(label)).not.toBeVisible()
-  expect(summary('Transport / Freight')).toHaveTextContent('₱0.00')
   await user.click(screen.getByRole('radio', { name: 'Delivery' }))
   for (const label of RECEIVING) expect(screen.getByLabelText(label)).toBeVisible()
   expect(screen.getByLabelText('Pick up date')).not.toBeVisible()
-  expect(summary('Transport / Freight')).toHaveTextContent('₱3,500.00')
+})
+
+// BC Dev 2026-10-23: delivery changes the price and adds freight and fuel per unit; the quote sends the delivery site.
+test('switching to Delivery re-quotes with the delivery site; freight and other charges follow', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  await quoted('Transport / Freight', '₱0.00')
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  await quoted('Transport / Freight', '₱100.00')
+  expect(summary('Other charges')).toHaveTextContent('₱50.00')
+  expect(summary('Order total')).toHaveTextContent('₱2,600.00')
+  expect(quoteCalls().at(-1)?.[1]?.body).toMatchObject({ shipmentMethod: 'delivery', site: 'PLANT1' })
 })
 
 test('fields hidden by the toggle keep their values', async () => {
@@ -251,21 +318,6 @@ test('Source lists the plants with the wireframe note', async () => {
   await openForm()
   expect(screen.getByRole('combobox', { name: 'Source' })).toHaveTextContent('PLANT1 — Plant 1 — Main Yard')
   expect(screen.getByText('Choose your preferred source plant.')).toBeInTheDocument()
-})
-
-// 2026-10-23: BC's portal items have no price until the quote endpoint (S3-06): every amount is "—", never ₱0, and no warning.
-test('BC items without a price show dashes for every amount and never the credit warning', async () => {
-  const user = userEvent.setup()
-  answer('portal-items', [{ code: '100014', description: 'APO PORTLAND TERNARY T1T 40 KGS', uom: 'BAG/40', unitPrice: null }])
-  await openForm()
-  await pickItem(user, 1, '100014 — APO PORTLAND TERNARY T1T 40 KGS')
-  await setQty(user, 1, '100000')
-  const row = lineRow(1)
-  expect(within(row).getByText('BAG/40')).toBeInTheDocument()
-  expect(within(row).getAllByText('—')).toHaveLength(2)
-  expect(summary('Lines')).toHaveTextContent('1')
-  for (const label of ['Subtotal', 'Transport / Freight', 'Other charges', 'Order total']) expect(summary(label)).toHaveTextContent('—')
-  expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
 })
 
 // 2026-10-23: Source lists BC's plants (mcrmSourcePlants) while the rest of order-options is still sample.

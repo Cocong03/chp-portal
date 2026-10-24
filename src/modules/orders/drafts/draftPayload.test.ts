@@ -1,8 +1,8 @@
 import type { DraftPayload, SiteDto } from '@/api/types'
 import { mocks } from '@/mocks'
 import { ORDER_OPTIONS_SAMPLE as options } from '@/mocks/orderOptions'
-import { newOrderDefaults, type NewOrderForm } from '../new/form'
-import { estTotal, fromDraft, toPayload } from './draftPayload'
+import { newOrderDefaults, quoteRequest, type NewOrderForm } from '../new/form'
+import { fromDraft, toPayload } from './draftPayload'
 
 const sites = mocks.sites!({ method: 'GET' }) as SiteDto[]
 
@@ -59,20 +59,26 @@ test('no saved lines gives one empty line', () => {
   expect(fromDraft(payload({ lines: [] }), options, sites).lines).toEqual([{ code: '', qty: 1 }])
 })
 
-test('estTotal = current prices × qty + freight for the shipment method + other charges', () => {
-  const lines = [{ code: 'CEM-T1-40KG', qty: 10 }]
-  expect(estTotal(payload({ lines, shipmentMethod: 'pickup' }), options)).toBe(2450)
-  expect(estTotal(payload({ lines, shipmentMethod: 'delivery' }), options)).toBe(2450 + 3500)
-  expect(estTotal(payload({ lines, shipmentMethod: 'pickup' }), { ...options, otherCharges: 100 })).toBe(2550)
+test('quoteRequest: the chosen lines in the sales unit, with the site only for delivery', () => {
+  expect(quoteRequest(saved, options.items)).toEqual({
+    request: { shipmentMethod: 'delivery', source: 'PLANT3', site: 'PLANT2', lines: [{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10 }, { code: 'CEM-T2-BULK', uom: 'MT', qty: 2 }] },
+    indexes: [0, 1],
+  })
+  expect(quoteRequest({ ...saved, shipmentMethod: 'pickup' }, options.items).request?.site).toBe('')
 })
 
-test('estTotal skips lines whose item no longer exists', () => {
-  expect(estTotal(payload({ lines: [{ code: 'CEM-T1-40KG', qty: 10 }, { code: 'GONE', qty: 3 }], shipmentMethod: 'pickup' }), options)).toBe(2450)
+test('quoteRequest skips lines without a known item or a qty above 0, keeping the form indexes', () => {
+  const lines = [{ code: 'GONE', qty: 3 }, { code: 'CEM-T1-40KG', qty: 0 }, { code: '', qty: 2 }, { code: 'CEM-T1-40KG', qty: 4 }]
+  const { request, indexes } = quoteRequest({ ...saved, lines }, options.items)
+  expect(indexes).toEqual([3])
+  expect(request?.lines).toEqual([{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 4 }])
 })
 
-test('estTotal is null while a chosen item has no price yet (BC items before the quote, S3-06)', () => {
-  const unpriced = { ...options, items: [...options.items, { code: '100014', description: 'APO', uom: 'BAG/40', unitPrice: null }] }
-  expect(estTotal(payload({ lines: [{ code: '100014', qty: 5 }], shipmentMethod: 'pickup' }), unpriced)).toBeNull()
+test('quoteRequest has nothing to price without a chosen line, a source, or a site for delivery', () => {
+  expect(quoteRequest({ ...saved, lines: [] }, options.items).request).toBeNull()
+  expect(quoteRequest({ ...saved, source: '' }, options.items).request).toBeNull()
+  expect(quoteRequest({ ...saved, site: '' }, options.items)).toEqual({ request: null, indexes: [0, 1] })
+  expect(quoteRequest({ ...saved, site: '', shipmentMethod: 'pickup' }, options.items).request).not.toBeNull()
 })
 
 test('toPayload wraps the form with version 1 and its orderType', () => {
