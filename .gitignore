@@ -39,6 +39,11 @@ coverage
 
 .playwright-mcp/
 
+# Playwright: saved session cookies (never commit), results and report
+e2e/.auth/
+e2e/results/
+e2e/report/
+
 # OS
 .DS_Store
 Thumbs.db
