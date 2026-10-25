@@ -94,6 +94,50 @@ test('while a new quote is on its way the old prices are never shown', async () 
   await quoted('Order total', '₱4,900.00')
 })
 
+/** Holds every order-quote answer until release() is called; other endpoints answer as usual. */
+function holdQuotes() {
+  let release = () => {}
+  const gate = new Promise<void>((resolve) => (release = resolve))
+  vi.mocked(serverLogic).mockImplementation(async (name, options) => {
+    if (name === 'order-quote') await gate
+    return actualServerLogic(name, options)
+  })
+  return () => release()
+}
+
+test("adding a line keeps the other lines' prices while BC re-quotes; only the new line and the totals wait", async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  await quoted('Order total', '₱2,450.00')
+  const release = holdQuotes()
+  await user.click(screen.getByRole('button', { name: '+ Add line' }))
+  await pickItem(user, 2, T2_BULK)
+  await waitFor(() => expect(quoteCalls().at(-1)?.[1]?.body).toMatchObject({ lines: [{ qty: 10 }, { qty: 1 }] }))
+  expect(within(lineRow(1)).getByText('₱245.00')).toBeInTheDocument()
+  expect(within(lineRow(1)).getByText('₱2,450.00')).toBeInTheDocument()
+  expect(within(lineRow(2)).queryByText('₱4,850.00')).not.toBeInTheDocument()
+  expect(summary('Order total')).not.toHaveTextContent('₱')
+  release()
+  await quoted('Order total', '₱7,300.00')
+  expect(within(lineRow(2)).getAllByText('₱4,850.00')).toHaveLength(2)
+})
+
+test('changing the shipment method hides every price until BC answers', async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await pickItem(user, 1, T1_BAG)
+  await setQty(user, 1, '10')
+  await quoted('Order total', '₱2,450.00')
+  const release = holdQuotes()
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  await waitFor(() => expect(quoteCalls().at(-1)?.[1]?.body).toMatchObject({ shipmentMethod: 'delivery' }))
+  expect(within(lineRow(1)).queryByText('₱245.00')).not.toBeInTheDocument()
+  release()
+  await quoted('Order total', '₱2,600.00')
+})
+
 test("BC's message for a line is shown under it", async () => {
   const user = userEvent.setup()
   const line = { unitPrice: 245, lineAmount: 2450, freight: 0, otherCharges: 0, total: 2450, message: 'Price valid until Oct 31.' }
@@ -222,7 +266,7 @@ test.each([
   await quoted('Subtotal', '₱245.00')
 })
 
-test('Blanket Order and Submit for approval are disabled', async () => {
+test('Blanket Order and Submit for approval are disabled, with no "Available soon" tooltip', async () => {
   const user = userEvent.setup()
   await openForm()
   expect(screen.getByRole('radio', { name: 'Single Order' })).toHaveAttribute('aria-checked', 'true')
@@ -232,7 +276,8 @@ test('Blanket Order and Submit for approval are disabled', async () => {
   const submit = screen.getByRole('button', { name: 'Submit for approval' })
   expect(submit).toBeDisabled()
   await user.hover(submit.parentElement!)
-  expect((await screen.findAllByText('Available soon.')).length).toBeGreaterThan(0)
+  await new Promise((resolve) => setTimeout(resolve, 800))
+  expect(screen.queryByText('Available soon.')).not.toBeInTheDocument()
 })
 
 test('a failed options load shows Try again', async () => {

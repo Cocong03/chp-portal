@@ -11,7 +11,6 @@ import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/ui/tooltip'
 import type { NewOrderForm } from './form'
 import type { OrderQuote } from './useOrderQuote'
 
@@ -21,22 +20,6 @@ function Row({ label, value, total }: { label: string; value: ReactNode; total?:
       <span>{label}</span>
       <span className="font-mono tabular-nums">{value}</span>
     </div>
-  )
-}
-
-/** Disabled until Submit (S3-10). A disabled button gets no hover, so the tooltip sits on a wrapper. */
-function Soon({ children }: { children: string }) {
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span tabIndex={0} className="flex-1">
-          <Button type="button" disabled className="w-full">
-            {children}
-          </Button>
-        </span>
-      </TooltipTrigger>
-      <TooltipContent>Available soon.</TooltipContent>
-    </Tooltip>
   )
 }
 
@@ -118,14 +101,15 @@ export function SummaryCards({
             ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.
           </p>
         )}
-        <TooltipProvider>
-          <div className="mt-4 flex gap-2.5">
-            <Button type="button" variant="outline" className="flex-1" onClick={onSaveDraft} disabled={saving}>
-              {saving ? 'Saving…' : 'Save as draft'}
-            </Button>
-            <Soon>Submit for approval</Soon>
-          </div>
-        </TooltipProvider>
+        <div className="mt-4 flex gap-2.5">
+          <Button type="button" variant="outline" className="flex-1" onClick={onSaveDraft} disabled={saving}>
+            {saving ? 'Saving…' : 'Save as draft'}
+          </Button>
+          {/* Disabled until Submit (S3-10). */}
+          <Button type="button" disabled className="flex-1">
+            Submit for approval
+          </Button>
+        </div>
       </SectionCard>
     </>
   )
