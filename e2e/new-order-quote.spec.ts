@@ -1,63 +1,12 @@
-import { expect, test, type Page, type Response } from '@playwright/test'
-import type { OrderQuoteDto, OrderQuoteRequest } from '../src/api/types'
+import { expect, test } from '@playwright/test'
 import { peso } from '../src/lib/format'
+import { ITEM, ITEM_2, PRICED_SOURCE, WARNING, expectSummary, lineRow, oneLine, openNewOrder, pickItem, pickSource, qty, quoteAfter, row, setLine } from './newOrder'
 
-// S3-06 New Order prices from BC's quote (and S3-10 Submit, opt-in), on the deployed Dev site. Prices are BC Dev's live data, so every amount is
-// checked against the quote BC answered in the same test, never a fixed number.
-const ITEM = process.env.E2E_ITEM ?? '100016'
-// Must share ITEM's unit of measure: an order takes one UOM (2026-10-26).
-const ITEM_2 = process.env.E2E_ITEM_2 ?? '100025'
-// A plant with Custom Sales Prices for ITEM at the customer's delivery site (BC Dev 2026-10-25: CAVITE has none).
-const PRICED_SOURCE = process.env.E2E_SOURCE ?? 'SOLID'
-const WARNING = '⚠ This order exceeds your available credit. You may still submit it for review by our credit team.'
-
-const isQuote = (response: Response) => response.url().includes('/_api/serverlogics/order-quote') && response.request().method() === 'POST'
-
-type Sent = OrderQuoteRequest & Record<string, unknown>
-
-/** Runs `action` and returns the order-quote it triggers (the first one whose request passes `match`): what was sent and BC's answer. */
-async function quoteAfter(page: Page, action: () => Promise<unknown>, match: (sent: Sent) => boolean = () => true) {
-  const wanted = (response: Response) => isQuote(response) && match(response.request().postDataJSON() as Sent)
-  const [response] = await Promise.all([page.waitForResponse(wanted), action()])
-  const request = response.request().postDataJSON() as Sent
-  const envelope = (await response.json().catch(() => ({}))) as { data?: unknown; Data?: unknown }
-  const raw = envelope.data ?? envelope.Data
-  const quote = (typeof raw === 'string' ? JSON.parse(raw) : raw) as OrderQuoteDto | undefined
-  return { response, request, quote }
-}
-
-const row = (page: Page, label: string) => page.getByText(label, { exact: true }).locator('..')
-const lineRow = (page: Page, n: number) => page.getByRole('table', { name: 'Order lines' }).getByRole('row').nth(n)
-const qty = (page: Page, n: number) => page.getByRole('spinbutton', { name: `Quantity, line ${n}` })
-
-async function pickItem(page: Page, n: number, code: string) {
-  await page.getByRole('combobox', { name: `Item, line ${n}` }).click()
-  await page.getByRole('option', { name: new RegExp(`^${code} — `) }).click()
-}
-
-async function pickSource(page: Page, code: string) {
-  await page.getByRole('combobox', { name: 'Source' }).click()
-  await page.getByRole('option', { name: new RegExp(`^${code} — `) }).click()
-}
-
-/** Line n = `code` × `amount`, waiting for its quote. Qty first: a line without an item is never quoted. */
-async function setLine(page: Page, n: number, code: string, amount: string) {
-  await qty(page, n).fill(amount)
-  return quoteAfter(page, () => pickItem(page, n, code), (sent) => sent.lines.length === n && sent.lines[n - 1].code === code)
-}
-const oneLine = (page: Page, code = ITEM, amount = '10') => setLine(page, 1, code, amount)
-
-async function expectSummary(page: Page, quote: OrderQuoteDto) {
-  await expect(row(page, 'Subtotal')).toContainText(peso(quote.subtotal))
-  await expect(row(page, 'Transport / Freight')).toContainText(peso(quote.freight))
-  await expect(row(page, 'Other charges')).toContainText(peso(quote.otherCharges))
-  await expect(row(page, 'Order total')).toContainText(peso(quote.total))
-}
+// S3-06 New Order prices from BC's quote, on the deployed Dev site. Prices are BC Dev's live data, so every amount is
+// checked against the quote BC answered in the same test, never a fixed number. Submit is in order-journey.spec.ts.
 
 test.beforeEach(async ({ page }) => {
-  await page.goto('/orders/new')
-  await expect(page.getByRole('table', { name: 'Order lines' })).toBeVisible()
-  await expect(page.getByRole('radio', { name: 'Pick up' })).toHaveAttribute('aria-checked', 'true')
+  await openNewOrder(page)
 })
 
 test("pick up: the line and summary show BC's quote", async ({ page }) => {
@@ -185,21 +134,4 @@ test("a saved draft's Est. total matches the Order total", async ({ page }) => {
     await page.getByRole('button', { name: 'Delete draft' }).click()
     await expect(draft).toHaveCount(0)
   }
-})
-
-// S3-10 Submit. Creates a real Open Sales Order in BC Dev, so it runs only with E2E_SUBMIT=1; delete the order in BC after.
-test('Submit creates the BC sales order and opens Orders with its number', async ({ page }) => {
-  test.skip(process.env.E2E_SUBMIT !== '1', 'creates a BC Dev order: set E2E_SUBMIT=1 to run')
-  await pickSource(page, PRICED_SOURCE)
-  await oneLine(page, ITEM, '10')
-  await page.getByLabel('Your PO reference (optional)').fill(`E2E-${Date.now()}`)
-  await page.getByRole('button', { name: 'Submit for approval' }).click()
-  const [response] = await Promise.all([
-    page.waitForResponse((each) => each.url().includes('/_api/serverlogics/orders') && each.request().method() === 'POST'),
-    page.getByRole('dialog', { name: 'Submit this order?' }).getByRole('button', { name: 'Submit order' }).click(),
-  ])
-  expect(response.request().postDataJSON()).toMatchObject({ paymentMethod: 'cash', source: PRICED_SOURCE, lines: [{ code: ITEM, qty: 10 }] })
-  const note = page.getByText(/^SOR\d+ was submitted\.$/)
-  await expect(note).toBeVisible({ timeout: 30_000 })
-  test.info().annotations.push({ type: 'BC order', description: (await note.textContent())! })
 })
