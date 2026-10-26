@@ -30,6 +30,7 @@ function answer(name: string, value: unknown) {
 
 const T1_BAG = 'CEM-T1-40KG — Portland Cement Type I — 40kg Bag'
 const T2_BULK = 'CEM-T2-BULK — Portland Cement Type II — Bulk'
+const T1_BULK = 'CEM-T1-BULK — Portland Cement Type I — Bulk'
 const WARNING = '⚠ This order exceeds your available credit. You may still submit it for review by our credit team.'
 
 async function openForm() {
@@ -108,19 +109,19 @@ function holdQuotes() {
 test("adding a line keeps the other lines' prices while BC re-quotes; only the new line and the totals wait", async () => {
   const user = userEvent.setup()
   await openForm()
-  await pickItem(user, 1, T1_BAG)
+  await pickItem(user, 1, T1_BULK)
   await setQty(user, 1, '10')
-  await quoted('Order total', '₱2,450.00')
+  await quoted('Order total', '₱47,000.00')
   const release = holdQuotes()
   await user.click(screen.getByRole('button', { name: '+ Add line' }))
   await pickItem(user, 2, T2_BULK)
   await waitFor(() => expect(quoteCalls().at(-1)?.[1]?.body).toMatchObject({ lines: [{ qty: 10 }, { qty: 1 }] }))
-  expect(within(lineRow(1)).getByText('₱245.00')).toBeInTheDocument()
-  expect(within(lineRow(1)).getByText('₱2,450.00')).toBeInTheDocument()
+  expect(within(lineRow(1)).getByText('₱4,700.00')).toBeInTheDocument()
+  expect(within(lineRow(1)).getByText('₱47,000.00')).toBeInTheDocument()
   expect(within(lineRow(2)).queryByText('₱4,850.00')).not.toBeInTheDocument()
   expect(summary('Order total')).not.toHaveTextContent('₱')
   release()
-  await quoted('Order total', '₱7,300.00')
+  await quoted('Order total', '₱51,850.00')
   expect(within(lineRow(2)).getAllByText('₱4,850.00')).toHaveLength(2)
 })
 
@@ -166,13 +167,27 @@ test('a failed quote shows dashes, Try again, and never the credit warning', asy
 test('+ Add line and ✕ change the Lines count', async () => {
   const user = userEvent.setup()
   await openForm()
-  await pickItem(user, 1, T1_BAG)
+  await pickItem(user, 1, T1_BULK)
   await user.click(screen.getByRole('button', { name: '+ Add line' }))
   await pickItem(user, 2, T2_BULK)
   expect(summary('Lines')).toHaveTextContent('2')
   await user.click(screen.getByRole('button', { name: 'Remove line 1' }))
   expect(summary('Lines')).toHaveTextContent('1')
   await quoted('Subtotal', '₱4,850.00')
+})
+
+// One unit of measure per order (2026-10-26): once a line has an item, the others offer only items in its UOM.
+test("other lines offer only items in the order's unit of measure", async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await pickItem(user, 1, T2_BULK)
+  await user.click(screen.getByRole('button', { name: '+ Add line' }))
+  await user.click(screen.getByRole('combobox', { name: 'Item, line 2' }))
+  expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual([T2_BULK, T1_BULK])
+  await user.keyboard('{Escape}')
+  await user.click(screen.getByRole('button', { name: 'Remove line 1' }))
+  await user.click(screen.getByRole('combobox', { name: 'Item, line 1' }))
+  expect(await screen.findAllByRole('option')).toHaveLength(4)
 })
 
 test('a blank or zero quantity counts as nothing', async () => {
@@ -578,6 +593,10 @@ describe('submit (S3-10)', () => {
   })
 
   const submit = () => screen.getByRole('button', { name: 'Submit for approval' })
+  async function confirmSubmit(user: UserEvent) {
+    await user.click(submit())
+    await user.click(await screen.findByRole('button', { name: 'Submit order' }))
+  }
   const orderPosts = () => vi.mocked(serverLogic).mock.calls.filter(([name, options]) => name === 'orders' && options?.method === 'POST')
   function openSection(route = '/orders/new') {
     renderApp(
@@ -605,7 +624,7 @@ describe('submit (S3-10)', () => {
     await setQty(user, 1, '10')
     await user.type(screen.getByLabelText('Your PO reference (optional)'), 'PO-8915')
     await quoted('Order total', '₱2,450.00')
-    await user.click(submit())
+    await confirmSubmit(user)
     expect(await screen.findByText('SO-100500 was submitted.')).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Orders' })).toHaveAttribute('aria-current', 'page')
     expect(orderPosts()).toHaveLength(1)
@@ -614,6 +633,36 @@ describe('submit (S3-10)', () => {
       poRef: 'PO-8915', pickupDate: '', requestedDate: '', receivingPerson: '', receivingContact: '', receivingEmail: '', timeWindow: 'DAY',
       instructions: 'Loading type: Loose pile. Call before delivery: No.',
     })
+  })
+
+  test('Submit asks first, with the order total; Cancel sends nothing', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    await quoted('Order total', '₱2,450.00')
+    await user.click(submit())
+    const dialog = await screen.findByRole('dialog', { name: 'Submit this order?' })
+    expect(dialog).toHaveTextContent('₱2,450.00')
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(orderPosts()).toEqual([])
+  })
+
+  test('while BC creates the order, a spinner says so', async () => {
+    const user = userEvent.setup()
+    let release = () => {}
+    vi.mocked(serverLogic).mockImplementation(async (name, options) => {
+      if (name === 'orders' && options?.method === 'POST') await new Promise<void>((resolve) => (release = resolve))
+      return actualServerLogic(name, options)
+    })
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await quoted('Order total', '₱245.00')
+    await confirmSubmit(user)
+    expect(await screen.findByText('Submitting your order…')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Submitting…' })).toBeDisabled()
+    release()
   })
 
   test("a line BC can't price keeps Submit disabled", async () => {
@@ -636,7 +685,7 @@ describe('submit (S3-10)', () => {
     await pickItem(user, 1, T1_BAG)
     await setQty(user, 1, '10')
     await quoted('Order total', '₱2,450.00')
-    await user.click(submit())
+    await confirmSubmit(user)
     await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message))
     expect(screen.getByRole('spinbutton', { name: 'Quantity, line 1' })).toHaveValue(10)
   })
@@ -658,7 +707,7 @@ describe('submit (S3-10)', () => {
     openSection(`/orders/new?draft=${SEED_ID}`)
     await screen.findByText(/Continuing Draft #1/)
     await quoted('Order total', '₱2,600.00')
-    await user.click(submit())
+    await confirmSubmit(user)
     expect(await screen.findByText('SO-100500 was submitted.')).toBeInTheDocument()
     await waitFor(() => expect(draftsMock({ method: 'GET' })).toEqual([]))
     expect(orderPosts()[0][1]!.body).toMatchObject({ shipmentMethod: 'delivery', site: 'PLANT2', timeWindow: 'DAY' })

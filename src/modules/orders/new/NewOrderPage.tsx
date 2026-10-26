@@ -1,16 +1,19 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { format } from 'date-fns'
+import { LoaderCircle } from 'lucide-react'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
 import { serverLogic } from '@/api/serverLogic'
 import type { DraftDto, OrderOptionsDto, OrderSubmitDto, OrderSubmitRequest, SiteDto } from '@/api/types'
-import { formatDate } from '@/lib/format'
+import { formatDate, peso } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { fromDraft, toPayload } from '@/modules/orders/drafts/draftPayload'
 import { saveDraft, useDeleteDraft, useDraft } from '@/modules/orders/drafts/useDrafts'
 import { useSites } from '@/modules/sites/useSites'
+import { Button } from '@/ui/button'
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog'
 import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { Skeleton } from '@/ui/skeleton'
@@ -141,20 +144,33 @@ function OrderForm({
     },
     onError: () => toast.error("We couldn't submit this order. Please try again."),
   })
+  // The order waiting for the customer's confirmation.
+  const [confirming, setConfirming] = useState<OrderSubmitRequest | null>(null)
   function onSubmit() {
     const values = form.getValues()
     const problem = submitProblem(values, format(new Date(), 'yyyy-MM-dd'))
     const body = submitRequest(values, options.items)
     if (problem) toast.error(problem)
-    else if (body) submit.mutate(body)
+    else if (body) setConfirming(body)
+  }
+  function confirmSubmit() {
+    if (confirming) submit.mutate(confirming)
+    setConfirming(null)
   }
 
   return (
     <FormProvider {...form}>
-      {note && (
-        <p role="status" className="mb-3.5 text-[12.5px] text-accent-foreground">
-          {note}
+      {submit.isPending ? (
+        <p role="status" className="mb-3.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-accent-foreground">
+          <LoaderCircle aria-hidden className="size-3.5 animate-spin" />
+          Submitting your order…
         </p>
+      ) : (
+        note && (
+          <p role="status" className="mb-3.5 text-[12.5px] text-accent-foreground">
+            {note}
+          </p>
+        )
       )}
       <form onSubmit={(event) => event.preventDefault()} className="grid items-start gap-x-5 lg:grid-cols-[1fr_340px]">
         <div>
@@ -172,6 +188,22 @@ function OrderForm({
           />
         </div>
       </form>
+      <Dialog open={confirming !== null} onOpenChange={(open) => !open && setConfirming(null)}>
+        <DialogContent className="sm:max-w-[420px]">
+          <DialogHeader className="text-left">
+            <DialogTitle>Submit this order?</DialogTitle>
+            <DialogDescription>
+              Order total: {quote.quote ? peso(quote.quote.total) : '—'}. Please check your order lines and delivery details before you submit.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setConfirming(null)}>
+              Cancel
+            </Button>
+            <Button onClick={confirmSubmit}>Submit order</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </FormProvider>
   )
 }

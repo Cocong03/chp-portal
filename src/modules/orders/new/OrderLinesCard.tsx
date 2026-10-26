@@ -48,6 +48,9 @@ export function OrderLinesCard({ options, quote }: { options: OrderOptionsDto; q
               const line = lines[index] ?? field
               const item = options.items.find((each) => each.code === line.code)
               const priced = quote.line(index)
+              // One unit of measure per order (decided 2026-10-26): the other lines' UOM limits this line's items.
+              const orderUom = lines.map((each, at) => (at === index ? undefined : options.items.find((one) => one.code === each.code)?.uom)).find(Boolean)
+              const choices = orderUom ? options.items.filter((each) => each.uom === orderUom || each.code === line.code) : options.items
               return (
                 <tr key={field.id} className="border-t">
                   <td className="py-2 pr-2">
@@ -60,7 +63,7 @@ export function OrderLinesCard({ options, quote }: { options: OrderOptionsDto; q
                             <SelectValue placeholder="Select item…" />
                           </SelectTrigger>
                           <SelectContent>
-                            {options.items.map((each) => (
+                            {choices.map((each) => (
                               <SelectItem key={each.code} value={each.code}>
                                 {each.code} — {each.description}
                               </SelectItem>

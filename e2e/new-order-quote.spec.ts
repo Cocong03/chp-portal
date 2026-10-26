@@ -5,6 +5,7 @@ import { peso } from '../src/lib/format'
 // S3-06 New Order prices from BC's quote (and S3-10 Submit, opt-in), on the deployed Dev site. Prices are BC Dev's live data, so every amount is
 // checked against the quote BC answered in the same test, never a fixed number.
 const ITEM = process.env.E2E_ITEM ?? '100016'
+// Must share ITEM's unit of measure: an order takes one UOM (2026-10-26).
 const ITEM_2 = process.env.E2E_ITEM_2 ?? '100025'
 // A plant with Custom Sales Prices for ITEM at the customer's delivery site (BC Dev 2026-10-25: CAVITE has none).
 const PRICED_SOURCE = process.env.E2E_SOURCE ?? 'SOLID'
@@ -192,9 +193,10 @@ test('Submit creates the BC sales order and opens Orders with its number', async
   await pickSource(page, PRICED_SOURCE)
   await oneLine(page, ITEM, '10')
   await page.getByLabel('Your PO reference (optional)').fill(`E2E-${Date.now()}`)
+  await page.getByRole('button', { name: 'Submit for approval' }).click()
   const [response] = await Promise.all([
     page.waitForResponse((each) => each.url().includes('/_api/serverlogics/orders') && each.request().method() === 'POST'),
-    page.getByRole('button', { name: 'Submit for approval' }).click(),
+    page.getByRole('dialog', { name: 'Submit this order?' }).getByRole('button', { name: 'Submit order' }).click(),
   ])
   expect(response.request().postDataJSON()).toMatchObject({ paymentMethod: 'cash', source: PRICED_SOURCE, lines: [{ code: ITEM, qty: 10 }] })
   const note = page.getByText(/^SOR\d+ was submitted\.$/)

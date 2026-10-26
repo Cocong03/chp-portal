@@ -1,6 +1,6 @@
 import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
-import { Download } from "lucide-react";
+import { Download, LoaderCircle } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
 import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
@@ -174,8 +174,10 @@ export function OrdersPage() {
         </Button>
       </PageHeader>
       {submitted && (
-        <p role="status" className="mb-3.5 text-[12.5px] font-semibold text-success">
+        <p role="status" className="mb-3.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-success">
           {submitted} was submitted.
+          {/* The list is reloading from BC to show it. */}
+          {orders.isFetching && <LoaderCircle aria-label="Updating your orders" className="size-3.5 animate-spin" />}
         </p>
       )}
       <SectionCard title="Orders">
