@@ -23,7 +23,7 @@ function Field({ id, label, hidden, wide, children }: { id: string; label: strin
 }
 
 /** One select bound to a form field. */
-function Choice({ id, name, items, onPicked }: { id: string; name: 'source' | 'timeWindow' | 'loadingType' | 'paymentMethod'; items: { value: string; label: string }[]; onPicked?: () => void }) {
+function Choice({ id, name, items, onPicked }: { id: string; name: 'source' | 'timeWindow' | 'loadingType' | 'paymentMethod'; items: { value: string; label: string; disabled?: boolean }[]; onPicked?: () => void }) {
   const { control } = useFormContext<NewOrderForm>()
   return (
     <Controller
@@ -42,7 +42,7 @@ function Choice({ id, name, items, onPicked }: { id: string; name: 'source' | 't
           </SelectTrigger>
           <SelectContent>
             {items.map((item) => (
-              <SelectItem key={item.value} value={item.value}>
+              <SelectItem key={item.value} value={item.value} disabled={item.disabled}>
                 {item.label}
               </SelectItem>
             ))}
@@ -91,19 +91,20 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
           <Controller control={control} name="pickupDate" render={({ field }) => <DateField id="pickup-date" value={field.value} onChange={field.onChange} />} />
         </Field>
         <Field id="recv-person" label="Receiving person" hidden={pickup}>
-          <Input id="recv-person" placeholder="Name" {...register('receivingPerson')} />
+          <Input id="recv-person" placeholder="Name" maxLength={100} {...register('receivingPerson')} />
         </Field>
         <Field id="recv-contact" label="Receiving contact number" hidden={pickup}>
-          <Input id="recv-contact" placeholder="e.g. 0917 123 4567" {...register('receivingContact')} />
+          <Input id="recv-contact" placeholder="e.g. 0917 123 4567" maxLength={30} {...register('receivingContact')} />
         </Field>
         <Field id="recv-email" label="Receiving email" hidden={pickup}>
-          <Input id="recv-email" type="email" placeholder="e.g. logistics@customer.com" {...register('receivingEmail')} />
+          {/* ponytail: BC's field holds 30 characters for now (decided 2026-10-26); 80 when BC widens it. */}
+          <Input id="recv-email" type="email" placeholder="e.g. logistics@customer.com" maxLength={30} {...register('receivingEmail')} />
         </Field>
         <Field id="req-date" label="Requested delivery date" hidden={pickup}>
           <Controller control={control} name="requestedDate" render={({ field }) => <DateField id="req-date" value={field.value} onChange={field.onChange} />} />
         </Field>
         <Field id="time-window" label="Receiving time window" hidden={pickup}>
-          <Choice id="time-window" name="timeWindow" items={asItems(TIME_WINDOWS)} />
+          <Choice id="time-window" name="timeWindow" items={TIME_WINDOWS} />
         </Field>
         <Field id="loading-type" label="Loading type">
           <Choice id="loading-type" name="loadingType" items={asItems(LOADING_TYPES)} onPicked={syncInstructions} />
@@ -118,7 +119,8 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
             name="paymentMethod"
             items={[
               { value: 'cash', label: 'Cash' },
-              { value: 'credit', label: 'Credit' },
+              // Phase 2 (decided 2026-10-26).
+              { value: 'credit', label: 'Credit', disabled: true },
             ]}
           />
         </Field>
@@ -135,6 +137,7 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
           <textarea
             id="special-instructions"
             rows={3}
+            maxLength={2048}
             placeholder="Add anything else after the line above — e.g. narrow access road, use side gate, contact guard on arrival"
             className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm shadow-xs outline-none placeholder:text-muted-foreground focus-visible:border-ring focus-visible:ring-[3px] focus-visible:ring-ring/50"
             {...register('instructions', { onBlur: syncInstructions })}

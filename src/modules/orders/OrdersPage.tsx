@@ -2,7 +2,7 @@ import { format, parseISO } from "date-fns";
 import { useQueryClient } from "@tanstack/react-query";
 import { Download } from "lucide-react";
 import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { Link, useLocation, useSearchParams } from "react-router-dom";
 import { toast } from "sonner";
 import { serverLogic } from "@/api/serverLogic";
 import type { OrderSummaryDto, OrdersPageDto, SiteDto } from "@/api/types";
@@ -112,6 +112,8 @@ export function OrdersPage() {
   const [viewing, setViewing] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
+  // Set by New Order after Submit (S3-10).
+  const submitted = (useLocation().state as { submitted?: string } | null)?.submitted;
 
   // S3-14: every order matching the filters (all=true), not just this page.
   async function exportOrders() {
@@ -171,6 +173,11 @@ export function OrdersPage() {
           <Link to="/orders/new">+ New Order</Link>
         </Button>
       </PageHeader>
+      {submitted && (
+        <p role="status" className="mb-3.5 text-[12.5px] font-semibold text-success">
+          {submitted} was submitted.
+        </p>
+      )}
       <SectionCard title="Orders">
         <Toolbar
           onClear={() => {

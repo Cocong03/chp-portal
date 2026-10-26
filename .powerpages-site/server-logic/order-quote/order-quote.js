@@ -186,6 +186,64 @@ async function post() {
         return archived.filter((row) => liveNos.indexOf(row.salesOrderNo) === -1).sort(newestOrderFirst);
     }
 
+    // New Order choices shared by order-quote and the orders POST (S3-06/S3-10): shipment method, source plant, delivery site
+    // ("" for pick up) and 1–50 lines; null when anything is missing or out of range.
+    function orderChoices(body) {
+        var delivery = body.shipmentMethod === "delivery";
+        var lines = Array.isArray(body.lines) ? body.lines : [];
+        var choices = {
+            delivery: delivery,
+            source: requestText(body.source, 20),
+            site: delivery ? requestText(body.site, 20) : "",
+            lines: lines.map((line) => ({
+                code: requestText(line && line.code, 20),
+                uom: requestText(line && line.uom, 10),
+                qty: Number(line && line.qty)
+            }))
+        };
+        var valid = (delivery || body.shipmentMethod === "pickup") && choices.source && choices.site !== null &&
+            lines.length > 0 && lines.length <= 50 &&
+            choices.lines.every((line) => line.code && line.uom && Number.isFinite(line.qty) && line.qty > 0 && line.qty <= 1000000);
+        return valid ? choices : null;
+    }
+
+    // A non-empty string of at most max characters, trimmed; null otherwise.
+    function requestText(value, max) {
+        return typeof value === "string" && value.trim() && value.length <= max ? value.trim() : null;
+    }
+
+    // Today's date in the Philippines (UTC+8): the Server Logic clock is UTC.
+    function manilaToday() {
+        return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    }
+
+    function cents(value) {
+        return Math.round(value * 100) / 100;
+    }
+
+    // BC's price for one line (portalPriceQuotes: one line per call, computed in memory, never stored). chargeRateMissing is
+    // left out for now (decided 2026-10-23); message is written for customers.
+    async function quoteLine(scope, choices, line, orderDate) {
+        var row = await bcPost(scope, "portalPriceQuotes", {
+            customerNo: scope.customerNo,
+            itemNo: line.code,
+            sourcePlant: choices.source,
+            shipmentMethodCode: choices.delivery ? "DELIVERY" : "PICKUP",
+            shipToCode: choices.site,
+            unitOfMeasureCode: line.uom,
+            quantity: line.qty,
+            orderDate: orderDate
+        });
+        return {
+            unitPrice: Number(row.unitPrice) || 0,
+            lineAmount: Number(row.lineAmount) || 0,
+            freight: Number(row.freightAmount) || 0,
+            otherCharges: cents((Number(row.fuelSurchargeAmount) || 0) + (Number(row.portChargesAmount) || 0)),
+            total: Number(row.totalAmount) || 0,
+            message: String(row.message || "")
+        };
+    }
+
     // OData string literal with single quotes doubled (architecture rule 4).
     function odataLiteral(value) {
         return "'" + String(value).split("'").join("''") + "'";
@@ -292,70 +350,12 @@ async function post() {
     }
     // #endregion bc-helpers
 
-    var MAX_LINES = 50;
-
-    function text(value, max) {
-        return typeof value === "string" && value.trim() && value.length <= max ? value.trim() : null;
-    }
-
-    // The request's choices, or null when anything is missing or out of range.
     function readRequest() {
         try {
-            var body = typeof Server.Context.Body === "string" ? JSON.parse(Server.Context.Body || "{}") : Server.Context.Body || {};
-            var delivery = body.shipmentMethod === "delivery";
-            var lines = Array.isArray(body.lines) ? body.lines : [];
-            var request = {
-                delivery: delivery,
-                source: text(body.source, 20),
-                site: delivery ? text(body.site, 20) : "",
-                lines: lines.map((line) => ({
-                    code: text(line && line.code, 20),
-                    uom: text(line && line.uom, 10),
-                    qty: Number(line && line.qty)
-                }))
-            };
-            var valid = (delivery || body.shipmentMethod === "pickup") && request.source && request.site !== null &&
-                lines.length > 0 && lines.length <= MAX_LINES &&
-                request.lines.every((line) => line.code && line.uom && Number.isFinite(line.qty) && line.qty > 0 && line.qty <= 1000000);
-            return valid ? request : null;
+            return orderChoices(typeof Server.Context.Body === "string" ? JSON.parse(Server.Context.Body || "{}") : Server.Context.Body || {});
         } catch (err) {
             return null;
         }
-    }
-
-    // Today's date in the Philippines (UTC+8): the Server Logic clock is UTC.
-    function manilaToday() {
-        return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
-    }
-
-    function amount(value) {
-        return Number(value) || 0;
-    }
-
-    function cents(value) {
-        return Math.round(value * 100) / 100;
-    }
-
-    // chargeRateMissing is left out for now (decided 2026-10-23); message is written for customers.
-    async function quoteLine(scope, request, line, orderDate) {
-        var row = await bcPost(scope, "portalPriceQuotes", {
-            customerNo: scope.customerNo,
-            itemNo: line.code,
-            sourcePlant: request.source,
-            shipmentMethodCode: request.delivery ? "DELIVERY" : "PICKUP",
-            shipToCode: request.site,
-            unitOfMeasureCode: line.uom,
-            quantity: line.qty,
-            orderDate: orderDate
-        });
-        return {
-            unitPrice: amount(row.unitPrice),
-            lineAmount: amount(row.lineAmount),
-            freight: amount(row.freightAmount),
-            otherCharges: cents(amount(row.fuelSurchargeAmount) + amount(row.portChargesAmount)),
-            total: amount(row.totalAmount),
-            message: String(row.message || "")
-        };
     }
 
     Server.Logger.Log("order-quote POST called");

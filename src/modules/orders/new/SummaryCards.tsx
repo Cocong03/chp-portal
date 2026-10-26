@@ -23,20 +23,24 @@ function Row({ label, value, total }: { label: string; value: ReactNode; total?:
   )
 }
 
-/** Credit standing (BC's credit overview, via the dashboard endpoint) and Order summary (BC's quote, S3-06). */
+/** Credit standing (BC's credit overview, via the dashboard endpoint), Order summary (BC's quote, S3-06) and Submit (S3-10). */
 export function SummaryCards({
   quote,
   sites,
   onSaveDraft,
   saving,
+  onSubmit,
+  submitting,
 }: {
   quote: OrderQuote
   sites: SiteDto[]
   onSaveDraft: () => void
   saving: boolean
+  onSubmit: () => void
+  submitting: boolean
 }) {
   const { control, register } = useFormContext<NewOrderForm>()
-  const siteCode = useWatch({ control, name: 'site' })
+  const [siteCode, paymentMethod] = useWatch({ control, name: ['site', 'paymentMethod'] })
   // BC's quote only (S3-06): "—" with nothing to price or a failed quote, never a partial or made-up total.
   const priced = quote.quote
   const amount = (key: 'subtotal' | 'freight' | 'otherCharges' | 'total') =>
@@ -84,7 +88,7 @@ export function SummaryCards({
         </div>
         <div className="mb-3 flex flex-col gap-1.5">
           <Label htmlFor="po-ref">Your PO reference (optional)</Label>
-          <Input id="po-ref" placeholder="e.g. PO-8915" {...register('poRef')} />
+          <Input id="po-ref" placeholder="e.g. PO-8915" maxLength={35} {...register('poRef')} />
         </div>
         <Row label="Lines" value={quote.count} />
         <Row label="Subtotal" value={amount('subtotal')} />
@@ -96,7 +100,8 @@ export function SummaryCards({
             <QueryError onRetry={quote.retry} />
           </div>
         )}
-        {priced && available !== null && priced.total > available && (
+        {/* Credit orders only (Phase 2): cash orders need no credit approval (decided 2026-10-26). */}
+        {paymentMethod === 'credit' && priced && available !== null && priced.total > available && (
           <p className="mt-2 text-[12.5px] font-medium text-warning">
             ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.
           </p>
@@ -105,9 +110,14 @@ export function SummaryCards({
           <Button type="button" variant="outline" className="flex-1" onClick={onSaveDraft} disabled={saving}>
             {saving ? 'Saving…' : 'Save as draft'}
           </Button>
-          {/* Disabled until Submit (S3-10). */}
-          <Button type="button" disabled className="flex-1">
-            Submit for approval
+          {/* Only an order BC has priced, every line of it. */}
+          <Button
+            type="button"
+            className="flex-1"
+            onClick={onSubmit}
+            disabled={!priced || priced.lines.some((line) => line.unitPrice <= 0) || submitting}
+          >
+            {submitting ? 'Submitting…' : 'Submit for approval'}
           </Button>
         </div>
       </SectionCard>

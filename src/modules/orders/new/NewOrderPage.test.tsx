@@ -198,17 +198,14 @@ test('removing every line leaves an empty, working table', async () => {
   expect(screen.getByRole('combobox', { name: 'Item, line 1' })).toBeInTheDocument()
 })
 
-test('the credit warning shows only when the order total exceeds available credit', async () => {
+// 2026-10-26: cash orders need no credit approval; the warning (and the credit team's review) comes back with Credit in Phase 2.
+test('a cash order over the available credit shows no credit warning', async () => {
   const user = userEvent.setup()
   await openForm()
-  await pickItem(user, 1, T1_BAG)
-  await setQty(user, 1, '10')
-  await quoted('Order total', '₱2,450.00')
-  expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
   await pickItem(user, 1, T2_BULK)
   await setQty(user, 1, '100')
   await quoted('Order total', '₱485,000.00')
-  expect(screen.getByText(WARNING)).toBeInTheDocument()
+  expect(screen.queryByText(WARNING)).not.toBeInTheDocument()
 })
 
 test('credit standing shows the Dashboard figures', async () => {
@@ -220,16 +217,12 @@ test('credit standing shows the Dashboard figures', async () => {
 })
 
 // S2-09: credit standing is BC's credit overview, read through the dashboard endpoint (order-options stays sample until S3-05).
-test("credit standing is BC's figures, and the warning compares against BC's available credit", async () => {
-  const user = userEvent.setup()
+test("credit standing is BC's figures", async () => {
   answer('dashboard', { ...dashboardMock(), account: { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, exposure: 203220, availableCredit: 2000 } } satisfies DashboardDto)
   await openForm()
   expect(await screen.findByText('₱500,000.00')).toBeInTheDocument()
   expect(summary('Current exposure')).toHaveTextContent('₱203,220.00')
   expect(summary('Available credit')).toHaveTextContent('₱2,000.00')
-  await pickItem(user, 1, T1_BAG)
-  await setQty(user, 1, '10')
-  expect(await screen.findByText(WARNING)).toBeInTheDocument()
 })
 
 test('credit BC could not give shows dashes and never the warning', async () => {
@@ -266,7 +259,7 @@ test.each([
   await quoted('Subtotal', '₱245.00')
 })
 
-test('Blanket Order and Submit for approval are disabled, with no "Available soon" tooltip', async () => {
+test('Blanket Order is disabled; Submit for approval waits for a priced order, with no "Available soon" tooltip', async () => {
   const user = userEvent.setup()
   await openForm()
   expect(screen.getByRole('radio', { name: 'Single Order' })).toHaveAttribute('aria-checked', 'true')
@@ -332,18 +325,27 @@ test('fields hidden by the toggle keep their values', async () => {
   expect(screen.getByLabelText('Receiving person')).toHaveValue('Juan Dela Cruz')
 })
 
-test('Cash shows Prepayment terms, Credit shows Payment terms', async () => {
+// 2026-10-26: Cash only; Credit (and its Payment terms) is Phase 2.
+test('Cash with Prepayment terms; Credit is listed but not available yet', async () => {
   const user = userEvent.setup()
   await openForm()
+  expect(screen.getByRole('combobox', { name: 'Payment method' })).toHaveTextContent('Cash')
   const prepay = screen.getByLabelText('Prepayment terms')
   expect(prepay).toHaveValue('100% advance payment before dispatch')
   expect(prepay).toHaveAttribute('readonly')
   expect(screen.queryByLabelText('Payment terms')).not.toBeInTheDocument()
   await user.click(screen.getByRole('combobox', { name: 'Payment method' }))
-  await user.click(await screen.findByRole('option', { name: 'Credit' }))
-  expect(screen.queryByRole('option', { name: 'Terms' })).not.toBeInTheDocument()
-  expect(screen.getByLabelText('Payment terms')).toHaveValue('30 Days from Invoice Date')
-  expect(screen.queryByLabelText('Prepayment terms')).not.toBeInTheDocument()
+  expect(await screen.findByRole('option', { name: 'Credit' })).toHaveAttribute('aria-disabled', 'true')
+})
+
+test("Receiving time window offers BC's windows, 8:00 AM – 5:00 PM chosen", async () => {
+  const user = userEvent.setup()
+  await openForm()
+  await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+  const window = screen.getByRole('combobox', { name: 'Receiving time window' })
+  expect(window).toHaveTextContent('8:00 AM – 5:00 PM')
+  await user.click(window)
+  expect((await screen.findAllByRole('option')).map((o) => o.textContent)).toEqual(['12:00 MN – 8:00 AM', '8:00 AM – 5:00 PM', '5:00 PM – 12:00 MN', 'Anytime'])
 })
 
 test('loading type and call before delivery rewrite the first instructions line', async () => {
@@ -563,5 +565,102 @@ describe('drafts (S3-12)', () => {
     await user.click(screen.getByRole('button', { name: 'Save as draft' }))
     await screen.findByText(SAVED)
     expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST'])
+  })
+})
+
+describe('submit (S3-10)', () => {
+  const SEED_ID = '6f1c2a3e-5b7d-4e8f-9a0b-1c2d3e4f5a01'
+
+  beforeEach(() => {
+    resetDraftsMock()
+    vi.mocked(serverLogic).mockImplementation(actualServerLogic)
+    vi.mocked(toast.error).mockClear()
+  })
+
+  const submit = () => screen.getByRole('button', { name: 'Submit for approval' })
+  const orderPosts = () => vi.mocked(serverLogic).mock.calls.filter(([name, options]) => name === 'orders' && options?.method === 'POST')
+  function openSection(route = '/orders/new') {
+    renderApp(
+      <Routes>
+        <Route path="/orders/*" element={<OrdersSection />} />
+      </Routes>,
+      { route },
+    )
+  }
+
+  test('Submit is enabled once BC has priced the order', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    expect(submit()).toBeDisabled()
+    await pickItem(user, 1, T1_BAG)
+    await quoted('Order total', '₱245.00')
+    expect(submit()).toBeEnabled()
+  })
+
+  test('Submit sends the order (never its prices) and opens Orders with the new order number', async () => {
+    const user = userEvent.setup()
+    openSection()
+    await screen.findByRole('table', { name: 'Order lines' })
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    await user.type(screen.getByLabelText('Your PO reference (optional)'), 'PO-8915')
+    await quoted('Order total', '₱2,450.00')
+    await user.click(submit())
+    expect(await screen.findByText('SO-100500 was submitted.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Orders' })).toHaveAttribute('aria-current', 'page')
+    expect(orderPosts()).toHaveLength(1)
+    expect(orderPosts()[0][1]!.body).toEqual({
+      shipmentMethod: 'pickup', source: 'PLANT1', site: '', lines: [{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10 }], paymentMethod: 'cash',
+      poRef: 'PO-8915', pickupDate: '', requestedDate: '', receivingPerson: '', receivingContact: '', receivingEmail: '', timeWindow: 'DAY',
+      instructions: 'Loading type: Loose pile. Call before delivery: No.',
+    })
+  })
+
+  test("a line BC can't price keeps Submit disabled", async () => {
+    const user = userEvent.setup()
+    const line = { unitPrice: 0, lineAmount: 0, freight: 0, otherCharges: 0, total: 0, message: 'No price is set up for this delivery area.' }
+    answer('order-quote', { lines: [line], subtotal: 0, freight: 0, otherCharges: 0, total: 0 })
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    expect(await screen.findByText(line.message)).toBeInTheDocument()
+    expect(submit()).toBeDisabled()
+  })
+
+  test.each([
+    ["BC can't price a line any more", { notPriced: true }, "We couldn't price every line. Please check your order and try again."],
+    ['the submit fails', new ApiError(500, 'x'), "We couldn't submit this order. Please try again."],
+  ])('%s: a message, and the form stays as it was', async (_case, reply, message) => {
+    const user = userEvent.setup()
+    answer('orders', reply)
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    await quoted('Order total', '₱2,450.00')
+    await user.click(submit())
+    await waitFor(() => expect(toast.error).toHaveBeenCalledWith(message))
+    expect(screen.getByRole('spinbutton', { name: 'Quantity, line 1' })).toHaveValue(10)
+  })
+
+  test('an invalid receiving email is caught before anything is sent', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+    await user.type(screen.getByLabelText('Receiving email'), 'juan.test.ph')
+    await quoted('Order total', '₱260.00')
+    await user.click(submit())
+    expect(toast.error).toHaveBeenCalledWith('Please enter a valid receiving email.')
+    expect(orderPosts()).toEqual([])
+  })
+
+  test('submitting a draft removes the draft', async () => {
+    const user = userEvent.setup()
+    openSection(`/orders/new?draft=${SEED_ID}`)
+    await screen.findByText(/Continuing Draft #1/)
+    await quoted('Order total', '₱2,600.00')
+    await user.click(submit())
+    expect(await screen.findByText('SO-100500 was submitted.')).toBeInTheDocument()
+    await waitFor(() => expect(draftsMock({ method: 'GET' })).toEqual([]))
+    expect(orderPosts()[0][1]!.body).toMatchObject({ shipmentMethod: 'delivery', site: 'PLANT2', timeWindow: 'DAY' })
   })
 })

@@ -19,10 +19,10 @@ const saved: NewOrderForm = {
   receivingContact: '0917 123 4567',
   receivingEmail: 'logistics@customer.com',
   requestedDate: '2026-10-28',
-  timeWindow: '1:00 – 3:00 PM',
+  timeWindow: 'NIGHT',
   loadingType: 'Palletized',
   callBefore: true,
-  paymentMethod: 'credit',
+  paymentMethod: 'cash',
   instructions: 'Loading type: Palletized · Call before delivery\nUse side gate',
   site: 'PLANT2',
   poRef: 'PO-8915',
@@ -83,4 +83,10 @@ test('quoteRequest has nothing to price without a chosen line, a source, or a si
 
 test('toPayload wraps the form with version 1 and its orderType', () => {
   expect(toPayload(saved)).toEqual({ version: 1, orderType: 'single', form: saved })
+})
+
+test('a draft saved before 2026-10-26: Credit becomes Cash and an old time window becomes 8:00 AM – 5:00 PM', () => {
+  const form = fromDraft(payload({ paymentMethod: 'credit', timeWindow: '1:00 – 3:00 PM' }), options, sites)
+  expect(form.paymentMethod).toBe('cash')
+  expect(form.timeWindow).toBe('DAY')
 })

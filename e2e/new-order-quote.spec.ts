@@ -2,7 +2,7 @@ import { expect, test, type Page, type Response } from '@playwright/test'
 import type { OrderQuoteDto, OrderQuoteRequest } from '../src/api/types'
 import { peso } from '../src/lib/format'
 
-// S3-06 New Order prices from BC's quote, on the deployed Dev site. Prices are BC Dev's live data, so every amount is
+// S3-06 New Order prices from BC's quote (and S3-10 Submit, opt-in), on the deployed Dev site. Prices are BC Dev's live data, so every amount is
 // checked against the quote BC answered in the same test, never a fixed number.
 const ITEM = process.env.E2E_ITEM ?? '100016'
 const ITEM_2 = process.env.E2E_ITEM_2 ?? '100025'
@@ -123,12 +123,14 @@ test('typing a quantity quickly sends one quote, after the typing stops', async 
   expect(sent).toBe(1)
 })
 
-test('an order over the available credit shows the warning', async ({ page }) => {
+// Cash orders need no credit approval (2026-10-26); the warning returns with Credit in Phase 2.
+test('a cash order over the available credit shows no warning', async ({ page }) => {
   await expect(row(page, 'Available credit')).toContainText('₱')
   const available = Number((await row(page, 'Available credit').textContent())!.replace(/[^0-9.-]/g, ''))
   const { quote } = await oneLine(page, ITEM, '1000000')
   test.skip(!(quote!.total > available), `BC priced ${ITEM} × 1,000,000 at ${quote!.total}, within the available credit`)
-  await expect(page.getByText(WARNING)).toBeVisible()
+  await expect(row(page, 'Order total')).toContainText(peso(quote!.total))
+  await expect(page.getByText(WARNING)).toBeHidden()
 })
 
 test('a quantity over 1,000,000 is refused: dashes, Try again, no warning', async ({ page }) => {
@@ -182,4 +184,20 @@ test("a saved draft's Est. total matches the Order total", async ({ page }) => {
     await page.getByRole('button', { name: 'Delete draft' }).click()
     await expect(draft).toHaveCount(0)
   }
+})
+
+// S3-10 Submit. Creates a real Open Sales Order in BC Dev, so it runs only with E2E_SUBMIT=1; delete the order in BC after.
+test('Submit creates the BC sales order and opens Orders with its number', async ({ page }) => {
+  test.skip(process.env.E2E_SUBMIT !== '1', 'creates a BC Dev order: set E2E_SUBMIT=1 to run')
+  await pickSource(page, PRICED_SOURCE)
+  await oneLine(page, ITEM, '10')
+  await page.getByLabel('Your PO reference (optional)').fill(`E2E-${Date.now()}`)
+  const [response] = await Promise.all([
+    page.waitForResponse((each) => each.url().includes('/_api/serverlogics/orders') && each.request().method() === 'POST'),
+    page.getByRole('button', { name: 'Submit for approval' }).click(),
+  ])
+  expect(response.request().postDataJSON()).toMatchObject({ paymentMethod: 'cash', source: PRICED_SOURCE, lines: [{ code: ITEM, qty: 10 }] })
+  const note = page.getByText(/^SOR\d+ was submitted\.$/)
+  await expect(note).toBeVisible({ timeout: 30_000 })
+  test.info().annotations.push({ type: 'BC order', description: (await note.textContent())! })
 })

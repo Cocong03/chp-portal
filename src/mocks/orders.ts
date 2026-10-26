@@ -1,4 +1,4 @@
-import type { OrderDto, OrdersPageDto, OrderStatus } from '@/api/types'
+import type { OrderDto, OrdersPageDto, OrderStatus, OrderSubmitDto } from '@/api/types'
 import type { MockRequest } from './index'
 
 // Wireframe CATALOG and ORDERS (Mockup-chp-v2.html). Totals here are mock data only; the real ones come from BC.
@@ -43,7 +43,8 @@ export const MOCK_ORDERS: OrderDto[] = RAW.map(([so, date, edd, po, site, status
 })
 
 /** Dev-server stand-in for the orders Server Logic (same query parameters, same answers). */
-export function ordersMock({ query = {} }: MockRequest): OrdersPageDto | OrderDto | { notFound: true } {
+export function ordersMock({ method, query = {} }: MockRequest): OrdersPageDto | OrderDto | OrderSubmitDto | { notFound: true } {
+  if (method === 'POST') return { so: 'SO-100500' }
   if (query.id) return MOCK_ORDERS.find((o) => o.so === query.id) ?? { notFound: true }
   const q = (query.q ?? '').trim().toLowerCase()
   const rows = MOCK_ORDERS.filter(

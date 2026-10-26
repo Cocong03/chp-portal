@@ -1,18 +1,20 @@
 import { useEffect, useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
+import { format } from 'date-fns'
 import { FormProvider, useForm } from 'react-hook-form'
 import { useLocation, useNavigate, useSearchParams } from 'react-router-dom'
 import { toast } from 'sonner'
-import type { DraftDto, OrderOptionsDto, SiteDto } from '@/api/types'
+import { serverLogic } from '@/api/serverLogic'
+import type { DraftDto, OrderOptionsDto, OrderSubmitDto, OrderSubmitRequest, SiteDto } from '@/api/types'
 import { formatDate } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
 import { fromDraft, toPayload } from '@/modules/orders/drafts/draftPayload'
-import { saveDraft, useDraft } from '@/modules/orders/drafts/useDrafts'
+import { saveDraft, useDeleteDraft, useDraft } from '@/modules/orders/drafts/useDrafts'
 import { useSites } from '@/modules/sites/useSites'
 import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { Skeleton } from '@/ui/skeleton'
-import { defaultSite, newOrderDefaults, type NewOrderForm } from './form'
+import { defaultSite, newOrderDefaults, submitProblem, submitRequest, type NewOrderForm } from './form'
 import { FulfillmentCard } from './FulfillmentCard'
 import { withAutoLine } from './instructions'
 import { OrderLinesCard } from './OrderLinesCard'
@@ -122,6 +124,31 @@ function OrderForm({
     onError: () => toast.error("We couldn't save this draft. Please try again."),
   })
 
+  // S3-10: BC prices the order again and creates it; on success the draft it came from is removed.
+  const removeDraft = useDeleteDraft()
+  const submit = useMutation({
+    mutationFn: (body: OrderSubmitRequest) => serverLogic<OrderSubmitDto>('orders', { method: 'POST', body }),
+    onSuccess: (answer) => {
+      if ('notPriced' in answer) {
+        toast.error("We couldn't price every line. Please check your order and try again.")
+        quote.retry()
+        return
+      }
+      if (draft && draftId) removeDraft.mutate(draftId)
+      void client.invalidateQueries({ queryKey: ['orders'] })
+      void client.invalidateQueries({ queryKey: ['dashboard'] })
+      navigate('/orders', { state: { submitted: answer.so } })
+    },
+    onError: () => toast.error("We couldn't submit this order. Please try again."),
+  })
+  function onSubmit() {
+    const values = form.getValues()
+    const problem = submitProblem(values, format(new Date(), 'yyyy-MM-dd'))
+    const body = submitRequest(values, options.items)
+    if (problem) toast.error(problem)
+    else if (body) submit.mutate(body)
+  }
+
   return (
     <FormProvider {...form}>
       {note && (
@@ -135,7 +162,14 @@ function OrderForm({
           <FulfillmentCard options={options} />
         </div>
         <div>
-          <SummaryCards quote={quote} sites={sites ?? NO_SITES} onSaveDraft={() => save.mutate()} saving={save.isPending} />
+          <SummaryCards
+            quote={quote}
+            sites={sites ?? NO_SITES}
+            onSaveDraft={() => save.mutate()}
+            saving={save.isPending}
+            onSubmit={onSubmit}
+            submitting={submit.isPending || submit.isSuccess}
+          />
         </div>
       </form>
     </FormProvider>
