@@ -51,7 +51,7 @@ test('resolves customers through business relations linked to Customer', () => {
 
 test('each business outcome returns its status to Power Pages', () => {
   const statusOf = (name: string) => actions.find(([n]) => n === name)![1].inputs.body
-  for (const name of ['Return_invalid_email', 'Return_no_match', 'Return_no_customer', 'Return_sent']) {
+  for (const name of ['Return_invalid_email', 'Return_no_customer', 'Return_sent']) {
     expect(statusOf(name), name).toEqual({ status: 'ok' })
   }
   for (const name of ['Return_several_customers', 'Return_several_contacts', 'Return_linked_elsewhere']) {
@@ -100,10 +100,11 @@ test('reads every environment-specific value from a ConcreatHub environment vari
     .map((p) => (p as Action).metadata?.schemaName)
     .filter(Boolean)
   expect(schemaNames.sort()).toEqual(
-    ['chp_BCApiBasePath', 'chp_BCClientId', 'chp_BCClientSecret', 'chp_BCEnvironmentName', 'chp_BCSolidCementCompanyId', 'chp_BCTenantId', 'chp_EmailLogoUrl', 'chp_PowerPagesSiteId', 'chp_SenderMailbox', 'chp_SiteUrl'],
+    ['chp_BCApiBasePath', 'chp_BCClientId', 'chp_BCClientSecret', 'chp_BCEnvironmentName', 'chp_BCTenantId', 'chp_EmailLogoUrl', 'chp_PowerPagesSiteId', 'chp_SenderMailbox', 'chp_SiteUrl'],
   )
   for (const p of Object.values(definition.parameters) as Action[]) if (p.metadata?.schemaName) expect(p.defaultValue).toBe('')
-  expect(text).not.toMatch(/f44e98b4|d2e4496e|188fc244|chp-portal-dev|automations365/)
+  expect(text).not.toMatch(/f44e98b4|d2e4496e|6b92847e|188fc244|chp-portal-dev|automations365/)
+  expect(text).not.toContain('chp_BCSolidCementCompanyId')
 })
 
 // Seen on Dev 2026-10-06: Power Pages treats an unconfirmed email as "user does not exist" for password resets.
@@ -159,4 +160,64 @@ test('a contact left with a username but no password gets the username cleared b
   })
   const [, list] = actions.find(([n]) => n === 'List_open_invitations')!
   expect(list.runAfter).toEqual({ Already_activated: ['Succeeded'] })
+})
+
+// S1-12 (2026-10-27): companies come from the chp_bccompany table; one email = one customer across all of them.
+test('lists only active companies and searches each one in its own BC company', () => {
+  const [, list] = actions.find(([n]) => n === 'List_companies')!
+  expect(list.inputs.parameters).toMatchObject({
+    entityName: 'chp_bccompanies', $select: 'chp_bccompanyid,chp_bccompanyguid,chp_name', $filter: 'statecode eq 0',
+  })
+  const [, loop] = actions.find(([n]) => n === 'For_each_company')!
+  expect(loop.type).toBe('Foreach')
+  expect(loop.foreach).toBe("@outputs('List_companies')?['body/value']")
+  const [, url] = actions.find(([n]) => n === 'Company_url')!
+  expect(url.inputs).toBe("@{outputs('BC_api_root')}companies(@{items('For_each_company')?['chp_bccompanyguid']})/")
+  for (const name of ['Get_BC_contacts', 'Get_BC_relations']) {
+    expect(actions.find(([n]) => n === name)![1].inputs.uri, name).toMatch(/^@\{outputs\('Company_url'\)\}/)
+  }
+})
+
+test('skips the relation lookup for a company with no contacts', () => {
+  const [, has] = actions.find(([n]) => n === 'Has_BC_contacts')!
+  expect(JSON.stringify(has.expression)).toContain("@greater(length(body('Company_nos')), 0)")
+  expect(Object.keys(has.actions)).toEqual(expect.arrayContaining(['Relation_filters', 'Get_BC_relations', 'For_each_customer']))
+})
+
+test('appends one match per company and customer, so the same customer no. in two companies counts twice', () => {
+  const [, append] = actions.find(([n]) => n === 'Append_match')!
+  expect(append.type).toBe('AppendToArrayVariable')
+  expect(append.inputs).toEqual({
+    name: 'Matches',
+    value: {
+      companyRowId: "@items('For_each_company')?['chp_bccompanyid']",
+      companyId: "@items('For_each_company')?['chp_bccompanyguid']",
+      companyName: "@items('For_each_company')?['chp_name']",
+      customerNo: "@items('For_each_customer')",
+    },
+  })
+  const several = JSON.stringify(actions.find(([n]) => n === 'Several_customers')![1].expression)
+  expect(several).toContain("@greater(length(variables('Matches')), 1)")
+  const none = JSON.stringify(actions.find(([n]) => n === 'No_customer')![1].expression)
+  expect(none).toContain("@equals(length(variables('Matches')), 0)")
+  const [, labels] = actions.find(([n]) => n === 'Match_labels')!
+  expect(labels.inputs.select).toBe("@concat(item()?['companyName'], ' ', item()?['customerNo'])")
+  const mail = actions.find(([n]) => n === 'Ops_notice_several_customers')![1].inputs.parameters['emailMessage/Body']
+  expect(mail).toContain("@{join(body('Match_labels'), ', ')}")
+})
+
+test("the single match's company drives the customer lookup, the account and pending grants", () => {
+  expect(actions.find(([n]) => n === 'Match')![1].inputs).toBe("@first(variables('Matches'))")
+  expect(actions.find(([n]) => n === 'Get_BC_customer')![1].inputs.uri).toBe(
+    "@{outputs('BC_api_root')}companies(@{outputs('Match')?['companyId']})/mcrmCustomers",
+  )
+  expect(actions.find(([n]) => n === 'List_accounts')![1].inputs.parameters.$filter).toBe(
+    "chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_bccompanyid eq '@{outputs('Match')?['companyId']}'",
+  )
+  const create = actions.find(([n]) => n === 'Create_account')![1].inputs.parameters
+  expect(create['item/chp_bccompanyid']).toBe("@{outputs('Match')?['companyId']}")
+  expect(create['item/chp_bccompanyname']).toBe("@{outputs('Match')?['companyName']}")
+  expect(actions.find(([n]) => n === 'List_pending_grants')![1].inputs.parameters.$filter).toContain(
+    "_chp_company_value eq @{outputs('Match')?['companyRowId']}",
+  )
 })
