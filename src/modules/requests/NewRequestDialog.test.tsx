@@ -159,3 +159,51 @@ test('Cancel closes without saving', async () => {
   expect(onClose).toHaveBeenCalled()
   expect(posts()).toHaveLength(0)
 })
+
+/** A FileReader whose reads finish only when the test says so, keyed by file name. */
+function holdReads() {
+  const held = new Map<string, () => void>()
+  class HeldReader {
+    result: string | null = null
+    onload: (() => void) | null = null
+    onerror: (() => void) | null = null
+    error = null
+    readAsDataURL(file: File) {
+      held.set(file.name, () => {
+        this.result = `data:application/pdf;base64,${btoa(file.name)}`
+        this.onload?.()
+      })
+    }
+  }
+  vi.stubGlobal('FileReader', HeldReader)
+  return held
+}
+afterEach(() => vi.unstubAllGlobals())
+
+test('Submit is disabled while an attachment is being read', async () => {
+  const held = holdReads()
+  const { user } = await open()
+  await fillMinimal(user)
+  await user.upload(screen.getByLabelText('Attach a supporting document (optional)'), new File(['x'], 'a.pdf'))
+  expect(screen.getByRole('button', { name: 'Submit request' })).toBeDisabled()
+  held.get('a.pdf')!()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: 'Submit request' }))
+  await waitFor(() => expect(posts()).toHaveLength(1))
+  expect(posts()[0][1]?.body).toMatchObject({ attachment: { name: 'a.pdf' } })
+})
+
+test('a stale attachment read does not overwrite a newer pick', async () => {
+  const held = holdReads()
+  const { user } = await open()
+  await fillMinimal(user)
+  const input = screen.getByLabelText('Attach a supporting document (optional)')
+  await user.upload(input, new File(['x'], 'old.pdf'))
+  await user.upload(input, new File(['x'], 'new.pdf'))
+  held.get('new.pdf')!()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled())
+  held.get('old.pdf')!()
+  await user.click(screen.getByRole('button', { name: 'Submit request' }))
+  await waitFor(() => expect(posts()).toHaveLength(1))
+  expect(posts()[0][1]?.body).toMatchObject({ attachment: { name: 'new.pdf' } })
+})
