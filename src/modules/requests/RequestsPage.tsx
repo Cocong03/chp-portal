@@ -11,6 +11,7 @@ import { SearchField } from '@/ui/SearchField'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Toolbar } from '@/ui/Toolbar'
+import { NewRequestDialog } from './NewRequestDialog'
 import { RequestDialog } from './RequestDialog'
 import { assignedGroups, SERVICE_STATUSES, ServiceStatusPill } from './serviceDisplay'
 import { useRequests, useRequestTaxonomy } from './useRequests'
@@ -52,6 +53,7 @@ export function RequestsPage() {
   const [group, setGroup] = useState(ALL)
   const [status, setStatus] = useState(ALL)
   const [page, setPage] = useState(1)
+  const [creating, setCreating] = useState(false)
   const [viewing, setViewing] = useState<RequestDto | null>(null)
   const all = requests.data ?? NO_REQUESTS
   const categories = useMemo(() => taxonomy?.categories.map((c) => c.name) ?? NO_OPTIONS, [taxonomy])
@@ -87,8 +89,7 @@ export function RequestsPage() {
   return (
     <>
       <PageHeader title="Requests">
-        {/* Task 6 adds the dialog and enables this. */}
-        <Button disabled>New request</Button>
+        <Button onClick={() => setCreating(true)}>New request</Button>
       </PageHeader>
       <SectionCard title="Requests">
         <Toolbar
@@ -142,6 +143,7 @@ export function RequestsPage() {
           </>
         )}
       </SectionCard>
+      <NewRequestDialog open={creating} onClose={() => setCreating(false)} />
       <RequestDialog request={viewing} onClose={() => setViewing(null)} />
     </>
   )

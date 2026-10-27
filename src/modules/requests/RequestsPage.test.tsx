@@ -36,7 +36,7 @@ test('has no page description or wireframe chrome', async () => {
   expect(screen.queryByText(/Submit a request to your account team/)).toBeNull()
   expect(screen.queryByText(/For Client Review/)).toBeNull()
   expect(screen.queryByText(/Sample data shown/)).toBeNull()
-  expect(screen.getByRole('button', { name: 'New request' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'New request' })).toBeEnabled()
 })
 
 test('search matches reference, details and category field values', async () => {
