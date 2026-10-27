@@ -31,6 +31,10 @@ FLOWS = [
      'Creates the monday.com item for a new portal request (Pending, no item yet) and writes back the item id. S4-07.'),
     ('SEND_COMPLAINT', 'Concreat Connect – Send complaint to service center', 'complaint_send_flow.json',
      'Creates the monday.com item for a new portal complaint (Pending, no item yet) and writes back the item id. S4-07.'),
+    ('SYNC', 'Concreat Connect – Sync with service center', 'service_sync_flow.json',
+     'Every 10 minutes: reads the status of the portal\'s monday.com items back into Dataverse, and re-sends Failed or '
+     'stuck Pending rows by bumping chp_syncattempts. S4-07. shortcut: re-sends every 10 min without a cap; add a '
+     'max-attempts stop if ops see repeat failures.'),
 ]
 
 parser = argparse.ArgumentParser()

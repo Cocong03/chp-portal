@@ -1,0 +1,612 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "monday.com API URL (chp_MondayApiUrl)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayApiUrl",
+        "description": "monday.com API URL"
+      }
+    },
+    "monday API Token (chp_MondayAPIToken)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayAPIToken",
+        "description": "monday API Token"
+      }
+    },
+    "monday.com Requests column map (chp_MondayRequestsColumns)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayRequestsColumns",
+        "description": "monday.com Requests column map"
+      }
+    },
+    "monday.com Complaints column map (chp_MondayComplaintsColumns)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayComplaintsColumns",
+        "description": "monday.com Complaints column map"
+      }
+    }
+  },
+  "triggers": {
+    "Every_10_minutes": {
+      "type": "Recurrence",
+      "recurrence": {
+        "frequency": "Minute",
+        "interval": 10
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      }
+    }
+  },
+  "actions": {
+    "Sync_requests": {
+      "type": "Scope",
+      "runAfter": {},
+      "actions": {
+        "Request_columns": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": "@json(parameters('monday.com Requests column map (chp_MondayRequestsColumns)'))"
+        },
+        "List_requests_to_read": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Request_columns": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "chp_requests",
+              "$select": "chp_requestid,chp_mondayitemid,chp_status,chp_dateresolved",
+              "$filter": "chp_mondayitemid ne null and (chp_status ne 775000002 or chp_dateresolved ge @{formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-dd')})"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "For_each_request_chunk": {
+          "type": "Foreach",
+          "runAfter": {
+            "List_requests_to_read": [
+              "Succeeded"
+            ]
+          },
+          "foreach": "@chunk(outputs('List_requests_to_read')?['body/value'], 100)",
+          "actions": {
+            "Request_item_ids": {
+              "type": "Select",
+              "runAfter": {},
+              "inputs": {
+                "from": "@items('For_each_request_chunk')",
+                "select": "@item()?['chp_mondayitemid']"
+              }
+            },
+            "Read_request_items": {
+              "type": "Http",
+              "runAfter": {
+                "Request_item_ids": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "method": "POST",
+                "uri": "@parameters('monday.com API URL (chp_MondayApiUrl)')",
+                "headers": {
+                  "Authorization": "@parameters('monday API Token (chp_MondayAPIToken)')",
+                  "API-Version": "2026-10",
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "query": "query ($ids: [ID!], $status: [String!], $date: [String!], $hasDate: Boolean!) { items(ids: $ids, limit: 100) { id status: column_values(ids: $status) { text } date: column_values(ids: $date) @include(if: $hasDate) { text } } }",
+                  "variables": {
+                    "ids": "@body('Request_item_ids')",
+                    "status": [
+                      "@outputs('Request_columns')?['status']?['id']"
+                    ],
+                    "date": "@if(empty(outputs('Request_columns')?['dateResolved']?['id']), json('[]'), createArray(outputs('Request_columns')?['dateResolved']?['id']))",
+                    "hasDate": "@not(empty(outputs('Request_columns')?['dateResolved']?['id']))"
+                  }
+                },
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 4,
+                  "interval": "PT10S"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              }
+            },
+            "Check_Read_request_items": {
+              "type": "If",
+              "runAfter": {
+                "Read_request_items": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@empty(body('Read_request_items')?['errors'])",
+                  false
+                ]
+              },
+              "actions": {
+                "Fail_Read_request_items": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@concat('monday read: ', string(body('Read_request_items')?['errors']))"
+                },
+                "Throw_Read_request_items": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Fail_Read_request_items": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@div(1, 0)",
+                  "description": "Fails the run on purpose, so a monday error shows in the run history."
+                }
+              },
+              "else": {
+                "actions": {}
+              }
+            },
+            "Request_item_values": {
+              "type": "Select",
+              "runAfter": {
+                "Check_Read_request_items": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Read_request_items')?['data']?['items']",
+                "select": {
+                  "id": "@item()?['id']",
+                  "status": "@if(equals(coalesce(first(item()?['status'])?['text'], ''), 'Resolved'), 775000002, if(contains(createArray('', 'Submitted'), coalesce(first(item()?['status'])?['text'], '')), 775000000, 775000001))",
+                  "date": "@take(coalesce(first(coalesce(item()?['date'], json('[]')))?['text'], ''), 10)"
+                }
+              }
+            },
+            "Request_item_entries": {
+              "type": "Select",
+              "runAfter": {
+                "Request_item_values": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Request_item_values')",
+                "select": "@concat('\"', item()?['id'], '\":', string(item()))"
+              },
+              "description": "monday item ids are numeric, so they are safe as JSON keys."
+            },
+            "Request_items_by_id": {
+              "type": "Compose",
+              "runAfter": {
+                "Request_item_entries": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@json(concat('{', join(body('Request_item_entries'), ','), '}'))"
+            },
+            "Request_updates": {
+              "type": "Select",
+              "runAfter": {
+                "Request_items_by_id": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@items('For_each_request_chunk')",
+                "select": {
+                  "id": "@item()?['chp_requestid']",
+                  "found": "@contains(outputs('Request_items_by_id'), item()?['chp_mondayitemid'])",
+                  "status": "@outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['status']",
+                  "oldStatus": "@item()?['chp_status']",
+                  "date": "@if(equals(outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['status'], 775000002), if(not(empty(outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['date'])), outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['date'], if(and(equals(item()?['chp_status'], 775000002), not(empty(take(coalesce(item()?['chp_dateresolved'], ''), 10)))), take(coalesce(item()?['chp_dateresolved'], ''), 10), formatDateTime(utcNow(), 'yyyy-MM-dd'))), '')",
+                  "oldDate": "@take(coalesce(item()?['chp_dateresolved'], ''), 10)"
+                }
+              }
+            },
+            "Changed_requests": {
+              "type": "Query",
+              "runAfter": {
+                "Request_updates": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Request_updates')",
+                "where": "@and(item()?['found'], or(not(equals(item()?['status'], item()?['oldStatus'])), not(equals(item()?['date'], item()?['oldDate']))))"
+              },
+              "description": "Write only what changed; an item monday did not return (deleted) is skipped."
+            },
+            "For_each_changed_request": {
+              "type": "Foreach",
+              "runAfter": {
+                "Changed_requests": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Changed_requests')",
+              "actions": {
+                "Update_request_status": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord"
+                    },
+                    "parameters": {
+                      "entityName": "chp_requests",
+                      "recordId": "@items('For_each_changed_request')?['id']",
+                      "item/chp_status": "@items('For_each_changed_request')?['status']",
+                      "item/chp_dateresolved": "@if(empty(items('For_each_changed_request')?['date']), null, items('For_each_changed_request')?['date'])"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "List_requests_to_resend": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "chp_requests",
+              "$select": "chp_requestid,chp_syncattempts",
+              "$filter": "chp_mondayitemid eq null and (chp_syncstate eq 775000002 or (chp_syncstate eq 775000000 and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "For_each_request_resend": {
+          "type": "Foreach",
+          "runAfter": {
+            "List_requests_to_resend": [
+              "Succeeded"
+            ]
+          },
+          "foreach": "@outputs('List_requests_to_resend')?['body/value']",
+          "actions": {
+            "Resend_request": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord"
+                },
+                "parameters": {
+                  "entityName": "chp_requests",
+                  "recordId": "@items('For_each_request_resend')?['chp_requestid']",
+                  "item/chp_syncstate": 775000000,
+                  "item/chp_syncattempts": "@add(coalesce(items('For_each_request_resend')?['chp_syncattempts'], 0), 1)"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "description": "Setting Pending and bumping chp_syncattempts re-fires the send flow, whose re-read guard and Reference lookup keep monday free of duplicates. shortcut: re-sends every 10 min without a cap; add a max-attempts stop if ops see repeat failures"
+        }
+      }
+    },
+    "Sync_complaints": {
+      "type": "Scope",
+      "runAfter": {},
+      "actions": {
+        "Complaint_columns": {
+          "type": "Compose",
+          "runAfter": {},
+          "inputs": "@json(parameters('monday.com Complaints column map (chp_MondayComplaintsColumns)'))"
+        },
+        "List_complaints_to_read": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Complaint_columns": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "chp_complaints",
+              "$select": "chp_complaintid,chp_mondayitemid,chp_status,chp_dateresolved,chp_resolution",
+              "$filter": "chp_mondayitemid ne null and (chp_status ne 775000002 or chp_dateresolved ge @{formatDateTime(addDays(utcNow(), -7), 'yyyy-MM-dd')})"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "For_each_complaint_chunk": {
+          "type": "Foreach",
+          "runAfter": {
+            "List_complaints_to_read": [
+              "Succeeded"
+            ]
+          },
+          "foreach": "@chunk(outputs('List_complaints_to_read')?['body/value'], 100)",
+          "actions": {
+            "Complaint_item_ids": {
+              "type": "Select",
+              "runAfter": {},
+              "inputs": {
+                "from": "@items('For_each_complaint_chunk')",
+                "select": "@item()?['chp_mondayitemid']"
+              }
+            },
+            "Read_complaint_items": {
+              "type": "Http",
+              "runAfter": {
+                "Complaint_item_ids": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "method": "POST",
+                "uri": "@parameters('monday.com API URL (chp_MondayApiUrl)')",
+                "headers": {
+                  "Authorization": "@parameters('monday API Token (chp_MondayAPIToken)')",
+                  "API-Version": "2026-10",
+                  "Content-Type": "application/json"
+                },
+                "body": {
+                  "query": "query ($ids: [ID!], $status: [String!], $date: [String!], $hasDate: Boolean!, $resolution: [String!], $hasResolution: Boolean!) { items(ids: $ids, limit: 100) { id status: column_values(ids: $status) { text } date: column_values(ids: $date) @include(if: $hasDate) { text } resolution: column_values(ids: $resolution) @include(if: $hasResolution) { text } } }",
+                  "variables": {
+                    "ids": "@body('Complaint_item_ids')",
+                    "status": [
+                      "@outputs('Complaint_columns')?['status']?['id']"
+                    ],
+                    "date": "@if(empty(outputs('Complaint_columns')?['dateResolved']?['id']), json('[]'), createArray(outputs('Complaint_columns')?['dateResolved']?['id']))",
+                    "hasDate": "@not(empty(outputs('Complaint_columns')?['dateResolved']?['id']))",
+                    "resolution": "@if(empty(outputs('Complaint_columns')?['resolution']?['id']), json('[]'), createArray(outputs('Complaint_columns')?['resolution']?['id']))",
+                    "hasResolution": "@not(empty(outputs('Complaint_columns')?['resolution']?['id']))"
+                  }
+                },
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 4,
+                  "interval": "PT10S"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              }
+            },
+            "Check_Read_complaint_items": {
+              "type": "If",
+              "runAfter": {
+                "Read_complaint_items": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@empty(body('Read_complaint_items')?['errors'])",
+                  false
+                ]
+              },
+              "actions": {
+                "Fail_Read_complaint_items": {
+                  "type": "Compose",
+                  "runAfter": {},
+                  "inputs": "@concat('monday read: ', string(body('Read_complaint_items')?['errors']))"
+                },
+                "Throw_Read_complaint_items": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Fail_Read_complaint_items": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@div(1, 0)",
+                  "description": "Fails the run on purpose, so a monday error shows in the run history."
+                }
+              },
+              "else": {
+                "actions": {}
+              }
+            },
+            "Complaint_item_values": {
+              "type": "Select",
+              "runAfter": {
+                "Check_Read_complaint_items": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Read_complaint_items')?['data']?['items']",
+                "select": {
+                  "id": "@item()?['id']",
+                  "status": "@if(equals(coalesce(first(item()?['status'])?['text'], ''), 'Resolved'), 775000002, if(contains(createArray('', 'Submitted'), coalesce(first(item()?['status'])?['text'], '')), 775000000, 775000001))",
+                  "date": "@take(coalesce(first(coalesce(item()?['date'], json('[]')))?['text'], ''), 10)",
+                  "resolution": "@coalesce(first(coalesce(item()?['resolution'], json('[]')))?['text'], '')"
+                }
+              }
+            },
+            "Complaint_item_entries": {
+              "type": "Select",
+              "runAfter": {
+                "Complaint_item_values": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Complaint_item_values')",
+                "select": "@concat('\"', item()?['id'], '\":', string(item()))"
+              },
+              "description": "monday item ids are numeric, so they are safe as JSON keys."
+            },
+            "Complaint_items_by_id": {
+              "type": "Compose",
+              "runAfter": {
+                "Complaint_item_entries": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@json(concat('{', join(body('Complaint_item_entries'), ','), '}'))"
+            },
+            "Complaint_updates": {
+              "type": "Select",
+              "runAfter": {
+                "Complaint_items_by_id": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@items('For_each_complaint_chunk')",
+                "select": {
+                  "id": "@item()?['chp_complaintid']",
+                  "found": "@contains(outputs('Complaint_items_by_id'), item()?['chp_mondayitemid'])",
+                  "status": "@outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['status']",
+                  "oldStatus": "@item()?['chp_status']",
+                  "date": "@if(equals(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['status'], 775000002), if(not(empty(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['date'])), outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['date'], if(and(equals(item()?['chp_status'], 775000002), not(empty(take(coalesce(item()?['chp_dateresolved'], ''), 10)))), take(coalesce(item()?['chp_dateresolved'], ''), 10), formatDateTime(utcNow(), 'yyyy-MM-dd'))), '')",
+                  "oldDate": "@take(coalesce(item()?['chp_dateresolved'], ''), 10)",
+                  "resolution": "@if(empty(outputs('Complaint_columns')?['resolution']?['id']), coalesce(item()?['chp_resolution'], ''), coalesce(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['resolution'], ''))",
+                  "oldResolution": "@coalesce(item()?['chp_resolution'], '')"
+                }
+              }
+            },
+            "Changed_complaints": {
+              "type": "Query",
+              "runAfter": {
+                "Complaint_updates": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": {
+                "from": "@body('Complaint_updates')",
+                "where": "@and(item()?['found'], or(not(equals(item()?['status'], item()?['oldStatus'])), not(equals(item()?['date'], item()?['oldDate'])), not(equals(item()?['resolution'], item()?['oldResolution']))))"
+              },
+              "description": "Write only what changed; an item monday did not return (deleted) is skipped."
+            },
+            "For_each_changed_complaint": {
+              "type": "Foreach",
+              "runAfter": {
+                "Changed_complaints": [
+                  "Succeeded"
+                ]
+              },
+              "foreach": "@body('Changed_complaints')",
+              "actions": {
+                "Update_complaint_status": {
+                  "type": "OpenApiConnection",
+                  "runAfter": {},
+                  "inputs": {
+                    "host": {
+                      "connectionName": "shared_commondataserviceforapps",
+                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                      "operationId": "UpdateOnlyRecord"
+                    },
+                    "parameters": {
+                      "entityName": "chp_complaints",
+                      "recordId": "@items('For_each_changed_complaint')?['id']",
+                      "item/chp_status": "@items('For_each_changed_complaint')?['status']",
+                      "item/chp_dateresolved": "@if(empty(items('For_each_changed_complaint')?['date']), null, items('For_each_changed_complaint')?['date'])",
+                      "item/chp_resolution": "@items('For_each_changed_complaint')?['resolution']"
+                    },
+                    "authentication": "@parameters('$authentication')"
+                  }
+                }
+              }
+            }
+          }
+        },
+        "List_complaints_to_resend": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "chp_complaints",
+              "$select": "chp_complaintid,chp_syncattempts",
+              "$filter": "chp_mondayitemid eq null and (chp_syncstate eq 775000002 or (chp_syncstate eq 775000000 and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "For_each_complaint_resend": {
+          "type": "Foreach",
+          "runAfter": {
+            "List_complaints_to_resend": [
+              "Succeeded"
+            ]
+          },
+          "foreach": "@outputs('List_complaints_to_resend')?['body/value']",
+          "actions": {
+            "Resend_complaint": {
+              "type": "OpenApiConnection",
+              "runAfter": {},
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+                  "operationId": "UpdateOnlyRecord"
+                },
+                "parameters": {
+                  "entityName": "chp_complaints",
+                  "recordId": "@items('For_each_complaint_resend')?['chp_complaintid']",
+                  "item/chp_syncstate": 775000000,
+                  "item/chp_syncattempts": "@add(coalesce(items('For_each_complaint_resend')?['chp_syncattempts'], 0), 1)"
+                },
+                "authentication": "@parameters('$authentication')"
+              }
+            }
+          },
+          "description": "Setting Pending and bumping chp_syncattempts re-fires the send flow, whose re-read guard and Reference lookup keep monday free of duplicates. shortcut: re-sends every 10 min without a cap; add a max-attempts stop if ops see repeat failures"
+        }
+      }
+    }
+  }
+}
