@@ -63,6 +63,37 @@ test('Delivery shows trip, related sales order and delivery site; Sales Order sh
   expect(screen.queryByRole('combobox', { name: 'Delivery site (Ship-to Address)' })).toBeNull()
 })
 
+test('with no sales orders or sites on the account, the pickers say so and stay closed', async () => {
+  const real = vi.mocked(serverLogic).getMockImplementation()!
+  vi.mocked(serverLogic).mockImplementation(async (name, options) =>
+    name === 'orders' ? ({ orders: [] } as never) : name === 'sites' ? ([] as never) : real(name, options),
+  )
+  try {
+    const { user } = await open()
+    await pick(user, 'Category', 'Delivery')
+    const order = screen.getByRole('combobox', { name: 'Related Sales Order' })
+    await waitFor(() => expect(order).toBeDisabled())
+    expect(order).toHaveTextContent('No sales orders on your account')
+    expect(screen.getByRole('combobox', { name: 'Delivery site (Ship-to Address)' })).toHaveTextContent('No delivery sites on your account')
+  } finally {
+    vi.mocked(serverLogic).mockImplementation(real)
+  }
+})
+
+test('while sales orders load, the picker stays closed and says so', async () => {
+  const real = vi.mocked(serverLogic).getMockImplementation()!
+  vi.mocked(serverLogic).mockImplementation((name, options) => (name === 'orders' ? new Promise(() => {}) : real(name, options)))
+  try {
+    const { user } = await open()
+    await pick(user, 'Category', 'Sales Order')
+    const order = screen.getByRole('combobox', { name: 'Sales Order Number' })
+    expect(order).toBeDisabled()
+    expect(order).toHaveTextContent('Loading sales orders…')
+  } finally {
+    vi.mocked(serverLogic).mockImplementation(real)
+  }
+})
+
 test('fields from a previous category are not sent', async () => {
   const { user } = await open()
   await pick(user, 'Category', 'Delivery')

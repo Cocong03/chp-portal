@@ -35,15 +35,16 @@ const IN_REVIEW = 775000001
 const RESOLVED = 775000002
 const PENDING = 775000000
 const FAILED = 775000002
-const SHORTCUT = 'shortcut: re-sends every 10 min without a cap; add a max-attempts stop if ops see repeat failures'
+const SHORTCUT = 'shortcut: re-sends every hour without a cap; add a max-attempts stop if ops see repeat failures'
 
 const http = (definition: any) => allActions(definition.actions).filter(([, a]) => a.type === 'Http')
 
-test('runs every 10 minutes, one run at a time', () => {
+// The webhook flow brings status back in real time; this hourly run is the backstop for a missed webhook and re-sends failures.
+test('runs every hour, one run at a time', () => {
   const definition = load()
   const [trigger] = Object.values(definition.triggers) as any[]
   expect(trigger.type).toBe('Recurrence')
-  expect(trigger.recurrence).toMatchObject({ frequency: 'Minute', interval: 10 })
+  expect(trigger.recurrence).toMatchObject({ frequency: 'Hour', interval: 1 })
   expect(trigger.runtimeConfiguration).toEqual({ concurrency: { runs: 1 } })
 })
 
@@ -164,7 +165,8 @@ describe.each(TABLES)('the $table branch', ({ table, entity, idColumn, columns, 
     expect(values.date).toBe("@take(coalesce(first(coalesce(item()?['date'], json('[]')))?['text'], ''), 10)")
     const date = findAction(definition.actions, `${T}_updates`).inputs.select.date as string
     expect(date).toContain(`equals(outputs('${T}_items_by_id')?[item()?['chp_mondayitemid']]?['status'], ${RESOLVED})`)
-    expect(date).toContain("formatDateTime(utcNow(), 'yyyy-MM-dd')")
+    // Today in Manila (Windows zone id for UTC+8), so a morning resolve is not dated the day before.
+    expect(date).toContain("formatDateTime(convertFromUtc(utcNow(), 'Singapore Standard Time'), 'yyyy-MM-dd')")
     expect(date).toContain(`equals(item()?['chp_status'], ${RESOLVED})`)
     expect(date.endsWith(", '')")).toBe(true)
   })

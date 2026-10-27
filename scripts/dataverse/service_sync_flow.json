@@ -44,11 +44,11 @@
     }
   },
   "triggers": {
-    "Every_10_minutes": {
+    "Every_hour": {
       "type": "Recurrence",
       "recurrence": {
-        "frequency": "Minute",
-        "interval": 10
+        "frequency": "Hour",
+        "interval": 1
       },
       "runtimeConfiguration": {
         "concurrency": {
@@ -232,7 +232,7 @@
                   "found": "@contains(outputs('Request_items_by_id'), item()?['chp_mondayitemid'])",
                   "status": "@outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['status']",
                   "oldStatus": "@item()?['chp_status']",
-                  "date": "@if(equals(outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['status'], 775000002), if(not(empty(outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['date'])), outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['date'], if(and(equals(item()?['chp_status'], 775000002), not(empty(take(coalesce(item()?['chp_dateresolved'], ''), 10)))), take(coalesce(item()?['chp_dateresolved'], ''), 10), formatDateTime(utcNow(), 'yyyy-MM-dd'))), '')",
+                  "date": "@if(equals(outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['status'], 775000002), if(not(empty(outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['date'])), outputs('Request_items_by_id')?[item()?['chp_mondayitemid']]?['date'], if(and(equals(item()?['chp_status'], 775000002), not(empty(take(coalesce(item()?['chp_dateresolved'], ''), 10)))), take(coalesce(item()?['chp_dateresolved'], ''), 10), formatDateTime(convertFromUtc(utcNow(), 'Singapore Standard Time'), 'yyyy-MM-dd'))), '')",
                   "oldDate": "@take(coalesce(item()?['chp_dateresolved'], ''), 10)"
                 }
               }
@@ -326,7 +326,7 @@
               }
             }
           },
-          "description": "Setting Pending and bumping chp_syncattempts re-fires the send flow, whose re-read guard and Reference lookup keep monday free of duplicates. shortcut: re-sends every 10 min without a cap; add a max-attempts stop if ops see repeat failures"
+          "description": "Setting Pending and bumping chp_syncattempts re-fires the send flow, whose re-read guard and Reference lookup keep monday free of duplicates. shortcut: re-sends every hour without a cap; add a max-attempts stop if ops see repeat failures"
         }
       }
     },
@@ -507,7 +507,7 @@
                   "found": "@contains(outputs('Complaint_items_by_id'), item()?['chp_mondayitemid'])",
                   "status": "@outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['status']",
                   "oldStatus": "@item()?['chp_status']",
-                  "date": "@if(equals(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['status'], 775000002), if(not(empty(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['date'])), outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['date'], if(and(equals(item()?['chp_status'], 775000002), not(empty(take(coalesce(item()?['chp_dateresolved'], ''), 10)))), take(coalesce(item()?['chp_dateresolved'], ''), 10), formatDateTime(utcNow(), 'yyyy-MM-dd'))), '')",
+                  "date": "@if(equals(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['status'], 775000002), if(not(empty(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['date'])), outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['date'], if(and(equals(item()?['chp_status'], 775000002), not(empty(take(coalesce(item()?['chp_dateresolved'], ''), 10)))), take(coalesce(item()?['chp_dateresolved'], ''), 10), formatDateTime(convertFromUtc(utcNow(), 'Singapore Standard Time'), 'yyyy-MM-dd'))), '')",
                   "oldDate": "@take(coalesce(item()?['chp_dateresolved'], ''), 10)",
                   "resolution": "@if(empty(outputs('Complaint_columns')?['resolution']?['id']), coalesce(item()?['chp_resolution'], ''), coalesce(outputs('Complaint_items_by_id')?[item()?['chp_mondayitemid']]?['resolution'], ''))",
                   "oldResolution": "@coalesce(item()?['chp_resolution'], '')"
@@ -604,7 +604,7 @@
               }
             }
           },
-          "description": "Setting Pending and bumping chp_syncattempts re-fires the send flow, whose re-read guard and Reference lookup keep monday free of duplicates. shortcut: re-sends every 10 min without a cap; add a max-attempts stop if ops see repeat failures"
+          "description": "Setting Pending and bumping chp_syncattempts re-fires the send flow, whose re-read guard and Reference lookup keep monday free of duplicates. shortcut: re-sends every hour without a cap; add a max-attempts stop if ops see repeat failures"
         }
       }
     }

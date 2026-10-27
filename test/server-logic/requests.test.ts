@@ -52,7 +52,7 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
         },
         RetrieveMultipleRecords: (...args: unknown[]) => {
           calls.push({ op: 'RetrieveMultipleRecords', args })
-          const options = String(args[1])
+          const options = decodeURIComponent(String(args[1]))
           if (args[0] === 'chp_requests') return JSON.stringify({ value: options.includes('chp_requestid,chp_reference') ? rows.slice(0, 1) : rows })
           const category = /chp_category eq '([^']*)'/.exec(options)?.[1]
           const name = /chp_name eq '([^']*)'/.exec(options)?.[1]
@@ -213,7 +213,16 @@ test.each([
 test('POST escapes a quote in the type before it reaches the filter', async () => {
   const { server, calls } = submit({ ...BODY, requestType: "O'Brien" })
   await load(server).post()
-  expect(String(calls.find((c) => c.args[0] === 'chp_requesttypes')!.args[1])).toContain("chp_name eq 'O''Brien'")
+  expect(decodeURIComponent(String(calls.find((c) => c.args[0] === 'chp_requesttypes')!.args[1]))).toContain("chp_name eq 'O''Brien'")
+})
+
+// An unencoded "&" ends the $filter early and Dataverse rejects the query (seen on Dev with "Billing & Documentation").
+test('POST URL-encodes the taxonomy filter so a name with "&" stays inside it', async () => {
+  const { server, calls } = submit({ ...BODY, requestType: 'Trip & Delivery' })
+  await load(server).post()
+  const query = String(calls.find((c) => c.args[0] === 'chp_requesttypes')!.args[1])
+  expect(query.split('&').filter((part) => part.startsWith('$filter='))).toHaveLength(1)
+  expect(query).not.toMatch(/ & /)
 })
 
 test('POST as a blocked contact answers blocked and writes nothing', async () => {
