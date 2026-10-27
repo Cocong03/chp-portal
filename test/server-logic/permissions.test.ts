@@ -95,3 +95,39 @@ test('request notes: parent scope through the request permission, never Global',
   for (const privilege of ['create', 'read', 'append']) expect(note.field(privilege), privilege).toBe('true')
   for (const privilege of ['write', 'delete', 'appendto']) expect(note.field(privilege), privilege).toBe('false')
 })
+
+
+// S4-05: complaints are Full Access only; the permissions mirror the requests ones.
+test('complaints: own-account rows, read + create + append only, Full Access only', () => {
+  const p = named('Complaint - own account (read, create)')!
+  expect(p.field('entitylogicalname')).toBe('chp_complaint')
+  expect(p.field('scope')).toBe('756150002') // Account
+  expect(p.field('accountrelationship')).toBe('chp_account_chp_complaint')
+  for (const privilege of ['read', 'create', 'append', 'appendto']) expect(p.field(privilege), privilege).toBe('true')
+  for (const privilege of ['write', 'delete']) expect(p.field(privilege), privilege).toBe('false')
+  const types = named('Complaint type (read)')!
+  expect(types.field('entitylogicalname')).toBe('chp_complainttype')
+  expect(types.field('scope')).toBe('756150000')
+  expect([types.field('read'), types.field('create'), types.field('write'), types.field('delete')]).toEqual(['true', 'false', 'false', 'false'])
+  for (const each of [p, types, named('Complaint note (create)')!]) {
+    expect(each.text, each.file).toContain('- 56b29291-b981-4ef0-865b-41c1e9523a97') // Full Access
+    expect(each.text, each.file).not.toContain('11bb7218') // Orders & Delivery
+    expect(each.text, each.file).not.toContain('b2780841-e908-44f8-b7d8-dfd367bfeeb2') // never all Authenticated Users
+  }
+})
+
+test('complaint notes: parent scope through the complaint permission, never Global', () => {
+  const note = named('Complaint note (create)')!
+  expect(note.field('entitylogicalname')).toBe('annotation')
+  expect(note.field('scope')).toBe('756150003')
+  expect(note.field('parententitypermission')).toBe(named('Complaint - own account (read, create)')!.field('id'))
+  expect(note.field('parentrelationship')).toBe('chp_complaint_Annotations')
+  for (const privilege of ['create', 'read', 'append']) expect(note.field(privilege), privilege).toBe('true')
+  for (const privilege of ['write', 'delete', 'appendto']) expect(note.field(privilege), privilege).toBe('false')
+})
+
+test('complaints: Full Access only — Orders & Delivery never sees complaints', () => {
+  const yml = readFileSync(resolve('.powerpages-site/server-logic/complaints/complaints.serverlogic.yml'), 'utf8')
+  expect(yml).toContain('56b29291-b981-4ef0-865b-41c1e9523a97')
+  expect(yml).not.toContain('11bb7218')
+})
