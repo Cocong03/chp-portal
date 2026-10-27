@@ -120,11 +120,11 @@ test('a failed delete keeps the row and shows the toast', async () => {
   expect(screen.getByText('Draft #1')).toBeInTheDocument()
 })
 
-test('the tabs read Orders, New Order, Drafts and mark Drafts current; the page sets its title', async () => {
+test('the tabs read Orders, Blanket Orders, New Order, Drafts and mark Drafts current; the page sets its title', async () => {
   openDrafts()
   await table()
   const links = within(tabs()).getAllByRole('link')
-  expect(links.map((link) => link.textContent)).toEqual(['Orders', 'New Order', 'Drafts 1'])
-  expect(links[2]).toHaveAttribute('aria-current', 'page')
+  expect(links.map((link) => link.textContent)).toEqual(['Orders', 'Blanket Orders', 'New Order', 'Drafts 1'])
+  expect(links[3]).toHaveAttribute('aria-current', 'page')
   expect(document.title).toBe('Drafts — Concreat Connect')
 })

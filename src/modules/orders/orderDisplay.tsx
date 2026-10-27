@@ -93,3 +93,20 @@ export function siteLabel(
   const site = sites.find((s) => s.code === code);
   return site ? `${code} — ${site.name}` : code;
 }
+
+/** The lists' Delivery site cell: the ship-to code, its name underneath once sites load; "—" without a code. */
+export function SiteCell({ code, sites }: { code: string; sites: SiteDto[] }) {
+  if (!code) return "—";
+  const site = sites.find((s) => s.code === code);
+  return (
+    <>
+      <span className="font-mono">{code}</span>
+      {site && (
+        <>
+          <br />
+          <span className="text-xs text-faint">{site.name}</span>
+        </>
+      )}
+    </>
+  );
+}

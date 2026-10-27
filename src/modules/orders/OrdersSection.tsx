@@ -1,13 +1,15 @@
 import { Navigate, NavLink, Route, Routes } from 'react-router-dom'
 import { cn } from '@/lib/utils'
+import { BlanketOrdersPage } from './BlanketOrdersPage'
 import { DraftsPage } from './drafts/DraftsPage'
 import { useDrafts } from './drafts/useDrafts'
 import { NewOrderPage } from './new/NewOrderPage'
 import { OrdersPage } from './OrdersPage'
 
-// Wireframe `.tabs` / `.tab`. Blanket Orders and Pending Approval join when they're built (S3-16, S3-11).
+// Wireframe `.tabs` / `.tab`. Pending Approval joins when it's built (S3-11).
 const TABS = [
   { label: 'Orders', to: '/orders', end: true },
+  { label: 'Blanket Orders', to: '/orders/blanket', end: false },
   { label: 'New Order', to: '/orders/new', end: false },
   { label: 'Drafts', to: '/orders/drafts', end: false },
 ]
@@ -45,6 +47,7 @@ export function OrdersSection() {
       </nav>
       <Routes>
         <Route index element={<OrdersPage />} />
+        <Route path="blanket" element={<BlanketOrdersPage />} />
         <Route path="new" element={<NewOrderPage />} />
         <Route path="drafts" element={<DraftsPage />} />
         <Route path="*" element={<Navigate to="/orders" replace />} />

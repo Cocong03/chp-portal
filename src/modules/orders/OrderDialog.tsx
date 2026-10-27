@@ -1,3 +1,4 @@
+import type { OrderKind } from "@/api/types";
 import { formatDate, peso } from "@/lib/format";
 import { cn } from "@/lib/utils";
 import { useSites } from "@/modules/sites/useSites";
@@ -9,23 +10,37 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { OrderStatusPill, siteLabel, tripNote } from "./orderDisplay";
 import { useOrder } from "./useOrders";
 
-/** The wireframe's View modal: details, BC lines and Order total, Trip ID note. Reorder arrives with New Order (S3). */
-export function OrderDialog({ id, onClose }: { id: string | null; onClose: () => void }) {
-  const order = useOrder(id);
+/**
+ * The wireframe's View modal: details, BC lines and Order total, Trip ID note. A Blanket Sales Order (S3-16) has no Trip ID
+ * note, its Blanket SO # is "—" (it is the BSO), and its footer offers Manage schedule.
+ */
+export function OrderDialog({
+  id,
+  onClose,
+  kind = "order",
+  onManageSchedule,
+}: {
+  id: string | null;
+  onClose: () => void;
+  kind?: OrderKind;
+  onManageSchedule?: (so: string) => void;
+}) {
+  const blanket = kind === "blanket";
+  const order = useOrder(id, kind);
   const sites = useSites().data ?? [];
   const data = order.data;
-  const note = data && tripNote(data);
+  const note = data && !blanket && tripNote(data);
+  // BC leaves blanket lines unpriced (₱0, probed 2026-10-27): "—", never a price the customer didn't agree to.
+  const unpriced = (line: { unitPrice: number }) => blanket && line.unitPrice === 0;
   /** While the order loads, each value is a bar the size of what it stands in for, so the layout doesn't jump. */
   const bone = (width = "w-24") => <Skeleton className={cn("h-4", width)} />;
-
-  console.log(data?.lines);
 
   return (
     <Dialog open={!!id} onOpenChange={(open) => !open && onClose()}>
       <DialogContent showCloseButton={false} className="max-h-[calc(100vh-40px)] max-w-[720px] overflow-y-auto rounded-2xl p-[22px]">
         <DialogHeader>
           <DialogTitle className="font-mono">{id}</DialogTitle>
-          <DialogDescription className="sr-only">Sales order details</DialogDescription>
+          <DialogDescription className="sr-only">{blanket ? "Blanket sales order details" : "Sales order details"}</DialogDescription>
         </DialogHeader>
         {order.isError ? (
           <QueryError onRetry={() => void order.refetch()} />
@@ -42,7 +57,7 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                   ["Shipment method", data ? (data.ship === "Pickup" ? "Pick up" : (data.ship ?? "—")) : bone("w-16")],
                   ["Delivery site", data ? siteLabel(data.site, sites) : bone("w-44")],
                   ["Expected delivery date", data ? formatDate(data.edd) : bone()],
-                  ["Blanket SO #", data ? (data.bso ?? "—") : bone("w-28")],
+                  ["Blanket SO #", data ? ((!blanket && data.bso) || "—") : bone("w-28")],
                   ["Trip ID number", data ? (data.trip?.id ?? "—") : bone("w-20")],
                 ] as const
               ).map(([label, value]) => (
@@ -89,8 +104,8 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
                         </TableCell>
                         <TableCell className="text-right font-mono tabular-nums">{line.qty.toLocaleString("en-PH")}</TableCell>
                         <TableCell className="font-mono">{line.uom || "—"}</TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">{peso(line.unitPrice)}</TableCell>
-                        <TableCell className="text-right font-mono tabular-nums">{peso(line.lineTotal)}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{unpriced(line) ? "—" : peso(line.unitPrice)}</TableCell>
+                        <TableCell className="text-right font-mono tabular-nums">{unpriced(line) ? "—" : peso(line.lineTotal)}</TableCell>
                       </TableRow>
                     ))
                   )}
@@ -110,6 +125,7 @@ export function OrderDialog({ id, onClose }: { id: string | null; onClose: () =>
           <Button variant="outline" onClick={onClose}>
             Close
           </Button>
+          {onManageSchedule && id && <Button onClick={() => onManageSchedule(id)}>Manage schedule</Button>}
         </DialogFooter>
       </DialogContent>
     </Dialog>
