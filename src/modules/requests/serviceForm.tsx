@@ -1,4 +1,4 @@
-import { useId } from 'react'
+import { useId, useRef, useState } from 'react'
 import { Controller, useFormState, useWatch, type Control } from 'react-hook-form'
 import { z } from 'zod'
 import type { AttachmentDto, ContactMethod } from '@/api/types'
@@ -139,4 +139,30 @@ export function AttachmentField({
       <FieldError>{error}</FieldError>
     </Field>
   )
+}
+
+/** Reading state for an AttachmentField. Only the latest pick is applied; `reading` should disable Submit. */
+export function useAttachment(kind: Kind) {
+  const [attachment, setAttachment] = useState<AttachmentDto>()
+  const [error, setError] = useState<string>()
+  const [reading, setReading] = useState(false)
+  const latest = useRef(0)
+  const pick = async (file: File | null) => {
+    const id = ++latest.current
+    setAttachment(undefined)
+    setError(undefined)
+    setReading(!!file)
+    if (!file) return
+    try {
+      const read = await readAttachment(file, kind)
+      if (id !== latest.current) return
+      if ('error' in read) setError(read.error)
+      else setAttachment(read)
+    } catch {
+      if (id === latest.current) setError("We couldn't read this file. Try again.")
+    } finally {
+      if (id === latest.current) setReading(false)
+    }
+  }
+  return { attachment, error, reading, pick }
 }

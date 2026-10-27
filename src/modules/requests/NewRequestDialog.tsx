@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { toast } from 'sonner'
 import { z } from 'zod'
 import { GENERIC_ERROR, serverLogic } from '@/api/serverLogic'
-import type { AttachmentDto, MeDto, RequestSubmitDto, RequestTaxonomyDto, SubmitResultDto } from '@/api/types'
+import type { MeDto, RequestSubmitDto, RequestTaxonomyDto, SubmitResultDto } from '@/api/types'
 import { useMe } from '@/auth/useMe'
 import { useSites } from '@/modules/sites/useSites'
 import { Button } from '@/ui/button'
@@ -15,7 +15,7 @@ import { Field, FieldError, FieldLabel } from '@/ui/field'
 import { Input } from '@/ui/input'
 import { QueryError } from '@/ui/QueryError'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
-import { AttachmentField, ATTACHMENT_ACCEPT, checkContact, ContactFields, contactShape, EMAIL_RE, readAttachment } from './serviceForm'
+import { AttachmentField, ATTACHMENT_ACCEPT, checkContact, ContactFields, contactShape, EMAIL_RE, useAttachment } from './serviceForm'
 import { useOrderNumbers } from './useOrderNumbers'
 import { useRequestTaxonomy } from './useRequests'
 
@@ -67,8 +67,7 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
   const queryClient = useQueryClient()
   const sites = useSites().data ?? []
   const orders = useOrderNumbers().data ?? []
-  const [attachment, setAttachment] = useState<AttachmentDto>()
-  const [attachmentError, setAttachmentError] = useState<string>()
+  const file = useAttachment('request')
   const send = useMutation({ mutationFn: (body: RequestSubmitDto) => serverLogic<SubmitResultDto>('requests', { method: 'POST', body }) })
 
   const [categoryName, setCategoryName] = useState('')
@@ -96,7 +95,7 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
     try {
       const result = await send.mutateAsync({
         category: values.category, requestType: values.requestType, contactMethod: values.contactMethod,
-        contactValue: values.contactValue, details: values.details, additionalInfo: values.additionalInfo, fields, attachment,
+        contactValue: values.contactValue, details: values.details, additionalInfo: values.additionalInfo, fields, attachment: file.attachment,
       })
       if ('invalid' in result) return void toast.error('Please check the form and try again.')
       // The server answers an empty ref when the request was saved but its number could not be read back.
@@ -236,22 +235,15 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
       <AttachmentField
         label="Attach a supporting document (optional)"
         accept={ATTACHMENT_ACCEPT.request}
-        error={attachmentError}
-        onChange={async (file) => {
-          setAttachment(undefined)
-          setAttachmentError(undefined)
-          if (!file) return
-          const read = await readAttachment(file, 'request')
-          if ('error' in read) setAttachmentError(read.error)
-          else setAttachment(read)
-        }}
+        error={file.error}
+        onChange={(picked) => void file.pick(picked)}
       />
 
       <DialogFooter>
         <Button type="button" variant="outline" onClick={onClose}>
           Cancel
         </Button>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button type="submit" disabled={isSubmitting || file.reading}>
           Submit request
         </Button>
       </DialogFooter>
