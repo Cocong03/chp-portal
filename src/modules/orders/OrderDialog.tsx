@@ -113,7 +113,7 @@ export function OrderDialog({
                     <TableCell colSpan={4} className="text-right font-bold">
                       Order total
                     </TableCell>
-                    <TableCell className="text-right font-mono font-bold tabular-nums">{data ? peso(data.total) : <div className="flex justify-end">{bone("w-24")}</div>}</TableCell>
+                    <TableCell className="text-right font-mono font-bold tabular-nums">{data ? (blanket && data.total === 0 ? "—" : peso(data.total)) : <div className="flex justify-end">{bone("w-24")}</div>}</TableCell>
                   </TableRow>
                 </TableBody>
               </Table>

@@ -78,3 +78,12 @@ test('saving a schedule shows the success note', async () => {
   expect(await screen.findByText('Delivery schedule for BSO-20441 has been updated.')).toBeInTheDocument()
   expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
 })
+
+test('a Blanket Sales Order BC left at ₱0 shows — as its Total', async () => {
+  answerBlanketList({
+    orders: [{ so: 'BSO000000012', date: '2026-10-27', po: '', site: 'PLANT1', ship: 'Pickup', bso: null, trip: null, edd: null, total: 0, status: 'Open' }],
+  })
+  open()
+  const row = await screen.findByRole('row', { name: /BSO000000012/ })
+  expect(row).not.toHaveTextContent('₱0.00')
+})

@@ -124,3 +124,16 @@ test('a sales order View has no Manage schedule button', async () => {
   await within(dialog).findByRole('row', { name: /CEM-T1-40KG/ })
   expect(within(dialog).queryByRole('button', { name: 'Manage schedule' })).not.toBeInTheDocument()
 })
+
+test('blanket View shows — for an Order total BC left at 0', async () => {
+  answerOrder({
+    so: 'BSO000000012', date: '2026-10-27', po: '', site: 'PLANT1', ship: 'Pickup', bso: null, trip: null, edd: null, total: 0, status: 'Open',
+    lines: [{ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', qty: 10, uom: 'BAG', unitPrice: 0, lineTotal: 0 }],
+  })
+  renderApp(<OrderDialog id="BSO000000012" kind="blanket" onClose={() => {}} />)
+  const lines = await screen.findByRole('table', { name: 'Order lines' })
+  const total = await within(lines).findByRole('row', { name: /Order total/ })
+  await within(lines).findByRole('row', { name: /CEM-T1-40KG/ })
+  expect(total).toHaveTextContent('—')
+  expect(total).not.toHaveTextContent('₱0.00')
+})

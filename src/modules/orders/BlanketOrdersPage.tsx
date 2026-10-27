@@ -24,7 +24,8 @@ function columns(sites: SiteDto[], onView: (so: string) => void, onSchedule: (so
     { id: "date", header: "Date", cell: ({ row }) => formatDate(row.original.date) },
     { id: "po", header: "PO reference", cell: ({ row }) => row.original.po || "—", meta: mono },
     { id: "site", header: "Delivery site", cell: ({ row }) => <SiteCell code={row.original.site} sites={sites} /> },
-    { id: "total", header: "Total", cell: ({ row }) => peso(row.original.total), meta: { className: "text-right font-mono tabular-nums" } },
+    // BC leaves blanket lines unpriced (₱0): never show a ₱0.00 total as if it were the agreed price.
+    { id: "total", header: "Total", cell: ({ row }) => (row.original.total === 0 ? "—" : peso(row.original.total)), meta: { className: "text-right font-mono tabular-nums" } },
     { id: "status", header: "Status", cell: ({ row }) => <OrderStatusPill status={row.original.status} /> },
     {
       id: "actions",

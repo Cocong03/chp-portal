@@ -118,3 +118,10 @@ test.each([null, {}, 'x', [{ item: 'CEM-T1-40KG' }], [{ item: 1, qty: 2, date: '
 test('an unknown order type comes back as Single', () => {
   expect(fromDraft(payload({ orderType: 'standing' as never }), options, sites).orderType).toBe('single')
 })
+
+test('a schedule row whose quantity was cleared (saved as null) keeps its item and date', () => {
+  const schedule = [{ item: 'CEM-T1-40KG', qty: null, date: '2026-11-20' }]
+  const [row] = fromDraft(payload({ schedule: schedule as never }), options, sites).schedule
+  expect(row).toMatchObject({ item: 'CEM-T1-40KG', date: '2026-11-20' })
+  expect(row.qty).toBeNaN()
+})
