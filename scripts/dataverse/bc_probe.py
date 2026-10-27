@@ -3,7 +3,7 @@
 Prints field NAMES and how many sampled rows fill each one. Never prints the BC secret, the token or
 personal values; only the enum-like fields in SHOW_VALUES print their values.
 
-Usage (from the repo root): python scripts/dataverse/bc_probe.py C00000009
+Usage (from the repo root): python scripts/dataverse/bc_probe.py C00000009 ["APO Cement"]  (company defaults to Solid Cement)
 """
 import sys
 
@@ -23,6 +23,8 @@ def env(schema):
     return (values[0]['value'] if values else row['defaultvalue'] or '').strip()
 
 
+company = sys.argv[2] if len(sys.argv) > 2 else 'Solid Cement'
+company_id = dv.get(f"chp_bccompanies?$select=chp_bccompanyguid&$filter=chp_name eq '{company}'")['value'][0]['chp_bccompanyguid']
 tenant = env('chp_BCTenantId')
 token_response = requests.post(f'https://login.microsoftonline.com/{tenant}/oauth2/v2.0/token', data={
     'grant_type': 'client_credentials', 'client_id': env('chp_BCClientId'),
@@ -31,7 +33,7 @@ if not token_response.ok:
     raise SystemExit(f'token request failed: {token_response.status_code}')
 headers = {'Authorization': 'Bearer ' + token_response.json()['access_token'], 'Accept': 'application/json'}
 root = (f"https://api.businesscentral.dynamics.com/v2.0/{tenant}/{env('chp_BCEnvironmentName')}"
-        f"{env('chp_BCApiBasePath')}/companies({env('chp_BCSolidCementCompanyId')})/")
+        f"{env('chp_BCApiBasePath')}/companies({company_id})/")
 customer = sys.argv[1]
 
 

@@ -184,13 +184,11 @@ sequenceDiagram
 
 ## 7. BC company scope and the duplicate-email rule
 
-**Current decision (Oct 1, 2026): activation and the portal use one BC company, Solid Cement.** APO Cement is out of scope until confirmed.
+**Current state (2026-10-27, S1-12): activation searches every BC company listed in `chp_bccompany`: Solid Cement and APO Cement.** More companies will follow; each is a new row per environment.
 
-- The packages put both companies in Release 1 scope (*"separate login email per account, of either kind"*), but the project is starting with **Solid Cement only**. Confirm the APO Cement go-live timing with Rene and the BC team.
-- Keep the design **company-aware** so adding APO Cement later is configuration, not a rebuild:
-  - the activation flow reads the BC company ID from an **environment variable** (`Solid Cement` company ID for now), not a hardcoded value;
-  - the Account record still stores `chp_bccompanyid` / `chp_bccompanyname`, and every Server Logic call takes the company from the Account.
-- **Enabling APO Cement later** (plan task S1-12): add its company ID, change the flow to search both companies, and apply the duplicate-email rule below.
+- The activation flow searches each active company and collects (company, customer) pairs. Exactly one pair activates; the Account stores that company's `chp_bccompanyid` / `chp_bccompanyname`, and every Server Logic call takes the company from the Account.
+- BC customer numbers repeat across companies (APO C00000002 is not Solid Cement C00000002), so access grants carry a Company too.
+- The production go-live date for APO Cement is still to confirm with Rene (Q11).
 
 **Open question Q10: an email registered on more than one BC customer**
 
@@ -204,6 +202,6 @@ The Nov 15 rule is one login email per account; the account switcher comes in Ph
 | B. Use the first match | Activate against the first customer BC returns | What the POC does today (`$top 1`). Order isn't guaranteed, so a customer could land in the wrong account |
 | C. Pick a primary | Activate against the customer flagged as primary (needs a BC field or rule) | Needs BC work; becomes moot when the Phase 2 switcher ships |
 
-To implement A, query BC with `$top 2` and treat more than one result as "duplicate". The same rule applies once APO Cement is added and both companies are searched.
+To implement A, query BC with `$top 2` and treat more than one result as "duplicate". The same rule applies across companies (built in S1-12): an email on a Solid Cement and an APO Cement customer is blocked, and the ops email lists both.
 
 **Owner:** Rene (business rule) + BC team (whether a "primary" signal exists). **Needed by:** S1-03.

@@ -2,7 +2,7 @@
 
 Prints the API's entity sets, each order/line field's fill count, and values only for status/type/flag/date-like
 fields (never names, addresses or amounts). Never prints the BC secret or token.
-Usage (from the repo root): python scripts/dataverse/bc_probe_orders.py [customer no.]
+Usage (from the repo root): python scripts/dataverse/bc_probe_orders.py [customer no.] ["APO Cement"]  (company defaults to Solid Cement)
 """
 import re
 import sys
@@ -32,7 +32,8 @@ if not token.ok:
     raise SystemExit(f'token request failed: {token.status_code}')
 headers = {'Authorization': 'Bearer ' + token.json()['access_token'], 'Accept': 'application/json'}
 api = f"https://api.businesscentral.dynamics.com/v2.0/{tenant}/{env('chp_BCEnvironmentName')}{env('chp_BCApiBasePath')}"
-root = f"{api}/companies({env('chp_BCSolidCementCompanyId')})/"
+company = sys.argv[2] if len(sys.argv) > 2 else 'Solid Cement'
+root = f"{api}/companies({dv.get(f"chp_bccompanies?$select=chp_bccompanyguid&$filter=chp_name eq '{company}'")['value'][0]['chp_bccompanyguid']})/"
 
 
 def get(url, params=None):

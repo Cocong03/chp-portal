@@ -5,7 +5,7 @@ Customers see the portal as **Concreat Connect** (wireframe name; decided 2026-1
 Customer portal for **Concreat Holdings (CHP)** customers. Customers sign in, place and track cement orders, view their ledger and documents, manage delivery sites, and submit requests/complaints. **Business Central (BC) is the system of record**; the portal consumes BC through APIs built by the BC team.
 
 - Release 1 target: **Nov 15, 2026** (full portal, scope still PROPOSED). Client "Phase 2" (account switcher, feature completion): **after Jan 1, 2027**.
-- BC companies: **Solid Cement only for now** (decided Oct 1, 2026). APO Cement comes later (plan task S1-12), so keep every BC call company-aware: the company ID comes from the Account record or an env var, never a hardcoded value.
+- BC companies: **Solid Cement and APO Cement** (APO enabled on Dev 2026-10-27, S1-12); more companies will follow. The companies are rows in the Dataverse table `chp_bccompany` (name + BC company ID, per environment): activation searches every active row, so adding a company is adding a row. Keep every BC call company-aware: the company ID comes from the Account record, never a hardcoded value. One email = one customer across all companies (Q10) until the Phase 2 switcher.
 
 ## Read these first
 
@@ -98,19 +98,19 @@ docs/               architecture, plan, registration docs
 - **DTO shapes mirror the wireframe's sample arrays** (`ORDERS`, `SITES`, `CATALOG`, `LEDGER_ENTRIES`…). Keep the field names so the SPA and BFF stay aligned.
 - **Server Logic can't `require`/`import`**, and banned patterns include `eval`, `setTimeout`, `delete`, `prototype`, `Reflect.`. Each record carries a copy of the shared helpers (token, BC GET/POST, OData escape, scoping). Keep the copies identical and generate them from one template; don't hand-edit them per file.
 - Server Logic HttpClient bodies are strings. Binary files (PDFs) come from BC as **base64 JSON**.
-- **All environment-specific values are Dataverse environment variables**: BC tenant, BC environment name, company IDs, API base path, site URL, sender mailbox. **Secrets: Key Vault → secret env var → site setting.** Never hardcode them.
+- **All environment-specific values are Dataverse environment variables**: BC tenant, BC environment name, API base path, site URL, sender mailbox. BC company IDs are the exception: they are `chp_bccompany` rows (decided 2026-10-27). **Secrets: Key Vault → secret env var → site setting.** Never hardcode them.
   - **Exception (Dev only, decided 2026-10-04):** `chp_BCClientSecret` is a plain-text environment variable (no default value, value set by hand in Dev only) instead of Key Vault. Moving it to Key Vault is part of S1-14 and must happen before UAT. Never put its value in chat, files or git.
 - Order status mapping (confirmed 2026-09-14): BC Open → _Open_ · Pending Prepayment → _Pending Prepayment_ · Released → _Ready for Dispatch_ · archived + Completely Shipped → _Completely Shipped_ · Completely Shipped + Invoiced → _Invoiced_.
 - Customer-facing copy uses the wireframe's wording exactly (renames per the packages, e.g. "+ New Multiple Order", "Account and User Management"). Never show BC jargon (location codes, table names) or the name of CHP's internal service-center system.
 - Every page sets `document.title` as `"<Page> — Concreat Connect"`.
 - Publisher **Concreat Holdings**, prefix `chp_` (option-value prefix 77500), solution **`ConcreatHub`**. Create every Dataverse component in that solution.
-- Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCSolidCementCompanyId`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`, `chp_PowerPagesSiteId`, `chp_BCClientId`, `chp_BCClientSecret` (see the Dev exception above), `chp_EmailLogoUrl` (public PNG for emails; mail clients can't read the private portal). Server Logic reads the BC ones through the `BC/*` site settings.
+- Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`, `chp_PowerPagesSiteId`, `chp_BCClientId`, `chp_BCClientSecret` (see the Dev exception above), `chp_EmailLogoUrl` (public PNG for emails; mail clients can't read the private portal). Server Logic reads the BC ones through the `BC/*` site settings.
 
 ## Environments
 
 |      | Power Platform                                                   | BC                                                                                                     |
 | ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
-| Dev  | _CHP Customer Portal_ (`https://org380257ac.crm5.dynamics.com/`) | Concreat Sandbox Dev - environment `DEV` (renamed from TRAINING 2026-10-04) · SOLID CEMENT CORPORATION |
+| Dev  | _CHP Customer Portal_ (`https://org380257ac.crm5.dynamics.com/`) | Concreat Sandbox Dev - environment `DEV` (renamed from TRAINING 2026-10-04) · SOLID CEMENT CORPORATION, APO CEMENT CORPORATION |
 | UAT  | TBD                                                              | Concreat UAT sandbox                                                                                   |
 | Prod | TBD                                                              | Concreat production                                                                                    |
 
