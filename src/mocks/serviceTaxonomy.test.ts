@@ -1,3 +1,4 @@
+import wireframe from '../../docs/Mockup-chp-v2.html?raw' // read-only: the wireframe is the source
 import taxonomy from './serviceTaxonomy.json'
 
 test('Nov 15 request categories are the six the plan names, in wireframe order', () => {
@@ -22,4 +23,30 @@ test('active categories use only the field keys the Nov 15 forms build', () => {
   expect([...keys].sort()).toEqual(['docdate', 'docref', 'order', 'site', 'trip', 'userEmail'])
   expect(taxonomy.requests.find((c) => c.category === 'Sales Order')!.fields.orderLabel).toBe('Sales Order Number')
   expect(taxonomy.requests.find((c) => c.category === 'Delivery')!.fields).toEqual({ rows: ['trip', 'order', 'site'], orderLabel: 'Related Sales Order' })
+})
+
+describe('taxonomy matches the wireframe', () => {
+  const html = wireframe.split('\n')
+  const literal = (name: string) => {
+    const start = html.findIndex((l) => l.includes(`const ${name} = {`))
+    const end = html.findIndex((l, i) => i > start && /^\s*};\s*$/.test(l))
+    const text = html.slice(start, end + 1).join('\n').replace(/^\s*const \w+ = /, '').replace(/;\s*$/, '')
+    return new Function('return ' + text)() as Record<string, any>
+  }
+
+  test('request types and fields', () => {
+    const types = literal('REQUEST_TAXONOMY')
+    const fields = literal('REQUEST_CATEGORY_FIELDS')
+    expect(taxonomy.requests.map((c) => c.category).sort()).toEqual(Object.keys(types).sort())
+    for (const c of taxonomy.requests) {
+      expect(c.types).toEqual(types[c.category])
+      expect(c.fields).toEqual(fields[c.category])
+    }
+  })
+
+  test('complaint types', () => {
+    const types = literal('COMPLAINT_TAXONOMY')
+    expect(taxonomy.complaints.map((c) => c.category)).toEqual(Object.keys(types))
+    for (const c of taxonomy.complaints) expect(c.types).toEqual(types[c.category])
+  })
 })
