@@ -22,7 +22,7 @@ The **access grant is the source of truth** for each person's portal role (decid
 **Give a role** (before or after the person activates)
 
 1. Open **Concreat Connect Admin** → **Access Grants** → **New**.
-2. Enter the **email**, the BC **customer no.** and the **role**, then **Save**.
+2. Enter the **email**, the **Company** (Solid Cement or APO Cement), the BC **customer no.** and the **role**, then **Save**. Customer numbers repeat between companies (APO's C00000002 is a different customer from Solid Cement's), so the Company must match the customer.
 
 **Change a role:** open the grant, pick the new **Role**, **Save**. The old role is removed and the new one applied.
 

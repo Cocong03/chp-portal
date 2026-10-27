@@ -20,6 +20,7 @@ MEMO = '{E0DECE4B-6FC8-4a8f-A065-082708572369}'
 # (logical name, label, control classid, read-only)
 FORM_FIELDS = [
     ('chp_email', 'Email', TEXT, False),
+    ('chp_company', 'Company', LOOKUP, False),
     ('chp_bccustomerno', 'BC Customer No.', TEXT, False),
     ('chp_webrole', 'Role', CHOICE, False),
     ('chp_status', 'Status', CHOICE, True),
@@ -27,7 +28,7 @@ FORM_FIELDS = [
     ('chp_appliedon', 'Applied on', DATETIME, True),
     ('chp_note', 'Note', MEMO, False),
 ]
-VIEW_COLUMNS = [('chp_email', 250), ('chp_bccustomerno', 120), ('chp_webrole', 150),
+VIEW_COLUMNS = [('chp_email', 250), ('chp_company', 150), ('chp_bccustomerno', 120), ('chp_webrole', 150),
                 ('chp_status', 140), ('chp_appliedon', 150), ('modifiedon', 150)]
 
 dv = Dataverse()
