@@ -155,9 +155,13 @@ def solution_id():
 
 def env_vars():
     print('Environment variables')
-    # (schema, display, value); value None = definition only (the token is set by hand, never here).
+    # The token is created by hand and never by this script; only add its definition to the solution.
+    token_id = definition_id('chp_MondayAPIToken')
+    if not token_id:
+        raise SystemExit('chp_MondayAPIToken is missing — create it in the maker portal first')
+    print('  = chp_MondayAPIToken exists')
+    ensure_in_solution(token_id)
     for schema, display, value in (
-            ('chp_MondayAPIToken', 'monday.com API token (set by hand, no default)', None),
             ('chp_MondayApiUrl', 'monday.com API URL', 'https://api.monday.com/v2'),
             ('chp_MondayRequestsBoardId', 'monday.com Requests board ID', '18435036978'),
             ('chp_MondayComplaintsBoardId', 'monday.com Complaints board ID', '18435203449'),
@@ -170,9 +174,6 @@ def env_vars():
             dv.post('environmentvariabledefinitions', {'schemaname': schema, 'displayname': display, 'type': STRING})
             def_id = definition_id(schema)
             print(f'  + {schema}')
-        if value is None:
-            ensure_in_solution(def_id)
-            continue
         rows = dv.get("environmentvariablevalues?$select=environmentvariablevalueid"
                       f"&$filter=_environmentvariabledefinitionid_value eq {def_id}")['value']
         if rows:
