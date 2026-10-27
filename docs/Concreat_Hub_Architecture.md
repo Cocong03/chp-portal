@@ -358,7 +358,7 @@ src/
 |---|---|---|---|
 | D1 | Where pending-credit-approval orders live | BC approval workflow (§7) | BC team + PASI |
 | D2 | Customer-specific pricing source | BC price-calculation endpoint, not raw price lists | BC team |
-| D3 | Where Requests/Complaints/site requests are worked by CHP ("internal service-center system", never named in the wireframe) | Dataverse tables + flow notification. If CHP runs **Dynamics 365 Customer Service**, create Cases instead | CHP / Rene |
+| D3 | Where Requests/Complaints/site requests are worked by CHP ("internal service-center system", never named in the wireframe) | Dataverse tables + flow notification. If CHP runs **Dynamics 365 Customer Service**, create Cases instead. **2026-10-27: CHP works these in monday.com boards**; a flow creates the monday.com item from the Dataverse row (board mapping and open asks in the implementation plan, "Service center = monday.com") | CHP / Rene |
 | D4 | Role granted on activation | None; ops assigns a role in Portal Management | Rene |
 | Q5 | BC API exposure of archived SOs, posted docs + PDFs, ledger | Needed for Orders statuses, Document Center, Ledger (§8) | BC team |
 | Q6 | Account & User Mgmt visibility per role (missing from role map) | All roles read; Full Access revokes | Rene |
