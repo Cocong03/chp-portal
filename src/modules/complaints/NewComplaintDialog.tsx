@@ -38,7 +38,7 @@ const schema = z
     relatedOrder: z.string(),
     subject: z.string().trim().min(1, 'Enter a subject.').max(200, 'Keep the subject to 200 characters.'),
     description: z.string().trim().max(4000, 'Keep the description to 4,000 characters.'),
-    consent: z.boolean(),
+    consent: z.boolean().refine((agreed) => agreed, 'Please agree to be contacted to submit.'),
   })
   .superRefine((values, ctx) => {
     checkContact(values, ctx)
@@ -79,7 +79,7 @@ function ComplaintForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: Complai
       const result = await send.mutateAsync({
         category: values.category, complaintType: values.complaintType, contactMethod: values.contactMethod,
         contactValue: values.contactValue, incidentDate: values.incidentDate, site: values.site, relatedOrder: values.relatedOrder,
-        subject: values.subject, description: values.description, consent: true, attachment: file.attachment,
+        subject: values.subject, description: values.description, consent: values.consent, attachment: file.attachment,
       })
       if ('invalid' in result) return void toast.error('Please check the form and try again.')
       // The server answers an empty ref when the complaint was saved but its number could not be read back.
@@ -193,7 +193,7 @@ function ComplaintForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: Complai
             control={control}
             name="site"
             render={({ field }) =>
-              choose('cp-site', field.value, field.onChange, 'Not Applicable', sites.map((s) => ({ value: `${s.code} — ${s.name}`, label: `${s.code} — ${s.name}` })))
+              choose('cp-site', field.value, field.onChange, 'Not Applicable', sites.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` })))
             }
           />
         </Field>

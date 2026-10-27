@@ -56,7 +56,7 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
           const category = unescape(/chp_category eq '((?:[^']|'')*)'/.exec(options)?.[1])
           const name = unescape(/chp_name eq '((?:[^']|'')*)'/.exec(options)?.[1])
           const active = TYPES.filter((t) => t.chp_active)
-          return JSON.stringify({ value: category ? active.filter((t) => t.chp_category === category && t.chp_name === name) : active })
+          return JSON.stringify({ value: category ? active.filter((t) => t.chp_category.toLowerCase() === category.toLowerCase() && t.chp_name === name) : active })
         },
         CreateRecord: (...args: unknown[]) => calls.push({ op: 'CreateRecord', args }) && '',
       },
@@ -124,6 +124,12 @@ test('GET as a blocked contact answers blocked', async () => {
   expect(await answer(load(fakeServer({ portal: [] }).server).get())).toEqual({ blocked: true })
 })
 
+test("POST stores the taxonomy row's category, not the casing the client sent", async () => {
+  const { server, calls } = submit({ ...BODY, category: 'billing & documentation' })
+  expect(await answer(load(server).post())).toEqual({ ref: 'CMP-00001' })
+  expect(created(calls)).toMatchObject({ chp_category: 'Billing & Documentation', chp_complainttype: 'Incorrect Invoice' })
+})
+
 test('POST sets account, contact, person, group, status, consent and sync from the server, never from the body', async () => {
   const { server, calls } = submit({ ...BODY, account: 'evil', assignedGroup: 'Hackers', status: 'Resolved', contactPerson: 'Evil', resolution: 'x' })
   expect(await answer(load(server).post())).toEqual({ ref: 'CMP-00001' })
@@ -165,6 +171,9 @@ test.each([
   ['an attachment named x.toString', { attachment: { name: 'x.toString', base64: 'aGVsbG8=' } }, 'attachment'],
   ['unpadded base64', { attachment: { name: 'x.pdf', base64: 'aGVsbG8' } }, 'attachment'],
   ['a 5,242,881-byte attachment', { attachment: { name: 'x.pdf', base64: big } }, 'attachment'],
+  ['an attachment name with a line break', { attachment: { name: 'a\r\nb.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['an attachment name with a quote', { attachment: { name: 'a"b.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['an attachment name with a path', { attachment: { name: '..\\x.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
 ])('POST with %s is invalid, nothing written', async (_case, change, field) => {
   const { server, writes } = submit({ ...BODY, ...change })
   expect(await answer(load(server).post())).toEqual({ invalid: true, field })

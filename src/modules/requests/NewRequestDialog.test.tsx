@@ -207,3 +207,16 @@ test('a stale attachment read does not overwrite a newer pick', async () => {
   await waitFor(() => expect(posts()).toHaveLength(1))
   expect(posts()[0][1]?.body).toMatchObject({ attachment: { name: 'new.pdf' } })
 })
+
+test('a Delivery request posts the delivery site as its ship-to code, not the label', async () => {
+  const { user } = await open()
+  await pick(user, 'Category', 'Delivery')
+  await pick(user, 'Request type', 'Concern')
+  await user.type(screen.getByLabelText('Trip ID reference'), 'TRP-1')
+  await pick(user, 'Related Sales Order', 'SO-100467')
+  await pick(user, 'Delivery site (Ship-to Address)', 'PLANT1 — Plant 1 — Main Yard')
+  await user.type(screen.getByRole('textbox', { name: 'Request details' }), 'Truck is late')
+  await user.click(screen.getByRole('button', { name: 'Submit request' }))
+  await waitFor(() => expect(posts()).toHaveLength(1))
+  expect(posts()[0][1]?.body).toMatchObject({ category: 'Delivery', fields: { site: 'PLANT1' } })
+})

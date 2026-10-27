@@ -144,3 +144,15 @@ test('a saved complaint whose number could not be read back still confirms and c
   await waitFor(() => expect(toast.success).toHaveBeenCalledWith('Complaint submitted.'))
   expect(onClose).toHaveBeenCalled()
 })
+
+test('a Delivery & Handling complaint posts the delivery site as its ship-to code, not the label', async () => {
+  const { user } = await open()
+  await pick(user, 'Category', 'Delivery & Handling')
+  await pick(user, 'Complaint type', 'Missing Bags (Short Delivery)')
+  await pick(user, 'Delivery site (optional)', 'PLANT1 — Plant 1 — Main Yard')
+  await user.type(screen.getByRole('textbox', { name: 'Subject' }), 'Short delivery')
+  await user.click(screen.getByRole('checkbox', { name: CONSENT }))
+  await user.click(screen.getByRole('button', { name: 'Submit' }))
+  await waitFor(() => expect(posts()).toHaveLength(1))
+  expect(posts()[0][1]?.body).toMatchObject({ category: 'Delivery & Handling', site: 'PLANT1', consent: true })
+})

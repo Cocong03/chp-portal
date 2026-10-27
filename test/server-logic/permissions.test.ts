@@ -114,7 +114,7 @@ test('complaint notes: parent scope through the complaint permission, never Glob
   for (const privilege of ['write', 'delete', 'appendto']) expect(note.field(privilege), privilege).toBe('false')
 })
 
-test('complaints: Full Access only — Orders & Delivery never sees complaints', () => {
+test('complaints: Full Access only â€” Orders & Delivery never sees complaints', () => {
   const yml = readFileSync(resolve('.powerpages-site/server-logic/complaints/complaints.serverlogic.yml'), 'utf8')
   expect(yml).toContain('56b29291-b981-4ef0-865b-41c1e9523a97')
   expect(yml).not.toContain('11bb7218')

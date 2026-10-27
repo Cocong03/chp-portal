@@ -57,7 +57,7 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
           const category = /chp_category eq '([^']*)'/.exec(options)?.[1]
           const name = /chp_name eq '([^']*)'/.exec(options)?.[1]
           const active = TYPES.filter((t) => t.chp_active)
-          return JSON.stringify({ value: category ? active.filter((t) => t.chp_category === category && t.chp_name === name) : active })
+          return JSON.stringify({ value: category ? active.filter((t) => t.chp_category.toLowerCase() === category.toLowerCase() && t.chp_name === name) : active })
         },
         CreateRecord: (...args: unknown[]) => calls.push({ op: 'CreateRecord', args }) && '',
       },
@@ -155,6 +155,10 @@ test.each([
   ['unpadded base64', { attachment: { name: 'x.pdf', base64: 'aGVsbG8' } }, 'attachment'],
   ['a .exe attachment', { attachment: { name: 'x.exe', base64: 'aGVsbG8=' } }, 'attachment'],
   ['a 5,242,881-byte attachment', { attachment: { name: 'x.pdf', base64: big } }, 'attachment'],
+  ['an attachment name with a line break', { attachment: { name: 'a\r\nb.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['an attachment name with a quote', { attachment: { name: 'a"b.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['an attachment name with a path', { attachment: { name: '..\\x.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['a 51-character document reference', { category: 'Document Copy', requestType: 'Delivery Receipt (DR)', fields: { docref: 'D'.repeat(51), docdate: '2026-09-01' } }, 'docref'],
 ])('POST with %s is invalid, nothing written', async (_case, change, field) => {
   const { server, writes } = submit({ ...BODY, ...change })
   expect(await answer(load(server).post())).toEqual({ invalid: true, field })
@@ -166,6 +170,12 @@ test('POST accepts an attachment at the size limit and an optional field left em
   const { server, writes } = submit({ ...BODY, requestType: 'Query', fields: {}, attachment: { name: 'x.pdf', base64: exact } })
   expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
   expect(writes()).toHaveLength(1) // the note rides in the same create
+})
+
+test("POST stores the taxonomy row's category, not the casing the client sent", async () => {
+  const { server, calls } = submit({ ...BODY, category: 'sales order' })
+  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
+  expect(created(calls)).toMatchObject({ chp_category: 'Sales Order', chp_requesttype: 'Modification' })
 })
 
 test('POST stores the site as "<code> — <name>" from BC, not the label the client sent', async () => {
