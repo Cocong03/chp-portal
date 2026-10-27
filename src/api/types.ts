@@ -170,3 +170,15 @@ export interface DraftDto {
   savedAt: string
   payload: DraftPayload
 }
+
+export type ServiceStatus = 'Submitted' | 'In Review' | 'Resolved'
+export type ContactMethod = 'Email' | 'Mobile'
+export interface AttachmentDto { name: string; base64: string }
+export interface RequestDto { id: string; ref: string; submitted: string; category: string; requestType: string; assignedGroup: string; contactMethod: ContactMethod; contactValue: string; contactPerson: string; details: string; additionalInfo: string; attachmentName: string; extra: { label: string; value: string }[]; status: ServiceStatus }
+export interface ComplaintDto { id: string; ref: string; submitted: string; category: string; complaintType: string; assignedGroup: string; incidentDate: string; deliverySite: string; subject: string; description: string; relatedOrder: string; contactMethod: ContactMethod; contactValue: string; contactPerson: string; attachmentName: string; status: ServiceStatus; dateResolved: string; resolutionNote: string }
+export interface RequestFieldConfig { rows: string[]; orderLabel?: string; optional?: string[] }
+export interface RequestTaxonomyDto { categories: { name: string; fields: RequestFieldConfig; types: { type: string; group: string }[] }[] }
+export interface ComplaintTaxonomyDto { categories: { name: string; types: { type: string; group: string }[] }[] }
+export interface RequestSubmitDto { category: string; requestType: string; contactMethod: ContactMethod; contactValue: string; details: string; additionalInfo: string; fields: Record<string, string>; attachment?: AttachmentDto }
+export interface ComplaintSubmitDto { category: string; complaintType: string; contactMethod: ContactMethod; contactValue: string; incidentDate: string; site: string; relatedOrder: string; subject: string; description: string; consent: boolean; attachment?: AttachmentDto }
+export type SubmitResultDto = { ref: string } | { invalid: true; field: string }
