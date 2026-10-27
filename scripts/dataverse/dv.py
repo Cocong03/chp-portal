@@ -7,14 +7,15 @@ import requests
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from auth import get_token, load_env  # noqa: E402
 
-SOLUTION = 'ConcreatHub'
+DEV_ORGS = ('org380257ac', 'org1945492c')
+SOLUTION = os.environ.get('CHP_SOLUTION', 'ConcreatHub')
 
 
 class Dataverse:
     def __init__(self):
         load_env()
         self.base = os.environ['DATAVERSE_URL'].rstrip('/') + '/api/data/v9.2/'
-        if 'org380257ac' not in self.base:
+        if not any(org in self.base for org in DEV_ORGS):
             raise SystemExit(f'Refusing to run against {self.base}: these scripts are for Dev only.')
         self.session = requests.Session()
         self.session.headers.update({
@@ -23,7 +24,7 @@ class Dataverse:
             'Content-Type': 'application/json; charset=utf-8',
             'OData-MaxVersion': '4.0',
             'OData-Version': '4.0',
-            'MSCRM.SolutionUniqueName': SOLUTION,  # new components land in ConcreatHub
+            'MSCRM.SolutionUniqueName': SOLUTION,  # new components land in the solution
         })
 
     def get(self, path):
