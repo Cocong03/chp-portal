@@ -194,6 +194,7 @@ test('appends one match per company and customer, so the same customer no. in tw
       companyId: "@items('For_each_company')?['chp_bccompanyguid']",
       companyName: "@items('For_each_company')?['chp_name']",
       customerNo: "@items('For_each_customer')",
+      personName: "@first(body('Get_BC_contacts')?['value'])?['name']",
     },
   })
   const several = JSON.stringify(actions.find(([n]) => n === 'Several_customers')![1].expression)
@@ -219,5 +220,20 @@ test("the single match's company drives the customer lookup, the account and pen
   expect(create['item/chp_bccompanyname']).toBe("@{outputs('Match')?['companyName']}")
   expect(actions.find(([n]) => n === 'List_pending_grants')![1].inputs.parameters.$filter).toContain(
     "_chp_company_value eq @{outputs('Match')?['companyRowId']}",
+  )
+})
+
+// Seen on Dev 2026-10-27: BC_person read Get_BC_contacts from outside For_each_company, where body() is the array of
+// every iteration's output, and the run failed for a new contact. Loop outputs leave the loop only through Matches.
+test('no action outside the company loop reads an action inside it', () => {
+  const [, loop] = actions.find(([n]) => n === 'For_each_company')!
+  const inside = allActions(loop.actions).map(([n]) => n)
+  const outsideText = JSON.stringify(actions.filter(([n]) => n !== 'For_each_company' && !inside.includes(n)).map(([, a]) => ({ ...a, actions: undefined, else: undefined, cases: undefined })))
+  for (const name of inside) expect(outsideText, name).not.toMatch(new RegExp(String.raw`(body|outputs|actions)\('${name}'\)`))
+})
+
+test("a new contact's last name is the BC person's name from the matched company", () => {
+  expect(actions.find(([n]) => n === 'Create_contact')![1].inputs.parameters['item/lastname']).toBe(
+    "@{coalesce(outputs('Match')?['personName'], outputs('Customer_name'))}",
   )
 })

@@ -454,7 +454,8 @@
                       "companyRowId": "@items('For_each_company')?['chp_bccompanyid']",
                       "companyId": "@items('For_each_company')?['chp_bccompanyguid']",
                       "companyName": "@items('For_each_company')?['chp_name']",
-                      "customerNo": "@items('For_each_customer')"
+                      "customerNo": "@items('For_each_customer')",
+                      "personName": "@first(body('Get_BC_contacts')?['value'])?['name']"
                     }
                   },
                   "runAfter": {}
@@ -1041,14 +1042,6 @@
       },
       "else": {
         "actions": {
-          "BC_person": {
-            "type": "Query",
-            "inputs": {
-              "from": "@body('Get_BC_contacts')?['value']",
-              "where": "@equals(item()?['type'], 'Person')"
-            },
-            "runAfter": {}
-          },
           "Create_contact": {
             "type": "OpenApiConnection",
             "inputs": {
@@ -1059,18 +1052,14 @@
               },
               "parameters": {
                 "entityName": "contacts",
-                "item/lastname": "@{coalesce(first(body('BC_person'))?['name'], outputs('Customer_name'))}",
+                "item/lastname": "@{coalesce(outputs('Match')?['personName'], outputs('Customer_name'))}",
                 "item/emailaddress1": "@{outputs('Email')}",
                 "item/parentcustomerid_account@odata.bind": "accounts(@{variables('AccountId')})",
                 "item/adx_identity_emailaddress1confirmed": true
               },
               "authentication": "@parameters('$authentication')"
             },
-            "runAfter": {
-              "BC_person": [
-                "Succeeded"
-              ]
-            }
+            "runAfter": {}
           },
           "Set_ContactId_new": {
             "type": "SetVariable",
