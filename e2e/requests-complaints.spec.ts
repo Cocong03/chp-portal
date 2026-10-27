@@ -40,6 +40,10 @@ test('a Delivery request with a trip, order and site is listed as Submitted', as
   await page.getByRole('option').first().click()
   await dialog.getByLabel('Trip ID reference').fill('TRP-E2E-01')
   await dialog.getByLabel('Related Sales Order').click()
+  if ((await page.getByRole('option').count()) === 0) {
+    await page.keyboard.press('Escape')
+    test.skip(true, 'The test customer has no BC orders on Dev, so a Delivery request (sales order required) cannot be completed')
+  }
   await page.getByRole('option').first().click()
   await dialog.getByLabel('Delivery site (Ship-to Address)').click()
   await page.getByRole('option').first().click()
@@ -70,6 +74,34 @@ test('a complaint with a photo is listed as Submitted with a CMP- reference', as
   await expect(page.getByText(/Complaint CMP-\d+ submitted\./)).toBeVisible()
   const top = page.getByRole('table').getByRole('row').nth(1)
   await expect(top).toContainText(`${STAMP} complaint`)
+  await expect(top).toContainText(/CMP-\d+/)
+  await expect(top).toContainText('Submitted')
+})
+
+test('a Delivery & Handling complaint with a delivery site is listed as Submitted', async ({ page }) => {
+  await page.goto('/complaints')
+  await page.getByRole('button', { name: 'New complaint' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New submission' })
+
+  await dialog.getByLabel('Category', { exact: true }).click()
+  await page.getByRole('option', { name: 'Delivery & Handling' }).click()
+  await dialog.getByLabel('Complaint type').click()
+  await page.getByRole('option', { name: 'Delivery Delay' }).click()
+  await dialog.getByLabel('Delivery site (optional)').click()
+  const sites = page.getByRole('option').filter({ hasNotText: 'Not Applicable' })
+  if ((await sites.count()) === 0) {
+    await page.keyboard.press('Escape')
+    test.skip(true, 'The test customer has no delivery sites on Dev')
+  }
+  await sites.first().click()
+  await dialog.getByLabel('Subject').fill(`${STAMP} site`)
+  await dialog.getByLabel('Description').fill('Automated check of the delivery site code; safe to ignore.')
+  await dialog.getByRole('checkbox').check()
+  await dialog.getByRole('button', { name: 'Submit', exact: true }).click()
+
+  await expect(page.getByText(/Complaint CMP-\d+ submitted\./)).toBeVisible()
+  const top = page.getByRole('table').getByRole('row').nth(1)
+  await expect(top).toContainText(`${STAMP} site`)
   await expect(top).toContainText(/CMP-\d+/)
   await expect(top).toContainText('Submitted')
 })
