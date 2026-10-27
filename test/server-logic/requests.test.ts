@@ -31,7 +31,7 @@ const ROW = {
 }
 
 /** A signed-in contact with portal access on; `portal` is the MCRMContacts answer (empty = blocked). */
-function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name: 'Buyer' }], rows = [ROW] }: { query?: Record<string, string>; body?: string; portal?: unknown[]; rows?: unknown[] } = {}) {
+function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name: 'Buyer' }], rows = [ROW], bcCustomer = 'C00000002', orderCustomer = bcCustomer }: { query?: Record<string, string>; body?: string; portal?: unknown[]; rows?: unknown[]; bcCustomer?: string; orderCustomer?: string } = {}) {
   const calls: { op: string; args: unknown[] }[] = []
   const server = {
     User: { contactid: CONTACT },
@@ -53,7 +53,7 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
         RetrieveMultipleRecords: (...args: unknown[]) => {
           calls.push({ op: 'RetrieveMultipleRecords', args })
           const options = String(args[1])
-          if (args[0] === 'chp_requests') return JSON.stringify({ value: rows })
+          if (args[0] === 'chp_requests') return JSON.stringify({ value: options.includes('chp_requestid,chp_reference') ? rows.slice(0, 1) : rows })
           const category = /chp_category eq '([^']*)'/.exec(options)?.[1]
           const name = /chp_name eq '([^']*)'/.exec(options)?.[1]
           const active = TYPES.filter((t) => t.chp_active)
@@ -67,8 +67,9 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
           const u = decodeURIComponent(url)
           if (u.includes('/MCRMContacts')) return ok({ value: portal })
           if (u.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: 'C00000002' }] })
-          if (u.includes('/mcrmSalesOrders?') && u.includes("salesOrderNo eq 'SO-100467'")) return ok({ value: [{ salesOrderNo: 'SO-100467', sellToCustomerNo: 'C00000002', documentType: 'Order' }] })
-          if (u.includes('/mcrmShipToAddress') && u.includes("code eq 'PLANT1'")) return ok({ value: [{ documentNo: 'C00000002', code: 'PLANT1', name: 'Plant 1 — Main Yard' }] })
+          // BC answers only when the filter names the session customer; bcCustomer lets a test make BC ignore the filter.
+          if (/\/mcrmSalesOrders(Archives)?\?/.test(u) && u.includes("sellToCustomerNo eq 'C00000002'") && u.includes("salesOrderNo eq 'SO-100467'")) return ok({ value: [{ salesOrderNo: 'SO-100467', sellToCustomerNo: orderCustomer, documentType: 'Order' }] })
+          if (u.includes('/mcrmShipToAddress') && u.includes("documentNo eq 'C00000002'") && u.includes("code eq 'PLANT1'")) return ok({ value: [{ documentNo: bcCustomer, code: 'PLANT1', name: 'Plant 1 — Main Yard' }] })
           return ok({ value: [] })
         },
       },
@@ -148,6 +149,10 @@ test.each([
   ['a bad document date', { category: 'Document Copy', requestType: 'Delivery Receipt (DR)', fields: { docref: 'DR-1', docdate: '2026-02-30' } }, 'docdate'],
   ['a bad affected user email', { category: 'Account', requestType: 'User Access', fields: { userEmail: 'nope' } }, 'userEmail'],
   ['a 51-character trip', { category: 'Delivery', requestType: 'Concern', fields: { trip: 'T'.repeat(51), order: 'SO-100467', site: 'PLANT1' } }, 'trip'],
+  ['contact method toString', { contactMethod: 'toString' }, 'contactMethod'],
+  ['an attachment named evil.constructor', { attachment: { name: 'evil.constructor', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['an attachment named x.__proto__', { attachment: { name: 'x.__proto__', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['unpadded base64', { attachment: { name: 'x.pdf', base64: 'aGVsbG8' } }, 'attachment'],
   ['a .exe attachment', { attachment: { name: 'x.exe', base64: 'aGVsbG8=' } }, 'attachment'],
   ['a 5,242,881-byte attachment', { attachment: { name: 'x.pdf', base64: big } }, 'attachment'],
 ])('POST with %s is invalid, nothing written', async (_case, change, field) => {
@@ -160,7 +165,7 @@ test('POST accepts an attachment at the size limit and an optional field left em
   const exact = 'A'.repeat(6_990_506) + '==' // 6,990,508 chars, 2 padding: 5,242,879 bytes
   const { server, writes } = submit({ ...BODY, requestType: 'Query', fields: {}, attachment: { name: 'x.pdf', base64: exact } })
   expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
-  expect(writes()).toHaveLength(2)
+  expect(writes()).toHaveLength(1) // the note rides in the same create
 })
 
 test('POST stores the site as "<code> — <name>" from BC, not the label the client sent', async () => {
@@ -172,14 +177,33 @@ test('POST stores the site as "<code> — <name>" from BC, not the label the cli
   ])
 })
 
-test('POST with a file creates one note bound to the new request', async () => {
+test('POST with a file deep-inserts one note in the same create, no separate annotations create', async () => {
   const { server, calls, writes } = submit({ ...BODY, attachment: PDF })
   await load(server).post()
-  expect(writes().map((c) => c.args[0])).toEqual(['chp_requests', 'annotations'])
+  expect(writes().map((c) => c.args[0])).toEqual(['chp_requests'])
   expect(created(calls).chp_attachmentname).toBe('po.pdf')
-  expect(created(calls, 'annotations')).toEqual({
-    subject: 'po.pdf', filename: 'po.pdf', mimetype: 'application/pdf', documentbody: 'aGVsbG8=', 'objectid_chp_request@odata.bind': `/chp_requests(${REQUEST_ID})`,
-  })
+  expect(created(calls).chp_request_Annotations).toEqual([{ subject: 'po.pdf', filename: 'po.pdf', mimetype: 'application/pdf', documentbody: 'aGVsbG8=' }])
+})
+
+test('POST answers an empty ref, not an error, when the new row cannot be read back', async () => {
+  const { server, writes } = fakeServer({ body: JSON.stringify(BODY), rows: [] })
+  expect(await answer(load(server).post())).toEqual({ ref: '' })
+  expect(writes()).toHaveLength(1)
+})
+
+test.each([
+  ["another customer's order", { fields: { order: 'SO-100467' } }, 'order'],
+  ["another customer's ship-to", { category: 'Delivery', requestType: 'Concern', fields: { order: 'SO-100467', site: 'PLANT1' } }, 'site'],
+])('POST rejects %s even when BC ignores the filter', async (_case, change, field) => {
+  const { server, writes } = fakeServer({ body: JSON.stringify({ ...BODY, ...change }), bcCustomer: 'C99999999', orderCustomer: field === 'site' ? 'C00000002' : undefined })
+  expect(await answer(load(server).post())).toEqual({ invalid: true, field })
+  expect(writes()).toEqual([])
+})
+
+test('POST escapes a quote in the type before it reaches the filter', async () => {
+  const { server, calls } = submit({ ...BODY, requestType: "O'Brien" })
+  await load(server).post()
+  expect(String(calls.find((c) => c.args[0] === 'chp_requesttypes')!.args[1])).toContain("chp_name eq 'O''Brien'")
 })
 
 test('POST as a blocked contact answers blocked and writes nothing', async () => {
