@@ -13,6 +13,7 @@ import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Toolbar } from '@/ui/Toolbar'
 import { ComplaintDialog } from './ComplaintDialog'
+import { NewComplaintDialog } from './NewComplaintDialog'
 import { useComplaints, useComplaintTaxonomy } from './useComplaints'
 
 const NO_COMPLAINTS: ComplaintDto[] = []
@@ -52,6 +53,7 @@ export function ComplaintsPage() {
   const [status, setStatus] = useState(ALL)
   const [page, setPage] = useState(1)
   const [viewing, setViewing] = useState<ComplaintDto | null>(null)
+  const [creating, setCreating] = useState(false)
   const all = complaints.data ?? NO_COMPLAINTS
   const groups = useMemo(() => (taxonomy ? assignedGroups(taxonomy) : NO_OPTIONS), [taxonomy])
   const tableColumns = useMemo(() => columns(setViewing), [])
@@ -83,8 +85,7 @@ export function ComplaintsPage() {
   return (
     <>
       <PageHeader title="Complaints & Feedback">
-        {/* Enabled with the New complaint dialog (next task). */}
-        <Button disabled>New complaint</Button>
+        <Button onClick={() => setCreating(true)}>New complaint</Button>
       </PageHeader>
       <SectionCard title="Complaints">
         <Toolbar
@@ -138,6 +139,7 @@ export function ComplaintsPage() {
         )}
       </SectionCard>
       <ComplaintDialog complaint={viewing} onClose={() => setViewing(null)} />
+      {creating && <NewComplaintDialog open onClose={() => setCreating(false)} />}
     </>
   )
 }

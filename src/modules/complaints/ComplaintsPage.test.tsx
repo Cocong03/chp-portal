@@ -26,7 +26,7 @@ test('shows complaints in the template columns with Date Resolved, no tab bar or
   ])
   expect(screen.queryByRole('tab')).toBeNull()
   expect(screen.queryByText(/File a complaint about/)).toBeNull()
-  expect(screen.getByRole('button', { name: 'New complaint' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'New complaint' })).toBeEnabled()
   expect(document.title).toBe('Complaints & Feedback — Concreat Connect')
 })
 
