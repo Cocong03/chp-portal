@@ -172,7 +172,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **Dashboard — Announcement** | Dataverse `chp_announcement` (newest active row, set by the account team in Concreat Connect Admin) | – | `announcement` Server Logic, read live with `skipCache` (decided 2026-10-09: the Web API served this Global-read table from a shared cache for up to 15 min) |
 | **Orders list / filters / paging / export** | BC Sales Orders + archive (status mapping below) | – | `orders` GET (server-side filter/page; `all=true` for export) |
 | **Order view / Reorder / Trip ID** | BC SO + lines + Trip ID field | – | `orders` GET `?id=` |
-| **Blanket Orders tab / Blanket entry** | BC Blanket Sales Orders + schedule | BC Sales Order referencing Blanket SO # | `blanket-orders`, `orders` POST |
+| **Blanket Orders tab / Blanket entry** | BC Blanket Sales Orders + schedule | BC Sales Order referencing Blanket SO # | `orders?type=blanket` (list + detail, S3-16 decided 2026-10-27), `orders` POST |
 | **New Order — options** (items, UOM, customer prices, plants/Source, ship-tos, payment method/terms) | BC | – | `order-options` |
 | **New Order — quote** (priced lines, freight ₱3,500/₱0, other charges, credit check) | BC price calc + freight ext + credit ext | – | `order-quote` POST |
 | **New Order — submit** | – | BC Sales Order incl. receiving details, freight/other-charge lines | `orders` POST (re-quotes + re-checks credit server-side) |
@@ -202,11 +202,10 @@ One Server Logic record per resource. Function names follow the HTTP verb. Serve
 | `me` | GET | all | Contact name, active account (customer no/name, company), roles. Phase 2: linked accounts |
 | `announcement` | GET | all | Newest active Dashboard announcement `{ title, message }` or `null`, read live (`skipCache`) |
 | `dashboard` | GET | all | Credit (limit, exposure, available), ledger tiles, SO status counts. **One call, fanned out server-side** |
-| `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export |
+| `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export · `?type=blanket` Blanket SOs list (newest 200) and `&id=` detail (S3-16) |
 | `orders` | POST | Full, Orders&Delivery | Submit: re-quote → re-check credit → create BC SO (or approval path). Requires an **idempotency key** from the client |
 | `order-options` | GET | Full, Orders&Delivery | Items/UOM/customer price, plants (plain labels), ship-tos, payment method + terms, standard freight |
 | `order-quote` | POST | Full, Orders&Delivery | BC-priced lines, freight, other charges, totals, credit verdict + message |
-| `blanket-orders` | GET | Full, Orders&Delivery | Blanket SOs + schedule + remaining quantities |
 | `ledger` | GET | Full, Finance | Entries with date range / type / reference search, paged |
 | `documents` | GET | Full, Finance | Document list with type filter + search |
 | `document-file` | GET | Full, Finance | `{ fileName, contentType, base64 }` (HttpClient bodies are strings, so BC must return PDFs as base64 JSON) |
@@ -275,7 +274,7 @@ The shared Postman collection is a **reused "Monday CRM Integration – DEV" col
 | **Available credit** (limit, exposure, available, past-due flag), live | No | **Available Credit** extension as an API |
 | Freight rate + other charges for a draft order | No | Quote-style endpoint (no SO created) |
 | Pending-approval orders + reason; approval outcome | No | Decision D1 |
-| Blanket Sales Orders + schedule + remaining qty | No | New API |
+| Blanket Sales Orders + schedule + remaining qty | Headers and lines: Yes (`mcrmSalesOrders` `documentType` Blanket Order, `chpSalesOrderLines`) · schedule + remaining qty: No | Schedule and remaining qty per line; writable `unitPrice` on `mcrmSalesOrderLines` for Blanket Orders |
 | Customer Ledger Entries (doc no, type, ext. doc no, posting/due date, original/remaining, open/closed) + balance/balance due/overdue | No | New API (these are standard BC fields) |
 | Posted invoices, credit memos, posted whse. shipments, payments + **PDF as base64** | No | New API; PDFs via BC report engine |
 | Phase 2: linked accounts for an email (company, customerNo, customerName, address, website, vatRegNumber) | No | Linked-accounts extension (Phase 2) |

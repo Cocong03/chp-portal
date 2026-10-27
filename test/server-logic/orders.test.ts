@@ -395,3 +395,62 @@ test.each([
   const { server } = fakeServer({ orders: [{ ...ORDER, shipmentMethodCode: code }] })
   expect(JSON.parse(await load(server).get()).orders[0].ship).toBe(ship)
 })
+
+// S3-16: Blanket Sales Orders are in mcrmSalesOrders with documentType Blanket_x0020_Order (BSO numbering).
+const BLANKET = { ...ORDER, salesOrderNo: 'BSO0000000002', documentType: 'Blanket_x0020_Order', externalDocumentNo: 'PO-B', totalAmountInclVAT: 150 }
+const BLANKET_BASE = "sellToCustomerNo eq 'C00000002' and documentType eq 'Blanket_x0020_Order'"
+
+test("type=blanket lists the session customer's blanket orders newest first, capped at 200", async () => {
+  const { server, http } = fakeServer({ query: { type: 'blanket' }, orders: [BLANKET] })
+  expect(JSON.parse(await load(server).get())).toEqual({
+    orders: [{ so: 'BSO0000000002', date: '2026-10-09', po: 'PO-B', site: '65072350', ship: null, bso: null, trip: null, edd: null, total: 150, status: 'Open' }],
+  })
+  const calls = orderCalls(http)
+  expect(calls).toHaveLength(1)
+  expect(calls[0]).toContain(`$filter=${BLANKET_BASE}&`)
+  expect(calls[0]).toContain('$orderby=orderDate desc,salesOrderNo desc')
+  expect(calls[0]).toContain('$top=200')
+  expect(archiveCalls(http)).toEqual([])
+})
+
+test('type=blanket ignores status, site, dates, search, page, all and a customer in the request', async () => {
+  const query = { type: 'blanket', status: 'Open', site: 'X', from: '2026-01-01', q: 'abc', page: '3', all: 'true', customerNo: 'C9' }
+  const { server, http } = fakeServer({ query, orders: [BLANKET] })
+  await load(server).get()
+  const calls = orderCalls(http)
+  expect(calls).toHaveLength(1)
+  expect(calls[0]).toContain(`$filter=${BLANKET_BASE}&`)
+  expect(calls[0]).toContain('$top=200')
+})
+
+test('type=blanket drops rows for another customer or that are not blanket orders', async () => {
+  const { server } = fakeServer({ query: { type: 'blanket' }, orders: [BLANKET, { ...BLANKET, salesOrderNo: 'BSO9', sellToCustomerNo: 'C1' }, ORDER] })
+  const body = JSON.parse(await load(server).get())
+  expect(body.orders.map((o: { so: string }) => o.so)).toEqual(['BSO0000000002'])
+})
+
+test('blanket detail returns the BSO with its BC lines', async () => {
+  const { server, http } = fakeServer({ query: { type: 'blanket', id: 'BSO0000000002' }, orders: [BLANKET], lines: [{ ...LINE, documentNo: 'BSO0000000002' }] })
+  expect(JSON.parse(await load(server).get())).toEqual({
+    so: 'BSO0000000002', date: '2026-10-09', po: 'PO-B', site: '65072350', ship: null, bso: null, trip: null, edd: null, total: 150, status: 'Open',
+    lines: [{ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', qty: 50, uom: 'BAG', unitPrice: 245, lineTotal: 12250 }],
+  })
+  expect(orderCalls(http)[0]).toContain(`$filter=salesOrderNo eq 'BSO0000000002' and ${BLANKET_BASE}`)
+  expect(http.some((u) => u.includes("chpSalesOrderLines?$filter=documentNo eq 'BSO0000000002'"))).toBe(true)
+})
+
+test.each([
+  ["another customer's BSO (BC returns nothing)", { query: { type: 'blanket', id: 'BSO0000000099' }, orders: [] }],
+  ['a row that belongs to someone else', { query: { type: 'blanket', id: 'BSO0000000002' }, orders: [{ ...BLANKET, sellToCustomerNo: 'C1' }] }],
+  ['a sales order number', { query: { type: 'blanket', id: 'SOR0000000006' }, orders: [ORDER] }],
+])('blanket detail of %s → notFound, lines and archive never read', async (_case, options) => {
+  const { server, http } = fakeServer(options as Parameters<typeof fakeServer>[0])
+  expect(JSON.parse(await load(server).get())).toEqual({ notFound: true })
+  expect(http.some((u) => u.includes('/chpSalesOrderLines') || u.includes('Archive'))).toBe(false)
+})
+
+test('blanket detail escapes quotes in the id', async () => {
+  const { server, http } = fakeServer({ query: { type: 'blanket', id: "B'1" }, orders: [] })
+  await load(server).get()
+  expect(orderCalls(http)[0]).toContain(`salesOrderNo eq 'B''1' and ${BLANKET_BASE}`)
+})
