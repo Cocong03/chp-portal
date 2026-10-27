@@ -274,11 +274,11 @@ test.each([
   await quoted('Subtotal', '₱245.00')
 })
 
-test('Blanket Order is disabled; Submit for approval waits for a priced order, with no "Available soon" tooltip', async () => {
+test('Single Order: Submit for approval waits for a priced order, with no "Available soon" tooltip', async () => {
   const user = userEvent.setup()
   await openForm()
   expect(screen.getByRole('radio', { name: 'Single Order' })).toHaveAttribute('aria-checked', 'true')
-  expect(screen.getByRole('radio', { name: 'Blanket Order' })).toBeDisabled()
+  expect(screen.getByRole('radio', { name: 'Blanket Order' })).toBeEnabled()
   expect(screen.getByText('For orders with agreed pricing, choose Blanket Order.')).toBeInTheDocument()
   expect(screen.getByRole('button', { name: 'Save as draft' })).toBeEnabled()
   const submit = screen.getByRole('button', { name: 'Submit for approval' })
@@ -286,6 +286,93 @@ test('Blanket Order is disabled; Submit for approval waits for a priced order, w
   await user.hover(submit.parentElement!)
   await new Promise((resolve) => setTimeout(resolve, 800))
   expect(screen.queryByText('Available soon.')).not.toBeInTheDocument()
+})
+
+describe('Blanket Order (S3-16)', () => {
+  const NOTE = "Blanket Orders can't be submitted from the portal yet. Save as draft to keep this order."
+  const price = (line: number) => screen.getByRole('spinbutton', { name: `Unit price, line ${line}` })
+  async function blanket(user: UserEvent) {
+    await openForm()
+    await user.click(screen.getByRole('radio', { name: 'Blanket Order' }))
+  }
+
+  test("typed unit price drives the line total and subtotal; freight and other charges stay BC's", async () => {
+    const user = userEvent.setup()
+    await blanket(user)
+    expect(screen.getByRole('radio', { name: 'Blanket Order' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.queryByText('For orders with agreed pricing, choose Blanket Order.')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('radio', { name: 'Delivery' }))
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    await user.type(price(1), '200')
+    expect(within(lineRow(1)).getByText('₱2,000.00')).toBeInTheDocument()
+    expect(summary('Subtotal')).toHaveTextContent('₱2,000.00')
+    await quoted('Transport / Freight', '₱100.00')
+    expect(summary('Other charges')).toHaveTextContent('₱50.00')
+    expect(summary('Order total')).toHaveTextContent('₱2,150.00')
+  })
+
+  test.each(['', '0'])('a unit price of "%s" shows — in the line total, subtotal and order total', async (typed) => {
+    const user = userEvent.setup()
+    await blanket(user)
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    if (typed) await user.type(price(1), typed)
+    await quoted('Transport / Freight', '₱0.00')
+    expect(within(lineRow(1)).getAllByText('—').length).toBeGreaterThan(0)
+    expect(within(lineRow(1)).queryByText('₱2,450.00')).not.toBeInTheDocument()
+    expect(summary('Subtotal')).toHaveTextContent('—')
+    expect(summary('Order total')).toHaveTextContent('—')
+  })
+
+  test('Submit is disabled with a note, even when every line has a price', async () => {
+    const user = userEvent.setup()
+    await blanket(user)
+    await pickItem(user, 1, T1_BAG)
+    await user.type(price(1), '200')
+    await quoted('Transport / Freight', '₱0.00')
+    expect(screen.getByRole('button', { name: 'Submit for approval' })).toBeDisabled()
+    expect(screen.getByText(NOTE)).toBeInTheDocument()
+    expect(vi.mocked(serverLogic).mock.calls.some(([name, options]) => name === 'orders' && options?.method === 'POST')).toBe(false)
+  })
+
+  test('the Delivery schedule starts with one row on the first line item; with no line item the footer asks for one', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await user.click(screen.getByRole('radio', { name: 'Blanket Order' }))
+    const schedule = screen.getByRole('table', { name: 'Delivery schedule' })
+    expect(within(schedule).getByRole('combobox', { name: 'Delivery item, row 1' })).toHaveTextContent(T1_BAG)
+    await user.click(screen.getByRole('button', { name: 'Remove line 1' }))
+    expect(within(schedule).getByText('Add order lines above to schedule deliveries against them.')).toBeInTheDocument()
+    expect(within(schedule).getByRole('combobox', { name: 'Delivery item, row 1' })).toHaveTextContent('Add an order line first…')
+  })
+
+  test('scheduling more than a line orders shows the over message, pointing below', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    await user.click(screen.getByRole('radio', { name: 'Blanket Order' }))
+    const qty = screen.getByRole('spinbutton', { name: 'Est. quantity, row 1' })
+    await user.clear(qty)
+    await user.type(qty, '12')
+    expect(screen.getByText('Over by 2 — reduce a scheduled quantity below')).toBeInTheDocument()
+  })
+
+  test('switching back to Single shows BC prices again and hides the schedule', async () => {
+    const user = userEvent.setup()
+    await blanket(user)
+    await pickItem(user, 1, T1_BAG)
+    await user.type(price(1), '200')
+    await user.click(screen.getByRole('radio', { name: 'Single Order' }))
+    expect(screen.queryByRole('spinbutton', { name: 'Unit price, line 1' })).not.toBeInTheDocument()
+    // Qty 1: BC's unit price and line total are both ₱245.00.
+    expect(await within(lineRow(1)).findAllByText('₱245.00')).toHaveLength(2)
+    expect(screen.queryByRole('table', { name: 'Delivery schedule' })).not.toBeInTheDocument()
+    expect(screen.getByText('For orders with agreed pricing, choose Blanket Order.')).toBeInTheDocument()
+    expect(screen.queryByText(NOTE)).not.toBeInTheDocument()
+  })
 })
 
 test('a failed options load shows Try again', async () => {
@@ -525,6 +612,31 @@ describe('drafts (S3-12)', () => {
     await user.click(screen.getByRole('button', { name: 'Save as draft' }))
     await screen.findByText(SAVED)
     expect(draftCalls().map(([, options]) => options!.method)).toEqual(['POST'])
+  })
+
+  test('Save as draft in Blanket mode keeps the order type, typed prices and schedule', async () => {
+    const user = userEvent.setup()
+    await openForm()
+    await pickItem(user, 1, T1_BAG)
+    await user.click(screen.getByRole('radio', { name: 'Blanket Order' }))
+    await user.type(screen.getByRole('spinbutton', { name: 'Unit price, line 1' }), '200')
+    await user.click(screen.getByRole('button', { name: 'Save as draft' }))
+    await screen.findByText(SAVED)
+    expect(lastSaved().orderType).toBe('blanket')
+    expect(lastSaved().form.lines[0]).toMatchObject({ code: 'CEM-T1-40KG', price: 200 })
+    expect(lastSaved().form.schedule).toEqual([{ item: 'CEM-T1-40KG', qty: 1, date: '' }])
+  })
+
+  test('Continue on a blanket draft reopens Blanket mode with its prices and schedule', async () => {
+    const seed = draftsMock({ method: 'GET', query: { id: SEED_ID } }) as { payload: DraftPayload }
+    const form = { ...seed.payload.form, orderType: 'blanket', lines: [{ code: 'CEM-T1-40KG', qty: 10, price: 200 }], schedule: [{ item: 'CEM-T1-40KG', qty: 4, date: '2026-11-20' }] }
+    draftsMock({ method: 'PUT', query: { id: SEED_ID }, body: { payload: { ...seed.payload, orderType: 'blanket', form } } })
+    await openDraft()
+    await screen.findByText(/Continuing Draft #1/)
+    expect(screen.getByRole('radio', { name: 'Blanket Order' })).toHaveAttribute('aria-checked', 'true')
+    expect(screen.getByRole('spinbutton', { name: 'Unit price, line 1' })).toHaveValue(200)
+    expect(screen.getByRole('spinbutton', { name: 'Est. quantity, row 1' })).toHaveValue(4)
+    expect(screen.getByLabelText('Expected delivery date, row 1')).toHaveValue('2026-11-20')
   })
 
   test('typing while the first save is on its way is kept', async () => {

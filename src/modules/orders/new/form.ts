@@ -1,10 +1,12 @@
 import type { OrderOptionsDto, OrderQuoteRequest, OrderSubmitRequest, SiteDto } from '@/api/types'
+import type { ScheduleRow } from '../schedule'
 import { withAutoLine } from './instructions'
 
 /** Everything the New Order form holds: saved as a draft (S3-12) or submitted to BC (S3-10). */
 export interface NewOrderForm {
   orderType: 'single' | 'blanket'
-  lines: { code: string; qty: number }[]
+  /** `price`: the customer's agreed unit price, typed in Blanket mode only (S3-16); BC prices Single Orders. */
+  lines: { code: string; qty: number; price?: number }[]
   shipmentMethod: 'pickup' | 'delivery'
   source: string
   pickupDate: string
@@ -19,6 +21,8 @@ export interface NewOrderForm {
   instructions: string
   site: string
   poRef: string
+  /** Blanket Order delivery schedule (S3-16): planning only, saved with drafts, never sent. */
+  schedule: ScheduleRow[]
 }
 
 // Wireframe option lists.
@@ -55,6 +59,7 @@ export function newOrderDefaults(options: OrderOptionsDto, sites: SiteDto[]): Ne
     instructions: withAutoLine('', LOADING_TYPES[0], false),
     site: defaultSite(sites),
     poRef: '',
+    schedule: [],
   }
 }
 
@@ -95,6 +100,24 @@ export function submitRequest(form: NewOrderForm, items: OrderOptionsDto['items'
     timeWindow: form.timeWindow,
     instructions: withAutoLine(form.instructions, form.loadingType, form.callBefore),
   }
+}
+
+// Wireframe gap (spec decision 10): Blanket submit waits on CHP (where a new Blanket Order starts) and BC (a writable price).
+export const BLANKET_SUBMIT_NOTE = "Blanket Orders can't be submitted from the portal yet. Save as draft to keep this order."
+
+/** A unit price the customer can agree to: a finite amount of at least ₱0.01. */
+export function validPrice(price: unknown): price is number {
+  return typeof price === 'number' && Number.isFinite(price) && price >= 0.01
+}
+
+/**
+ * Blanket Order subtotal from the typed prices (display only, spec decision 9): qty × price over the lines with an item and
+ * a qty > 0, in centavos. null while there's no such line or one of them has no valid price.
+ */
+export function typedSubtotal(lines: NewOrderForm['lines'], items: OrderOptionsDto['items']): number | null {
+  const chosen = (lines ?? []).filter((line) => items.some((item) => item.code === line.code) && Number(line.qty) > 0)
+  if (!chosen.length || !chosen.every((line) => validPrice(line.price))) return null
+  return Math.round(chosen.reduce((sum, line) => sum + Number(line.qty) * line.price! * 100, 0)) / 100
 }
 
 /** Why the server would refuse this order, in the customer's words; null when it wouldn't. `today` is YYYY-MM-DD. */

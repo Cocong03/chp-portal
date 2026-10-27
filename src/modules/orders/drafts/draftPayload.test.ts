@@ -26,6 +26,7 @@ const saved: NewOrderForm = {
   instructions: 'Loading type: Palletized · Call before delivery\nUse side gate',
   site: 'PLANT2',
   poRef: 'PO-8915',
+  schedule: [],
 }
 const payload = (form: Partial<NewOrderForm> & Record<string, unknown>): DraftPayload => ({ version: 1, orderType: 'single', form: { ...saved, ...form } as NewOrderForm })
 
@@ -89,4 +90,31 @@ test('a draft saved before 2026-10-26: Credit becomes Cash and an old time windo
   const form = fromDraft(payload({ paymentMethod: 'credit', timeWindow: '1:00 – 3:00 PM' }), options, sites)
   expect(form.paymentMethod).toBe('cash')
   expect(form.timeWindow).toBe('DAY')
+})
+
+test('restores blanket prices and schedule', () => {
+  const schedule = [{ item: 'CEM-T1-40KG', qty: 4, date: '2026-11-20' }]
+  const form = fromDraft(
+    { version: 1, orderType: 'blanket', form: { ...saved, orderType: 'blanket', lines: [{ code: 'CEM-T1-40KG', qty: 10, price: 200 }], schedule } },
+    options,
+    sites,
+  )
+  expect(form.orderType).toBe('blanket')
+  expect(form.lines).toEqual([{ code: 'CEM-T1-40KG', qty: 10, price: 200 }])
+  expect(form.schedule).toEqual(schedule)
+})
+
+test('an old draft with no price or schedule opens as before, with an empty schedule', () => {
+  const form = fromDraft(payload({}), options, sites)
+  expect(form.lines).toEqual([{ code: 'CEM-T1-40KG', qty: 10 }, { code: 'CEM-T2-BULK', qty: 2 }])
+  expect(form.schedule).toEqual([])
+  expect(form.orderType).toBe('single')
+})
+
+test.each([null, {}, 'x', [{ item: 'CEM-T1-40KG' }], [{ item: 1, qty: 2, date: '' }]])('a malformed schedule %j comes back empty', (schedule) => {
+  expect(fromDraft(payload({ schedule: schedule as never }), options, sites).schedule).toEqual([])
+})
+
+test('an unknown order type comes back as Single', () => {
+  expect(fromDraft(payload({ orderType: 'standing' as never }), options, sites).orderType).toBe('single')
 })

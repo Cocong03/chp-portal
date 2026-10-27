@@ -17,6 +17,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { Skeleton } from '@/ui/skeleton'
+import { DeliveryScheduleCard } from './DeliveryScheduleCard'
 import { defaultSite, newOrderDefaults, submitProblem, submitRequest, type NewOrderForm } from './form'
 import { FulfillmentCard } from './FulfillmentCard'
 import { withAutoLine } from './instructions'
@@ -176,10 +177,12 @@ function OrderForm({
         <div>
           <OrderLinesCard options={options} quote={quote} />
           <FulfillmentCard options={options} />
+          <DeliveryScheduleCard options={options} />
         </div>
         <div>
           <SummaryCards
             quote={quote}
+            items={options.items}
             sites={sites ?? NO_SITES}
             onSaveDraft={() => save.mutate()}
             saving={save.isPending}
