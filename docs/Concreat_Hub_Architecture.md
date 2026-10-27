@@ -1,7 +1,7 @@
 # Concreat Hub — Power Pages Solution Architecture (Release 1)
 
 **Status:** Proposal for team review · **Prepared:** Sept 30, 2026 · **Audience:** PASI Power Platform team, BC Integration team
-**Inputs:** Power Platform & BC Developer Packages (Sept 27), monday.com export, `Standard_Portal_Flow_v47_ForDevBuildGuide.html`, BC Postman collection, and the working login/activation POC in this repo.
+**Inputs:** Power Platform & BC Developer Packages (Sept 27), monday.com export, `Mockup-chp-v2.html`, BC Postman collection, and the working login/activation POC in this repo.
 
 > INTERNAL — PASI project team only (same classification as the source packages).
 
@@ -9,7 +9,7 @@
 
 ## 1. Recommendation in one paragraph
 
-Keep **Business Central as the only system of record for business data** and **do not copy BC data into Dataverse**. The React code site calls a thin **Server Logic "backend-for-frontend" (BFF)** layer on the Power Pages runtime. Server Logic calls the BC team's custom APIs **live**, using an app identity (OAuth client credentials). It always scopes each call to the signed-in customer's account, which it resolves on the server, never from browser input. **Dataverse holds only what the portal owns**: identity (Contact ↔ BC customer link, web roles), drafts, and the customer-submitted requests (Requests, Complaints, delivery-site requests, Excel uploads) with their taxonomies. The SPA reads and writes those through the standard **Portal Web API with table permissions**. **Power Automate is reserved for asynchronous back-office work**: the activation email (already built), routing submissions to the service center and Credit team, and notifications. It is never on the read path.
+Keep **Business Central as the only system of record for business data** and **do not copy BC data into Dataverse**. The React code site calls a thin **Server Logic "backend-for-frontend" (BFF)** layer on the Power Pages runtime. Server Logic calls the BC team's custom APIs **live**, using an app identity (OAuth client credentials). It always scopes each call to the signed-in customer's account, which it resolves on the server, never from browser input. **Dataverse holds only what the portal owns**: identity (Contact ↔ BC customer link, web roles), drafts, and the customer-submitted requests (Requests, Complaints, delivery-site requests, Excel uploads) with their taxonomies. The SPA reads and writes those through the standard **Portal Web API with table permissions** (drafts go through a `drafts` Server Logic endpoint instead, still behind table permissions; see the S3-B drafts spec). **Power Automate is reserved for asynchronous back-office work**: the activation email (already built), routing submissions to the service center and Credit team, and notifications. It is never on the read path.
 
 Why this shape fits the requirements:
 
@@ -73,6 +73,8 @@ flowchart LR
 | **Power Automate** | Activation email, routing submissions to the service center/Credit, notifications | Sit on any synchronous read path (too slow; licensing per run) |
 | **Business Central** | Customers, ship-tos, items, prices, orders, blanket orders, ledger, documents/PDFs, credit, freight, trip IDs, statuses | — |
 
+**Exception to the Power Automate rule (2026-10-06):** the *Check activation link* flow answers the Set password page on load (valid | invalid). Server Logic would need anonymous read access to `adx_invitation`, which holds secret codes; the flow's one-bit answer about a 128-bit random code reveals nothing useful.
+
 ---
 
 ## 3. Identity, tenancy and account scoping
@@ -95,14 +97,14 @@ erDiagram
   ACCOUNT {
     guid accountid
     string name "BC Customer Name"
-    string cr_bccustomerno "BC Customer No."
-    string cr_bccompanyid "BC company GUID"
-    string cr_bccompanyname "Solid Cement | APO Cement"
+    string chp_bccustomerno "BC Customer No."
+    string chp_bccompanyid "BC company GUID"
+    string chp_bccompanyname "Solid Cement | APO Cement"
   }
   ACCOUNT_LINK {
-    guid cr_accountlinkid
-    lookup cr_contact
-    lookup cr_account
+    guid chp_accountlinkid
+    lookup chp_contact
+    lookup chp_account
   }
 ```
 
@@ -115,7 +117,7 @@ erDiagram
 Every Server Logic function starts the same way:
 
 1. `Server.User` → contact id (null means reject).
-2. Read the contact's active Account (`cr_bccustomerno`, `cr_bccompanyid`).
+2. Read the contact's active Account (`chp_bccustomerno`, `chp_bccompanyid`).
 3. Build the BC URL with that company and that customer filter. Any `customerNo`/`companyId` in the request is **ignored**.
 4. For detail calls (`?id=SO-…`), verify that the BC record's `sellToCustomerNo` equals the session customer before returning it.
 5. Escape every user-supplied value placed in an OData `$filter` (single-quote doubling, as the activation flow already does).
@@ -125,7 +127,7 @@ Every Server Logic function starts the same way:
 The POC flow already does BC lookup → Contact → single-use invitation → email, and it works end to end. Production changes:
 
 - Query the **BC team's customer/contact API** instead of the standard `v2.0/customers`. The BC package's match rule is "Customer whose registered Contact has this email". **Company scope: Solid Cement only for now** (decision Oct 1, 2026); APO Cement is added later by configuration (plan task S1-12). An email that matches more than one customer follows rule **Q10** (Registration doc §7).
-- Find or create the **Account** (by `cr_bccustomerno` + company), set `parentcustomerid`, and create the Account Link row.
+- Find or create the **Account** (by `chp_bccustomerno` + company), set `parentcustomerid`, and create the Account Link row.
 - **Role on activation (decision D4):** activation grants no business role by default. CHP ops assigns one of the four roles in Portal Management, per the "no in-portal user management" direction. Alternative: auto-grant `Full Access` when the email is the BC customer card's primary email.
 
 ---
@@ -154,6 +156,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 - BC access goes through an **Entra app registration** (client credentials), registered **inside BC** with a permission set limited to the Concreat Hub API pages (read, plus Sales Order create). Do not reuse the "Monday CRM" app.
 - Client secret: **Azure Key Vault → Dataverse environment variable (secret type) → site setting**, read with `Server.SiteSetting`. Non-secret config (BC tenant, environment name, company IDs, API base path) goes in plain environment variables, so it differs per environment without code changes.
 - Tenant admins can **disable external calls from Server Logic** (a GA governance control). This must stay enabled for Concreat Hub's environment.
+- **Dev exception (2026-10-04):** the BC client secret is a plain-text environment variable with no default value, set by hand in Dev only. Key Vault is required before UAT (plan task S1-14).
 
 ---
 
@@ -166,7 +169,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **Dashboard — credit tiles** (Credit limit, Available credit) | BC Available Credit ext | – | `dashboard` (same call New Order uses) |
 | **Dashboard — Balance / Balance due / Overdue** | BC customer ledger | – | `dashboard` |
 | **Dashboard — Sales statistics tiles** (5 counts) | BC Sales Orders (+ archive) | – | `dashboard` (BC-side count endpoint preferred) |
-| **Dashboard — Announcement** | Dataverse `Announcement` (single active row, set by account team) | – | Web API (Global read) |
+| **Dashboard — Announcement** | Dataverse `chp_announcement` (newest active row, set by the account team in Concreat Connect Admin) | – | `announcement` Server Logic, read live with `skipCache` (decided 2026-10-09: the Web API served this Global-read table from a shared cache for up to 15 min) |
 | **Orders list / filters / paging / export** | BC Sales Orders + archive (status mapping below) | – | `orders` GET (server-side filter/page; `all=true` for export) |
 | **Order view / Reorder / Trip ID** | BC SO + lines + Trip ID field | – | `orders` GET `?id=` |
 | **Blanket Orders tab / Blanket entry** | BC Blanket Sales Orders + schedule | BC Sales Order referencing Blanket SO # | `blanket-orders`, `orders` POST |
@@ -174,7 +177,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **New Order — quote** (priced lines, freight ₱3,500/₱0, other charges, credit check) | BC price calc + freight ext + credit ext | – | `order-quote` POST |
 | **New Order — submit** | – | BC Sales Order incl. receiving details, freight/other-charge lines | `orders` POST (re-quotes + re-checks credit server-side) |
 | **Pending Approval tab** | BC (SOs pending credit approval + reason) | – | `orders?view=pending` (see decision D1) |
-| **Drafts tab** | Dataverse `Order Draft` (JSON payload) | Dataverse | Web API (Contact scope) |
+| **Drafts tab** | Dataverse `Order Draft` (JSON payload) | Dataverse | `drafts` Server Logic (Dataverse connector, Contact-scope table permission; S3-B spec 2026-10-21) |
 | **+ New Multiple Order (Excel)** | – | Dataverse `Excel Order Upload` (file + notes) | Web API → flow notifies service center |
 | **Customer Ledger** | BC Customer Ledger Entries | – | `ledger` |
 | **Document Center list / search / download** | BC posted invoices, credit memos, posted whse. shipments (Delivery Receipt), payments (Acknowledgement Receipt) + PDFs | – | `documents`, `document-file` (base64 JSON) |
@@ -197,6 +200,7 @@ One Server Logic record per resource. Function names follow the HTTP verb. Serve
 | Endpoint (`/_api/serverlogics/…`) | Verb | Roles | Returns / does |
 |---|---|---|---|
 | `me` | GET | all | Contact name, active account (customer no/name, company), roles. Phase 2: linked accounts |
+| `announcement` | GET | all | Newest active Dashboard announcement `{ title, message }` or `null`, read live (`skipCache`) |
 | `dashboard` | GET | all | Credit (limit, exposure, available), ledger tiles, SO status counts. **One call, fanned out server-side** |
 | `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export |
 | `orders` | POST | Full, Orders&Delivery | Submit: re-quote → re-check credit → create BC SO (or approval path). Requires an **idempotency key** from the client |
@@ -282,20 +286,20 @@ The shared Postman collection is a **reused "Monday CRM Integration – DEV" col
 
 ## 9. Dataverse data model (portal-owned)
 
-Publisher prefix `cr_` is a placeholder; use the solution's actual prefix.
+Publisher **Concreat Holdings**, prefix `chp_`, solution `ConcreatHub` (created in Dev on 2026-10-01, S0-07).
 
 | Table | Key columns | Table permission |
 |---|---|---|
-| Account *(standard)* | `cr_bccustomerno`, `cr_bccompanyid`, `cr_bccompanyname` | read: Self/Account via contact (for `me`) |
+| Account *(standard)* | `chp_bccustomerno`, `chp_bccompanyid`, `chp_bccompanyname` | read: Self/Account via contact (for `me`) |
 | Contact *(standard)* | `parentcustomerid` = active account | Self read |
-| `cr_accountlink` | contact, account | Contact scope read (Phase 2 picker) |
-| `cr_orderdraft` | contact, account, name, `cr_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal) |
-| `cr_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
-| `cr_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
-| `cr_request` | account, submitted by, category, request type, assigned group, contact method/value/person, details, category fields, status, attachments | Account scope create/read |
-| `cr_complaint` | account, submitted by, category, complaint type, assigned group, incident date, delivery site, SO no., subject, description, consent, attachments, status | Account scope create/read |
-| `cr_requesttype` / `cr_complainttype` | category, type, assigned group, active, field config | Global read (ops edit in model-driven app, no redeploy) |
-| `cr_announcement` | title, message, active | Global read |
+| `chp_accountlink` | contact, account | Contact scope read (Phase 2 picker) |
+| `chp_orderdraft` | contact, account, name, `chp_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal), used through the `drafts` Server Logic, which sets contact and account from the session |
+| `chp_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
+| `chp_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
+| `chp_request` | account, submitted by, category, request type, assigned group, contact method/value/person, details, category fields, status, attachments | Account scope create/read |
+| `chp_complaint` | account, submitted by, category, complaint type, assigned group, incident date, delivery site, SO no., subject, description, consent, attachments, status | Account scope create/read |
+| `chp_requesttype` / `chp_complainttype` | category, type, assigned group, active, field config | Global read (ops edit in model-driven app, no redeploy) |
+| `chp_announcement` | title, message, active | Global read |
 
 Requests and Complaints reference BC data (SO no., ship-to code) as **plain text keys**, not lookups, because the BC data isn't in Dataverse.
 
@@ -354,7 +358,7 @@ src/
 |---|---|---|---|
 | D1 | Where pending-credit-approval orders live | BC approval workflow (§7) | BC team + PASI |
 | D2 | Customer-specific pricing source | BC price-calculation endpoint, not raw price lists | BC team |
-| D3 | Where Requests/Complaints/site requests are worked by CHP ("internal service-center system", never named in the wireframe) | Dataverse tables + flow notification. If CHP runs **Dynamics 365 Customer Service**, create Cases instead | CHP / Rene |
+| D3 | Where Requests/Complaints/site requests are worked by CHP ("internal service-center system", never named in the wireframe) | Dataverse tables + flow notification. If CHP runs **Dynamics 365 Customer Service**, create Cases instead. **2026-10-27: CHP works these in monday.com boards**; a flow creates the monday.com item from the Dataverse row (board mapping and open asks in the implementation plan, "Service center = monday.com") | CHP / Rene |
 | D4 | Role granted on activation | None; ops assigns a role in Portal Management | Rene |
 | Q5 | BC API exposure of archived SOs, posted docs + PDFs, ledger | Needed for Orders statuses, Document Center, Ledger (§8) | BC team |
 | Q6 | Account & User Mgmt visibility per role (missing from role map) | All roles read; Full Access revokes | Rene |

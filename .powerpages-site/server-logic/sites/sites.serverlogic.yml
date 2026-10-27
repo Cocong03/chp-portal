@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+description: 'Signed-in customer''s BC ship-to addresses for Delivery Sites (S2-02)'
+display_name: 'Sites (BC ship-to addresses)'
+id: 586ce8ae-ad9b-472c-a7e1-06ee3c1da382
+name: sites

@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+description: 'BC price quote for the New Order lines and summary'
+display_name: 'Order quote (BC)'
+id: a4d24c65-283b-4c74-8d3b-b8523685f5b5
+name: order-quote

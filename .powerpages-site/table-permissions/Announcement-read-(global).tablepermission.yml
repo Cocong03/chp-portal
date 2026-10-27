@@ -1,0 +1,12 @@
+adx_entitypermission_webrole:
+- b2780841-e908-44f8-b7d8-dfd367bfeeb2
+append: false
+appendto: false
+create: false
+delete: false
+entitylogicalname: chp_announcement
+entityname: Announcement - read (global)
+id: 784a354e-3cb1-4cb0-8a5b-b0ff1d54c576
+read: true
+scope: 756150000
+write: false

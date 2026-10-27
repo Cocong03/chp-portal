@@ -1,0 +1,14 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+append: true
+appendto: false
+contactrelationship: contact_customer_accounts
+create: false
+delete: false
+entitylogicalname: account
+entityname: Account - own account (append, order drafts)
+id: 41bc5544-2727-43d9-aa0a-31d25cd5a1cb
+read: false
+scope: 756150001
+write: false

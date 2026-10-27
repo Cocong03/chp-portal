@@ -1,0 +1,14 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+append: true
+appendto: true
+contactrelationship: chp_contact_chp_orderdraft
+create: true
+delete: true
+entitylogicalname: chp_orderdraft
+entityname: Order draft - own (CRUD)
+id: e9ff62f3-7216-4695-aaca-ebaa791671c6
+read: true
+scope: 756150001
+write: true

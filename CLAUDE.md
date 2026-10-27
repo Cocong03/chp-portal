@@ -1,4 +1,6 @@
-# CHP Portal (Concreat Hub)
+# CHP Portal (Concreat Connect)
+
+Customers see the portal as **Concreat Connect** (wireframe name; decided 2026-10-04). "Concreat Hub" survives only in internal identifiers (solution `ConcreatHub`, doc file names).
 
 Customer portal for **Concreat Holdings (CHP)** customers. Customers sign in, place and track cement orders, view their ledger and documents, manage delivery sites, and submit requests/complaints. **Business Central (BC) is the system of record**; the portal consumes BC through APIs built by the BC team.
 
@@ -7,12 +9,12 @@ Customer portal for **Concreat Holdings (CHP)** customers. Customers sign in, pl
 
 ## Read these first
 
-| Doc                                                          | Use it for                                                                                                |
-| ------------------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
-| `docs/Concreat_Hub_Architecture.md`                          | The architecture. Follow it; propose changes there before deviating                                       |
-| `docs/Concreat_Hub_Implementation_Plan.md`                   | Task IDs (S0–S5, P2), dependencies, "done when" checks. Reference task IDs in commits/PRs                 |
-| `docs/Concreat_Hub_Registration_Architecture.md`             | Sign-in/activation design ported from the POC, plus lessons learned                                       |
-| `Standard_Portal_Flow_v47_ForDevBuildGuide.html` (wireframe) | **The UI spec.** Exact fields, labels, dropdown values, copy and behavior. Build to it; don't redesign it |
+| Doc                                              | Use it for                                                                                                |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------- |
+| `docs/Concreat_Hub_Architecture.md`              | The architecture. Follow it; propose changes there before deviating                                       |
+| `docs/Concreat_Hub_Implementation_Plan.md`       | Task IDs (S0–S5, P2), dependencies, "done when" checks. Reference task IDs in commits/PRs                 |
+| `docs/Concreat_Hub_Registration_Architecture.md` | Sign-in/activation design ported from the POC, plus lessons learned                                       |
+| `Mockup-chp-v2.html` (wireframe)                 | **The UI spec.** Exact fields, labels, dropdown values, copy and behavior. Build to it; don't redesign it |
 
 | Power Platform / BC Developer Packages (.docx)
 
@@ -23,7 +25,7 @@ see at docs\bc-api-collection.json
 
 ## UI Mockup
 
-- see at docs\Standard_Portal_Flow_v47_ForDevBuildGuide.html
+- see at docs\Mockup-chp-v2.html (updated at 10/08/2026)
 
 ## Tech stack
 
@@ -46,8 +48,6 @@ see at docs\bc-api-collection.json
 
 - use this design system for branding and styles at DESIGN.md
 
-Use the components already provided by the Power Apps Code Apps starter.
-
 Prefer **shadcn/ui** components over custom recreations.
 
 Examples:
@@ -68,17 +68,17 @@ Examples:
 
 1. **BC is the only store of business data.** Never copy orders, ledger, prices, credit, ship-tos or documents into Dataverse. Read them live from BC.
 2. **The browser never calls BC.** All BC calls go through Server Logic (`/_api/serverlogics/<name>`) using the portal's app identity (client credentials).
-3. **Scope every BC call from the session, never from the request.** Every Server Logic function: `Server.User` → contact → active Account (`cr_bccustomerno`, `cr_bccompanyid`) → BC company + customer filter. Ignore any customer/company id sent by the client. Detail endpoints verify that the BC record belongs to the session customer.
+3. **Scope every BC call from the session, never from the request.** Every Server Logic function: `Server.User` → contact → active Account (`chp_bccustomerno`, `chp_bccompanyid`) → BC company + customer filter. Ignore any customer/company id sent by the client. Detail endpoints verify that the BC record belongs to the session customer.
 4. **Escape every user value placed in an OData `$filter`** (double single quotes).
 5. **No business math in the SPA.** Prices, freight, other charges and available credit come from BC. The SPA only sums for display. Order submit re-quotes and re-checks credit on the server and never trusts client totals.
-6. **Dataverse owns only portal data:** Contact/Account identity, `cr_accountlink`, web roles, drafts, requests, complaints, site requests, Excel uploads, taxonomy tables, announcement. Account stores only BC identity keys (customer no., name, company).
+6. **Dataverse owns only portal data:** Contact/Account identity, `chp_accountlink`, web roles, drafts, requests, complaints, site requests, Excel uploads, taxonomy tables, announcement. Account stores only BC identity keys (customer no., name, company).
 7. **Power Automate is never on a synchronous read path.** Use it for activation, routing submissions, notifications.
 8. **Security is server-side.** Web roles on every Server Logic record and table permissions (mostly Account scope via `parentcustomerid`). Client-side role checks are UX only.
 9. **Design for multiple linked accounts per contact** (Phase 2 switcher) even though Nov 15 ships one link per contact.
 
 ## Web roles
 
-`Full Access` · `Orders & Delivery` · `Finance & Documents` · `View Only`. The page matrix is in Architecture §4. Activation does not grant a business role (decision D4 pending); CHP ops assigns roles in Portal Management.
+`Full Access` · `Orders & Delivery` · `Finance & Documents` · `View Only`. The page matrix is in Architecture §4. Activation does not grant a business role (decision D4 pending). **Access grants in Concreat Connect Admin are the source of truth for roles** (decided 2026-10-08): a grant adds or replaces the contact's business role, Deactivate revokes, Activate restores; grants can't be deleted. Don't assign roles in Portal Management.
 
 ## Repository conventions
 
@@ -99,18 +99,20 @@ docs/               architecture, plan, registration docs
 - **Server Logic can't `require`/`import`**, and banned patterns include `eval`, `setTimeout`, `delete`, `prototype`, `Reflect.`. Each record carries a copy of the shared helpers (token, BC GET/POST, OData escape, scoping). Keep the copies identical and generate them from one template; don't hand-edit them per file.
 - Server Logic HttpClient bodies are strings. Binary files (PDFs) come from BC as **base64 JSON**.
 - **All environment-specific values are Dataverse environment variables**: BC tenant, BC environment name, company IDs, API base path, site URL, sender mailbox. **Secrets: Key Vault → secret env var → site setting.** Never hardcode them.
+  - **Exception (Dev only, decided 2026-10-04):** `chp_BCClientSecret` is a plain-text environment variable (no default value, value set by hand in Dev only) instead of Key Vault. Moving it to Key Vault is part of S1-14 and must happen before UAT. Never put its value in chat, files or git.
 - Order status mapping (confirmed 2026-09-14): BC Open → _Open_ · Pending Prepayment → _Pending Prepayment_ · Released → _Ready for Dispatch_ · archived + Completely Shipped → _Completely Shipped_ · Completely Shipped + Invoiced → _Invoiced_.
 - Customer-facing copy uses the wireframe's wording exactly (renames per the packages, e.g. "+ New Multiple Order", "Account and User Management"). Never show BC jargon (location codes, table names) or the name of CHP's internal service-center system.
-- Every page sets `document.title` as `"<Page> — Concreat Hub"`.
-- Publisher prefix `cr_` in the docs is a placeholder; use the solution's real prefix.
+- Every page sets `document.title` as `"<Page> — Concreat Connect"`.
+- Publisher **Concreat Holdings**, prefix `chp_` (option-value prefix 77500), solution **`ConcreatHub`**. Create every Dataverse component in that solution.
+- Environment variables (in `ConcreatHub`): `chp_BCTenantId`, `chp_BCEnvironmentName`, `chp_BCSolidCementCompanyId`, `chp_BCApiBasePath`, `chp_SiteUrl`, `chp_SenderMailbox`, `chp_PowerPagesSiteId`, `chp_BCClientId`, `chp_BCClientSecret` (see the Dev exception above), `chp_EmailLogoUrl` (public PNG for emails; mail clients can't read the private portal). Server Logic reads the BC ones through the `BC/*` site settings.
 
 ## Environments
 
-|      | Power Platform                                                   | BC                                                          |
-| ---- | ---------------------------------------------------------------- | ----------------------------------------------------------- |
-| Dev  | _CHP Customer Portal_ (`https://org380257ac.crm5.dynamics.com/`) | Concreat Sanbox Dev - `Training · SOLID CEMENT CORPORATION` |
-| UAT  | TBD                                                              | Concreat UAT sandbox                                        |
-| Prod | TBD                                                              | Concreat production                                         |
+|      | Power Platform                                                   | BC                                                                                                     |
+| ---- | ---------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| Dev  | _CHP Customer Portal_ (`https://org380257ac.crm5.dynamics.com/`) | Concreat Sandbox Dev - environment `DEV` (renamed from TRAINING 2026-10-04) · SOLID CEMENT CORPORATION |
+| UAT  | TBD                                                              | Concreat UAT sandbox                                                                                   |
+| Prod | TBD                                                              | Concreat production                                                                                    |
 
 - **Never develop or test against BC production.** Orders and activations create real records and send real emails.
 - Confirm the target with `pac auth who` before any deploy. Deploy only with `pac pages upload-code-site` (**never** `pac pages upload`).
@@ -139,6 +141,7 @@ pac pages upload-code-site --rootPath .   # deploy to the confirmed environment
 - Contact has **Business Required custom columns from another project** (`rpn_quickbooksid`, `rpn_vendordisplayname`) in the Dev environment. Pass them empty when a flow creates contacts.
 - Power Pages local sign-in posts to `/SignIn` with **`PasswordValue`**. Registration is a Web Forms page (copy ViewState and control names).
 - `pac pages upload-code-site` wipes the **Header** web template. Keep redirect scripts in **Code-Site-Shell-Header**.
+- **Changing an environment variable value behind a site setting (e.g. `BC/ClientSecret`) needs a site restart** (Power Platform admin center → Power Pages sites → Restart); the site keeps the cached old value otherwise (seen 2026-10-05). Server Logic reads site settings with `Server.SiteSetting.Get` (Microsoft Learn; the plugin's `Server.Sitesetting` is wrong), and a form-urlencoded `HttpClient.PostAsync` body must be a JSON object string (the platform encodes it).
 - On Windows, the plugin's Node scripts call `az` without a shell (`az.cmd` fails); Git Bash also rewrites args that start with `/` (check `flowapiurl` in generated YAML).
 
 ## Don't

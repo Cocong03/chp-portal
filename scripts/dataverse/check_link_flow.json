@@ -1,0 +1,129 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    }
+  },
+  "triggers": {
+    "manual": {
+      "type": "Request",
+      "kind": "PowerPages",
+      "inputs": {
+        "schema": {
+          "type": "object",
+          "properties": {
+            "text": {
+              "title": "Code",
+              "type": "string",
+              "x-ms-dynamically-added": true,
+              "description": "Code from the activation link",
+              "x-ms-content-hint": "TEXT"
+            }
+          },
+          "required": [
+            "text"
+          ]
+        }
+      }
+    }
+  },
+  "actions": {
+    "Code": {
+      "type": "Compose",
+      "runAfter": {},
+      "inputs": "@trim(coalesce(triggerBody()?['text'], ''))"
+    },
+    "List_invitation": {
+      "type": "OpenApiConnection",
+      "runAfter": {
+        "Code": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "adx_invitations",
+          "$select": "adx_expirydate,adx_redemptions,adx_maximumredemptions",
+          "$filter": "adx_invitationcode eq '@{replace(outputs('Code'), '''', '''''')}' and statecode eq 0",
+          "$top": 1
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    },
+    "Is_valid": {
+      "type": "If",
+      "runAfter": {
+        "List_invitation": [
+          "Succeeded"
+        ]
+      },
+      "expression": {
+        "equals": [
+          "@and(not(equals(outputs('Code'), '')), greater(length(outputs('List_invitation')?['body/value']), 0), greater(ticks(coalesce(first(outputs('List_invitation')?['body/value'])?['adx_expirydate'], '9999-12-31T00:00:00Z')), ticks(utcNow())), less(coalesce(first(outputs('List_invitation')?['body/value'])?['adx_redemptions'], 0), coalesce(first(outputs('List_invitation')?['body/value'])?['adx_maximumredemptions'], 1)))",
+          true
+        ]
+      },
+      "actions": {
+        "Return_valid": {
+          "type": "Response",
+          "kind": "PowerPages",
+          "runAfter": {},
+          "inputs": {
+            "statusCode": 200,
+            "body": {
+              "status": "valid"
+            },
+            "schema": {
+              "type": "object",
+              "properties": {
+                "status": {
+                  "title": "status",
+                  "x-ms-dynamically-added": true,
+                  "type": "string"
+                }
+              }
+            }
+          }
+        }
+      },
+      "else": {
+        "actions": {
+          "Return_invalid": {
+            "type": "Response",
+            "kind": "PowerPages",
+            "runAfter": {},
+            "inputs": {
+              "statusCode": 200,
+              "body": {
+                "status": "invalid"
+              },
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "title": "status",
+                    "x-ms-dynamically-added": true,
+                    "type": "string"
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "outputs": {}
+}

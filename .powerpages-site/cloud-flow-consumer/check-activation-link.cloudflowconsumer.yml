@@ -1,0 +1,8 @@
+adx_CloudFlowConsumer_adx_webrole:
+  - 24d62544-a66e-4660-81a6-ee467b783abb
+flowapiurl: '/_api/cloudflow/v1.0/trigger/12d72231-3bc1-f111-aaad-70a8a503683e'
+flowtriggerurl: ''
+id: 479a52d8-1a55-48a4-a3e3-7350723a42af
+metadata: ''
+name: 'Concreat Connect – Check activation link'
+processid: 12d72231-3bc1-f111-aaad-70a8a503683e

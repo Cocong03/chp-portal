@@ -43,7 +43,7 @@ sequenceDiagram
     opt no Contact
       F->>DV: create Contact (lastname = BC displayName)
     end
-    opt Contact not yet activated (no adx_identity_username)
+    opt Contact not yet activated (no saved password)
       F->>DV: create adx_invitation (Single, 1 use, 7 days)
       F->>M: email link /activate/complete?code=…&email=…
     end
@@ -88,7 +88,7 @@ sequenceDiagram
 | Proof of email ownership | The password is set only through a link sent **to the BC email address**, so knowing someone's email isn't enough to take over their account |
 | No customer enumeration | The flow always returns `{"status":"ok"}` and the page always shows the same "Check your inbox" message |
 | Single-use, expiring links | Invitation `adx_maximumredemptions = 1`, `adx_expirydate = +7 days`, random 32-hex code |
-| No double activation | If the Contact already has `adx_identity_username`, no new invitation is created |
+| No double activation | If the Contact already has a username **and a saved password** (`adx_identity_passwordhash ne null`, filtered on, never read), no new invitation is created. A username without a password (activation never completed, seen 2026-10-15) gets the username cleared and a new invitation |
 | OData injection safe | The email is lower-cased and trimmed, with single quotes doubled, before going into `$filter` |
 | Passwords never touch our code | Power Pages hashes and stores them; the SPA only posts to Power Pages' own endpoints |
 | CSRF | Every POST carries the token from `/_layout/tokenhtml` |
@@ -171,7 +171,7 @@ sequenceDiagram
 |---|---|
 | BC standard API `v2.0/customers`, SANDBOXUS, one company | BC team's Concreat Hub customer/contact API against **Solid Cement only** for now (see §7), with the company ID in an environment variable |
 | Match on `customer.email` | BC package rule: *Customer whose registered Contact has this email* |
-| Contact only | Also find/create the Dataverse **Account** (`cr_bccustomerno`, `cr_bccompanyid`, `cr_bccompanyname`), set `parentcustomerid`, create the **Account Link** row |
+| Contact only | Also find/create the Dataverse **Account** (`chp_bccustomerno`, `chp_bccompanyid`, `chp_bccompanyname`), set `parentcustomerid`, create the **Account Link** row |
 | No business role on activation | Per decision D4: CHP ops assigns a role (or auto-grant for the primary email) |
 | Email link hardcoded to `site-hdiqg.powerappsportals.com` | Site URL from an environment variable |
 | Sent from the developer mailbox | Shared mailbox (`noreply@…`) with Send As |
@@ -189,7 +189,7 @@ sequenceDiagram
 - The packages put both companies in Release 1 scope (*"separate login email per account, of either kind"*), but the project is starting with **Solid Cement only**. Confirm the APO Cement go-live timing with Rene and the BC team.
 - Keep the design **company-aware** so adding APO Cement later is configuration, not a rebuild:
   - the activation flow reads the BC company ID from an **environment variable** (`Solid Cement` company ID for now), not a hardcoded value;
-  - the Account record still stores `cr_bccompanyid` / `cr_bccompanyname`, and every Server Logic call takes the company from the Account.
+  - the Account record still stores `chp_bccompanyid` / `chp_bccompanyname`, and every Server Logic call takes the company from the Account.
 - **Enabling APO Cement later** (plan task S1-12): add its company ID, change the flow to search both companies, and apply the duplicate-email rule below.
 
 **Open question Q10: an email registered on more than one BC customer**

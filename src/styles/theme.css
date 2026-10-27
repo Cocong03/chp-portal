@@ -1,13 +1,24 @@
 /* Scan only src/ for class names. */
-@import 'tailwindcss' source('..');
-@import 'tw-animate-css';
+@import "tailwindcss" source("..");
+@import "tw-animate-css";
 
 @custom-variant dark (&:where([data-theme='dark'], [data-theme='dark'] *));
 
-/* Tokens from the wireframe (docs/Standard_Portal_Flow_v47_ForDevBuildGuide.html),
+/* Tokens from the wireframe (docs/Mockup-chp-v2.html),
    mapped onto the shadcn/ui variable names. */
-:root {
-  --radius: 0.5rem;
+/* [data-theme='light'] re-applies the light tokens inside a dark page (sign-in screens are fixed light). */
+:root,
+[data-theme="light"] {
+  /* Fixed brand palette for the sign-in screens (DESIGN.md §7); deliberately not redefined for dark. */
+  --brand-navy: #1b2e63;
+  --brand-navy-deep: #0c1633;
+  --brand-ink: #16255a;
+  --brand-blue: #3e63b8;
+  --brand-soft: #eaf1fc;
+  --brand-field: #d7dce2;
+  --brand-divider: #eaedf1;
+  --shadow: 0 1px 2px rgb(23 34 46 / 0.06), 0 4px 14px rgb(23 34 46 / 0.05);
+  --scrim: rgb(23 34 46 / 0.4);
   --background: #f5f8fb;
   --foreground: #17222e;
   --card: #ffffff;
@@ -34,7 +45,7 @@
   --ring: #2560a8;
 }
 
-[data-theme='dark'] {
+[data-theme="dark"] {
   --background: #10161d;
   --foreground: #e7ecf1;
   --card: #161f29;
@@ -59,15 +70,21 @@
   --border: #2b3948;
   --input: #2b3948;
   --ring: #6fa8dc;
+  --shadow: 0 1px 2px rgb(0 0 0 / 0.3), 0 6px 20px rgb(0 0 0 / 0.35);
+  --scrim: rgb(4 7 10 / 0.6);
 }
 
 @theme inline {
-  --font-sans: 'IBM Plex Sans', ui-sans-serif, system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
-  --radius-sm: calc(var(--radius) - 4px);
-  --radius-md: calc(var(--radius) - 2px);
-  --radius-lg: var(--radius);
-  --radius-xl: calc(var(--radius) + 4px);
+  --font-sans: "IBM Plex Sans", ui-sans-serif, system-ui, sans-serif;
+  --font-mono: "IBM Plex Mono", ui-monospace, monospace;
+  /* Wireframe radii (DESIGN.md §3): controls 6, notes 8, cards 10, dialogs 12. */
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 10px;
+  --radius-2xl: 12px;
+  --shadow-card: var(--shadow);
+  --color-scrim: var(--scrim);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-card: var(--card);
@@ -92,6 +109,13 @@
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
+  --color-brand-navy: var(--brand-navy);
+  --color-brand-navy-deep: var(--brand-navy-deep);
+  --color-brand-ink: var(--brand-ink);
+  --color-brand-blue: var(--brand-blue);
+  --color-brand-soft: var(--brand-soft);
+  --color-brand-field: var(--brand-field);
+  --color-brand-divider: var(--brand-divider);
 }
 
 @layer base {

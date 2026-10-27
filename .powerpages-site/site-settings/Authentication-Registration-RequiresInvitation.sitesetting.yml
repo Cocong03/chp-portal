@@ -1,0 +1,4 @@
+description: "Invitation code required; disables open registration (Microsoft Learn: configure-site troubleshooting)"
+id: 3833833d-3ce5-4104-9f40-9910caa5aac6
+name: Authentication/Registration/RequiresInvitation
+value: true
