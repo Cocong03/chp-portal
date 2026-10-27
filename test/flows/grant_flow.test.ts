@@ -116,3 +116,13 @@ test('a mismatch removes roles only when the grant was Applied', () => {
 test('the business roles are listed before the match check so a mismatch can remove them', () => {
   expect(findAction(definition.actions, 'Customer_matches').runAfter).toEqual({ List_current_business_roles: ['Succeeded'] })
 })
+
+// Final review 2026-10-27: an admin who edits an Applied grant's email to another person's address must not strip that
+// person's roles (they come from their own grant). Only the contact the grant was applied to loses them.
+test('a mismatch removes roles only from the contact the grant was applied to', () => {
+  expect(definition.actions.Get_grant.inputs.parameters.$select.split(',')).toContain('_chp_contact_value')
+  const wasApplied = JSON.stringify(findAction(definition.actions, 'Customer_matches').else.actions.Was_applied.expression)
+  expect(wasApplied).toContain(
+    `"@outputs('Get_grant')?['body/_chp_contact_value']","@first(outputs('List_contacts_by_email')?['body/value'])?['contactid']"`,
+  )
+})

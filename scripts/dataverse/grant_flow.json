@@ -42,7 +42,7 @@
         "parameters": {
           "entityName": "chp_accessgrants",
           "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
-          "$select": "chp_accessgrantid,chp_email,chp_bccustomerno,_chp_company_value,chp_webrole,chp_status,statecode"
+          "$select": "chp_accessgrantid,chp_email,chp_bccustomerno,_chp_company_value,chp_webrole,chp_status,_chp_contact_value,statecode"
         }
       }
     },
@@ -438,6 +438,12 @@
                           "equals": [
                             "@outputs('Get_grant')?['body/chp_status']",
                             775000001
+                          ]
+                        },
+                        {
+                          "equals": [
+                            "@outputs('Get_grant')?['body/_chp_contact_value']",
+                            "@first(outputs('List_contacts_by_email')?['body/value'])?['contactid']"
                           ]
                         }
                       ]
