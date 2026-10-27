@@ -155,7 +155,7 @@ CHP wants portal submissions passed to their **monday.com** boards (workspace "C
 | Complaints & Feedback | S4-05, P2-06 | Customer Complaints → **Complaints & Feedback** (Survey: **CSAT Survey**?) |
 | Blanket order delivery schedule (Manage schedule) | S3-16 | Sales → **Blanket Sales Order** (groups Orders · Created in BC · Completed; views Pick up, Delivery) |
 | + New Multiple Order (Excel file) | S3-13 | To confirm |
-| Delivery site requests (new / change / removal) | S4-06 | To confirm |
+| Delivery site requests (new / change / removal) | S4-06 | Sales → **Jobsite/POD** (confirmed 2026-10-27). Groups: Request for Ship to Address · For Endorsement · For Site Inspection · Integration Error. Columns seen: Jobsite/pod/project name, Assignee, Date Created, Status, Shipment Method, BC Status (locked; 23 more hidden). New requests likely land in "Request for Ship to Address"; change and removal requests on the same board: to confirm |
 | Request an access change | P2-05 | To confirm (Sales Operations → **Additional Portal User Requests**?) |
 
 **How it fits the architecture (proposal, to agree before S4):**
@@ -168,7 +168,7 @@ CHP wants portal submissions passed to their **monday.com** boards (workspace "C
 
 **Asks of CHP:**
 
-1. The board for each "To confirm" row above.
+1. The board for each "To confirm" row above. Jobsite/POD also shows a locked **BC Status** column and an **Integration Error** group, so it looks like CHP already has a monday.com → BC integration that creates the ship-to in BC: confirm, so the portal only creates the board item and never writes ship-tos to BC itself.
 2. Each board's column mapping (which portal field goes in which column), and the group a new item lands in.
 3. An integration account and API token for Power Automate, plus test boards (or a test workspace) for Dev and UAT.
 4. Whether status changes on the boards should show in the portal, and which status values the customer sees.
@@ -187,7 +187,7 @@ Dataverse + Web API + routing flows. Independent of the BC APIs (except display 
 | S4-03 | `chp_request` + **Requests list & filters** (category, assigned group, status) | PP | S4-01, S4-02 | Matches wireframe | Requests — List & filters | ⬜ Not started | 2026-10-27: submissions go to the monday.com **Requests** board (see [Service center = monday.com](#service-center--mondaycom-d3-noted-2026-10-27)) |
 | S4-04 | **Requests cascade** + **submission form** (base fields, preferred contact method, category-specific fields, attachments) | PP | S4-03 | 6 categories work end to end | Requests — Cascade · Submission form | ⬜ Not started | 2026-10-27: submissions go to the monday.com **Requests** board (see [Service center = monday.com](#service-center--mondaycom-d3-noted-2026-10-27)) |
 | S4-05 | `chp_complaint` + **Complaints tab** (cascade, incident date, site, attachment, consent required, preferred contact + contact person, "Submitted By" label, Dispatch Coordination → Logistics) | PP | S4-01, S4-02 | Submit disabled until consent is checked | Complaints & Feedback — Complaints tab · Preferred contact · Category/type adjustments | ⬜ Not started | 2026-10-27: submissions go to the monday.com **Complaints & Feedback** board (see [Service center = monday.com](#service-center--mondaycom-d3-noted-2026-10-27)) |
-| S4-06 | `chp_siterequest` + **Delivery Sites — request new / change / removal** + pending requests list (auto-filled requestor + BC account no.) | PP | S4-02, S2-02 | Pending list shows status; nothing changes in BC until CHP applies it | Delivery Sites — Request a new site · Request a change · Request removal | ⬜ Not started | 2026-10-27: goes to a monday.com board (which one: to confirm with CHP) (see [Service center = monday.com](#service-center--mondaycom-d3-noted-2026-10-27)) |
+| S4-06 | `chp_siterequest` + **Delivery Sites — request new / change / removal** + pending requests list (auto-filled requestor + BC account no.) | PP | S4-02, S2-02 | Pending list shows status; nothing changes in BC until CHP applies it | Delivery Sites — Request a new site · Request a change · Request removal | ⬜ Not started | 2026-10-27: goes to the monday.com **Jobsite/POD** board (new sites in "Request for Ship to Address"; change/removal: to confirm) (see [Service center = monday.com](#service-center--mondaycom-d3-noted-2026-10-27)) |
 | S4-07 | **Routing flows**: on create of Request / Complaint / Site request → notify the Assigned Group (or create a Case per D3); status updates flow back | PP | S4-03–S4-06, S0-06 | The right team gets each submission in the sandbox test | ✚ | ⬜ Not started | 2026-10-27: the routing target is **monday.com** (D3), not a Dataverse notification or a Case (see [Service center = monday.com](#service-center--mondaycom-d3-noted-2026-10-27)) |
 | S4-08 | `portal-access` endpoint + **Revoke access now** (Full Access only, not self, same account only) | PP | S2-19, S1-05 | Revoked user loses access immediately | ✚ (part of Account & User Mgmt) | ⬜ Not started |  |
 
