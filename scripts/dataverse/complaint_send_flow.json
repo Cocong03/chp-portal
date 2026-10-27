@@ -59,6 +59,11 @@
           "subscriptionRequest/filteringattributes": "chp_syncattempts,chp_syncstate"
         }
       },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      },
       "conditions": [
         {
           "expression": "@and(empty(triggerOutputs()?['body/chp_mondayitemid']), equals(triggerOutputs()?['body/chp_syncstate'], 775000000))"
@@ -151,15 +156,54 @@
             "parameters": {
               "entityName": "chp_complaints",
               "recordId": "@triggerOutputs()?['body/chp_complaintid']",
-              "$select": "chp_reference,chp_category,chp_complainttype,chp_contactmethod,chp_contactvalue,chp_contactperson,chp_subject,chp_description,chp_incidentdate,chp_sitelabel,chp_relatedorder,chp_consent,chp_attachmentname,_chp_account_value"
+              "$select": "chp_reference,chp_category,chp_complainttype,chp_contactmethod,chp_contactvalue,chp_contactperson,chp_subject,chp_description,chp_incidentdate,chp_sitelabel,chp_relatedorder,chp_consent,chp_attachmentname,_chp_account_value,chp_mondayitemid,chp_syncstate"
             },
             "authentication": "@parameters('$authentication')"
           }
         },
+        "Already_handled": {
+          "type": "If",
+          "runAfter": {
+            "Get_complaint": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "or": [
+              {
+                "equals": [
+                  "@empty(outputs('Get_complaint')?['body/chp_mondayitemid'])",
+                  false
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@outputs('Get_complaint')?['body/chp_syncstate']",
+                    775000000
+                  ]
+                }
+              }
+            ]
+          },
+          "actions": {
+            "Nothing_to_send": {
+              "type": "Terminate",
+              "runAfter": {},
+              "inputs": {
+                "runStatus": "Succeeded"
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "description": "R13: another run already sent this row (or it is no longer Pending): do nothing."
+        },
         "Get_account": {
           "type": "OpenApiConnection",
           "runAfter": {
-            "Get_complaint": [
+            "Already_handled": [
               "Succeeded"
             ]
           },
@@ -562,9 +606,7 @@
                     }
                   },
                   "retryPolicy": {
-                    "type": "exponential",
-                    "count": 4,
-                    "interval": "PT10S"
+                    "type": "none"
                   }
                 },
                 "runtimeConfiguration": {
