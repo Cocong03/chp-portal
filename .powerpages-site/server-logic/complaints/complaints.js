@@ -706,7 +706,7 @@ async function post() {
         var result = parseResult(
             Server.Connector.Dataverse.RetrieveMultipleRecords(
                 "chp_complainttypes",
-                "$select=chp_name,chp_assignedgroup&$top=1&$filter=chp_active eq true and chp_category eq " + odataLiteral(category) + " and chp_name eq " + odataLiteral(type),
+                "$select=chp_name,chp_category,chp_assignedgroup&$top=1&$filter=chp_active eq true and chp_category eq " + odataLiteral(category) + " and chp_name eq " + odataLiteral(type),
                 true
             ),
             "dataverse"
@@ -750,7 +750,7 @@ async function post() {
         var name = file && typeof file.name === "string" ? file.name.trim() : "";
         var ext = name.indexOf(".") > 0 ? name.split(".").pop().toLowerCase() : "";
         var base64 = file && typeof file.base64 === "string" ? file.base64 : "";
-        return isOwn(MIME, ext) && name.length <= 260 && base64.length % 4 === 0 && BASE64.test(base64) && decodedSize(base64) <= MAX_FILE ? { name: name, base64: base64, mime: MIME[ext] } : null;
+        return isOwn(MIME, ext) && name.length <= 260 && !/[\x00-\x1f"\\/]/.test(name) && base64.length % 4 === 0 && BASE64.test(base64) && decodedSize(base64) <= MAX_FILE ? { name: name, base64: base64, mime: MIME[ext] } : null;
     }
 
     function invalid(field) {
@@ -767,6 +767,8 @@ async function post() {
         if (!row) {
             return invalid(category ? "complaintType" : "category");
         }
+        category = row.chp_category;
+        complaintType = row.chp_name;
         var contactMethod = text(body.contactMethod);
         var contactValue = text(body.contactValue);
         if (!isOwn(METHODS, contactMethod) || !(contactMethod === "Email" ? EMAIL : MOBILE).test(contactValue)) {

@@ -29,6 +29,29 @@ test('a request submitted in the portal is listed as Submitted with an RQ- refer
   await expect(top).toContainText('Submitted')
 })
 
+test('a Delivery request with a trip, order and site is listed as Submitted', async ({ page }) => {
+  await page.goto('/requests')
+  await page.getByRole('button', { name: 'New request' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New request' })
+
+  await dialog.getByLabel('Category', { exact: true }).click()
+  await page.getByRole('option', { name: 'Delivery', exact: true }).click()
+  await dialog.getByLabel('Request type').click()
+  await page.getByRole('option').first().click()
+  await dialog.getByLabel('Trip ID reference').fill('TRP-E2E-01')
+  await dialog.getByLabel('Related Sales Order').click()
+  await page.getByRole('option').first().click()
+  await dialog.getByLabel('Delivery site (Ship-to Address)').click()
+  await page.getByRole('option').first().click()
+  await dialog.getByLabel('Request details').fill(`${STAMP} delivery`)
+  await dialog.getByRole('button', { name: 'Submit request' }).click()
+
+  await expect(page.getByText(/Request RQ-\d+ submitted\./)).toBeVisible()
+  const top = page.getByRole('table').getByRole('row').nth(1)
+  await expect(top).toContainText(`${STAMP} delivery`)
+  await expect(top).toContainText('Submitted')
+})
+
 test('a complaint with a photo is listed as Submitted with a CMP- reference', async ({ page }) => {
   await page.goto('/complaints')
   await page.getByRole('button', { name: 'New complaint' }).click()

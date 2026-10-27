@@ -1,7 +1,7 @@
 import type {
-  ComplaintDto, ComplaintSubmitDto, ComplaintTaxonomyDto, RequestDto, RequestSubmitDto, RequestTaxonomyDto,
+  ComplaintDto, SiteDto, ComplaintSubmitDto, ComplaintTaxonomyDto, RequestDto, RequestSubmitDto, RequestTaxonomyDto,
 } from '@/api/types'
-import type { MockRequest } from './index'
+import { mocks, type MockRequest } from './index'
 import taxonomy from './serviceTaxonomy.json'
 
 const REQUEST_TAXONOMY: RequestTaxonomyDto = {
@@ -48,6 +48,11 @@ export function resetServiceMocks() {
 }
 resetServiceMocks()
 
+// What the servers store for a site: "<code> — <name>" (the shipToLabel).
+const siteLabel = (code: string) => {
+  const site = (mocks.sites?.({ method: 'GET' }) as SiteDto[]).find((s) => s.code === code)
+  return site ? `${site.code} — ${site.name}` : ''
+}
 const nextRef = (prefix: string, rows: { ref: string }[]) =>
   `${prefix}-${1 + Math.max(...rows.map((r) => Number(r.ref.split('-')[1])))}`
 const newestFirst = <T extends { submitted: string }>(rows: T[]) => [...rows].sort((a, b) => b.submitted.localeCompare(a.submitted))
@@ -61,7 +66,7 @@ export function requestsMock({ method, query = {}, body }: MockRequest): unknown
   const category = REQUEST_TAXONOMY.categories.find((c) => c.name === b.category)
   const extra = Object.entries(b.fields ?? {})
     .filter(([, value]) => value)
-    .map(([key, value]) => ({ label: key === 'order' ? (category?.fields.orderLabel ?? 'Sales Order Number') : (FIELD_LABELS[key] ?? key), value }))
+    .map(([key, value]) => ({ label: key === 'order' ? (category?.fields.orderLabel ?? 'Sales Order Number') : (FIELD_LABELS[key] ?? key), value: key === 'site' ? siteLabel(value) : value }))
   const ref = nextRef('RQ', requests)
   requests.push({
     id: crypto.randomUUID(), ref, submitted: new Date().toISOString(), category: b.category, requestType: b.requestType,
@@ -80,7 +85,7 @@ export function complaintsMock({ method, query = {}, body }: MockRequest): unkno
   const ref = nextRef('CMP', complaints)
   complaints.push({
     id: crypto.randomUUID(), ref, submitted: new Date().toISOString(), category: b.category, complaintType: b.complaintType,
-    assignedGroup: groupOf(category?.types, b.complaintType), incidentDate: b.incidentDate, deliverySite: b.site,
+    assignedGroup: groupOf(category?.types, b.complaintType), incidentDate: b.incidentDate, deliverySite: siteLabel(b.site),
     subject: b.subject, description: b.description, relatedOrder: b.relatedOrder, contactMethod: b.contactMethod,
     contactValue: b.contactValue, contactPerson: ME, attachmentName: b.attachment?.name ?? '', status: 'Submitted', dateResolved: '', resolutionNote: '',
   })

@@ -201,7 +201,7 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
                   )
                   if (meta.kind === 'order') return choose(orders.map((so) => ({ value: so, label: so })), 'Select a sales order…')
                   if (meta.kind === 'site') {
-                    return choose(sites.map((s) => ({ value: `${s.code} — ${s.name}`, label: `${s.code} — ${s.name}` })), 'Select a delivery site…')
+                    return choose(sites.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` })), 'Select a delivery site…')
                   }
                   if (meta.kind === 'date') return <DateField id={id} value={field.value ?? ''} onChange={field.onChange} />
                   return <Input id={id} {...field} value={field.value ?? ''} placeholder={meta.placeholder} aria-invalid={!!fieldError(key)} />

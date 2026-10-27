@@ -705,7 +705,7 @@ async function post() {
         var result = parseResult(
             Server.Connector.Dataverse.RetrieveMultipleRecords(
                 "chp_requesttypes",
-                "$select=chp_name,chp_assignedgroup,chp_fieldconfig&$top=1&$filter=chp_active eq true and chp_category eq " + odataLiteral(category) + " and chp_name eq " + odataLiteral(type),
+                "$select=chp_name,chp_category,chp_assignedgroup,chp_fieldconfig&$top=1&$filter=chp_active eq true and chp_category eq " + odataLiteral(category) + " and chp_name eq " + odataLiteral(type),
                 true
             ),
             "dataverse"
@@ -761,7 +761,7 @@ async function post() {
         if (key === "userEmail") {
             return !value || EMAIL.test(value) ? value : null;
         }
-        return value.length <= (key === "trip" ? 50 : 200) ? value : null;
+        return value.length <= (key === "trip" || key === "docref" ? 50 : 200) ? value : null;
     }
 
     // Decoded size of a base64 string, without decoding it.
@@ -775,7 +775,7 @@ async function post() {
         var name = file && typeof file.name === "string" ? file.name.trim() : "";
         var ext = name.indexOf(".") > 0 ? name.split(".").pop().toLowerCase() : "";
         var base64 = file && typeof file.base64 === "string" ? file.base64 : "";
-        return isOwn(MIME, ext) && name.length <= 260 && base64.length % 4 === 0 && BASE64.test(base64) && decodedSize(base64) <= MAX_FILE ? { name: name, base64: base64, mime: MIME[ext] } : null;
+        return isOwn(MIME, ext) && name.length <= 260 && !/[\x00-\x1f"\\/]/.test(name) && base64.length % 4 === 0 && BASE64.test(base64) && decodedSize(base64) <= MAX_FILE ? { name: name, base64: base64, mime: MIME[ext] } : null;
     }
 
     function invalid(field) {
@@ -792,6 +792,8 @@ async function post() {
         if (!row) {
             return invalid(category ? "requestType" : "category");
         }
+        category = row.chp_category;
+        requestType = row.chp_name;
         var cfg = parseConfig(row);
         var contactMethod = text(body.contactMethod);
         var contactValue = text(body.contactValue);
