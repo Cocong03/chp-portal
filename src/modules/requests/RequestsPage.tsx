@@ -13,13 +13,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Toolbar } from '@/ui/Toolbar'
 import { NewRequestDialog } from './NewRequestDialog'
 import { RequestDialog } from './RequestDialog'
-import { assignedGroups, SERVICE_STATUSES, ServiceStatusPill } from './serviceDisplay'
+import { assignedGroups, PAGE_SIZE, SERVICE_STATUSES, ServiceStatusPill } from './serviceDisplay'
 import { useRequests, useRequestTaxonomy } from './useRequests'
 
 const NO_REQUESTS: RequestDto[] = []
 const NO_OPTIONS: string[] = []
 const ALL = '__all'
-const PAGE_SIZE = 10
 
 function columns(onView: (request: RequestDto) => void): DataColumn<RequestDto>[] {
   return [

@@ -13,3 +13,5 @@ export function ServiceStatusPill({ status }: { status: ServiceStatus }) {
 export function assignedGroups(taxonomy: { categories: { types: { group: string }[] }[] }): string[] {
   return [...new Set(taxonomy.categories.flatMap((c) => c.types.map((t) => t.group)))]
 }
+
+export const PAGE_SIZE = 10
