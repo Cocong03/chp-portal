@@ -51,6 +51,8 @@ describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritt
       'subscriptionRequest/entityname': table,
       'subscriptionRequest/filteringattributes': 'chp_syncattempts,chp_syncstate',
     })
+    // R13: runs are serial, so a slow send and the sync flow's re-send can't both see "not found" and both create.
+    expect(trigger.runtimeConfiguration).toEqual({ concurrency: { runs: 1 } })
     expect(trigger.conditions).toEqual([
       { expression: `@and(empty(triggerOutputs()?['body/chp_mondayitemid']), equals(triggerOutputs()?['body/chp_syncstate'], ${PENDING}))` },
     ])
@@ -68,7 +70,7 @@ describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritt
     for (const [, action] of calls) {
       expect(action.inputs.headers.Authorization).toBe(TOKEN)
       expect(action.inputs.headers['API-Version']).toBe('2026-10')
-      expect(action.inputs.retryPolicy).toMatchObject({ type: 'exponential', count: 4 })
+      if (action !== findAction(definition.actions, 'Create_item')) expect(action.inputs.retryPolicy).toMatchObject({ type: 'exponential', count: 4 })
       expect(action.runtimeConfiguration.secureData.properties).toEqual(expect.arrayContaining(['inputs', 'outputs']))
     }
     for (const [, action] of graphql(definition)) expect(action.inputs.headers['Content-Type']).toBe('application/json')
@@ -113,6 +115,37 @@ describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritt
     expect(findAction(definition.actions, 'Create_item').inputs.body.query).toBe(
       'mutation ($board: ID!, $group: String!, $name: String!, $values: JSON!) { create_item(board_id: $board, group_id: $group, item_name: $name, column_values: $values) { id } }',
     )
+  })
+
+  test('creating an item is never retried in the run (the mutation is not idempotent)', () => {
+    const definition = load(file)
+    expect(findAction(definition.actions, 'Create_item').inputs.retryPolicy).toEqual({ type: 'none' })
+  })
+
+  test('re-reads the row and does nothing when it already has an item or is no longer Pending', () => {
+    const definition = load(file)
+    const send = definition.actions.Send_to_monday.actions
+    const [get] = Object.entries(send as Record<string, any>).find(([, a]) => Object.keys(a.runAfter).length === 0)!
+    expect(send[get].inputs.parameters.$select.split(',')).toEqual(expect.arrayContaining(['chp_mondayitemid', 'chp_syncstate']))
+    const guard = send.Already_handled
+    expect(guard.runAfter).toEqual({ [get]: ['Succeeded'] })
+    const expression = JSON.stringify(guard.expression)
+    expect(expression).toContain(`outputs('${get}')?['body/chp_mondayitemid']`)
+    expect(expression).toContain(`outputs('${get}')?['body/chp_syncstate']`)
+    expect(expression).toContain(String(PENDING))
+    expect(guard.actions.Nothing_to_send).toMatchObject({ type: 'Terminate', inputs: { runStatus: 'Succeeded' } })
+    expect(send.Get_account.runAfter).toEqual({ Already_handled: ['Succeeded'] })
+  })
+
+  test('every Fail_ step is followed by its Throw_, so an error never falls through to the next step', () => {
+    const definition = load(file)
+    const fails = allActions(definition.actions).filter(([name]) => name.startsWith('Fail_'))
+    expect(fails.length).toBe(4)
+    for (const [name] of fails) {
+      const branch = allActions(definition.actions).find(([, a]) => a.type === 'If' && a.actions?.[name])![1]
+      const step = name.slice('Fail_'.length)
+      expect(branch.actions[`Throw_${step}`]).toMatchObject({ type: 'Compose', runAfter: { [name]: ['Succeeded'] }, inputs: '@div(1, 0)' })
+    }
   })
 
   test('a GraphQL error or a missing attachment fails the send', () => {
