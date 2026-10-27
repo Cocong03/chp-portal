@@ -24,7 +24,7 @@
           "subscriptionRequest/message": 4,
           "subscriptionRequest/entityname": "chp_accessgrant",
           "subscriptionRequest/scope": 4,
-          "subscriptionRequest/filteringattributes": "chp_email,chp_bccustomerno,chp_webrole,statecode"
+          "subscriptionRequest/filteringattributes": "chp_email,chp_bccustomerno,chp_company,chp_webrole,statecode"
         }
       }
     }
@@ -42,7 +42,7 @@
         "parameters": {
           "entityName": "chp_accessgrants",
           "recordId": "@triggerOutputs()?['body/chp_accessgrantid']",
-          "$select": "chp_accessgrantid,chp_email,chp_bccustomerno,chp_webrole,statecode"
+          "$select": "chp_accessgrantid,chp_email,chp_bccustomerno,_chp_company_value,chp_webrole,chp_status,statecode"
         }
       }
     },
@@ -112,16 +112,57 @@
                 "parameters": {
                   "entityName": "accounts",
                   "recordId": "@first(outputs('List_contacts_by_email')?['body/value'])?['_parentcustomerid_value']",
-                  "$select": "chp_bccustomerno"
+                  "$select": "chp_bccustomerno,chp_bccompanyid"
+                }
+              }
+            },
+            "Get_grant_company": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Get_parent_account": [
+                  "Succeeded",
+                  "Failed"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "GetItem",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "chp_bccompanies",
+                  "recordId": "@outputs('Get_grant')?['body/_chp_company_value']",
+                  "$select": "chp_bccompanyguid"
+                }
+              }
+            },
+            "List_current_business_roles": {
+              "type": "OpenApiConnection",
+              "runAfter": {
+                "Get_grant_company": [
+                  "Succeeded",
+                  "Failed"
+                ]
+              },
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_commondataserviceforapps",
+                  "operationId": "ListRecords",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                },
+                "parameters": {
+                  "entityName": "powerpagecomponents",
+                  "$select": "powerpagecomponentid,name",
+                  "$filter": "powerpagecomponenttype eq 11 and _powerpagesiteid_value eq f44e98b4-3da3-4f8d-8f79-fbb244454741 and (name eq 'Full Access' or name eq 'Orders & Delivery' or name eq 'Finance & Documents' or name eq 'View Only') and powerpagecomponent_mspp_webrole_contact/any(c: c/contactid eq @{first(outputs('List_contacts_by_email')?['body/value'])?['contactid']})"
                 }
               }
             },
             "Customer_matches": {
               "type": "If",
               "runAfter": {
-                "Get_parent_account": [
-                  "Succeeded",
-                  "Failed"
+                "List_current_business_roles": [
+                  "Succeeded"
                 ]
               },
               "expression": {
@@ -143,6 +184,18 @@
                       "@outputs('Get_parent_account')?['body/chp_bccustomerno']",
                       "@outputs('Get_grant')?['body/chp_bccustomerno']"
                     ]
+                  },
+                  {
+                    "equals": [
+                      "@actions('Get_grant_company')?['status']",
+                      "Succeeded"
+                    ]
+                  },
+                  {
+                    "equals": [
+                      "@toLower(string(outputs('Get_parent_account')?['body/chp_bccompanyid']))",
+                      "@toLower(string(outputs('Get_grant_company')?['body/chp_bccompanyguid']))"
+                    ]
                   }
                 ]
               },
@@ -152,30 +205,10 @@
                   "runAfter": {},
                   "inputs": "@if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000000), 'Full Access', if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000001), 'Orders & Delivery', if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000002), 'Finance & Documents', if(equals(outputs('Get_grant')?['body/chp_webrole'], 775000003), 'View Only', ''))))"
                 },
-                "List_current_business_roles": {
-                  "type": "OpenApiConnection",
-                  "runAfter": {
-                    "Grant_role_name": [
-                      "Succeeded"
-                    ]
-                  },
-                  "inputs": {
-                    "host": {
-                      "connectionName": "shared_commondataserviceforapps",
-                      "operationId": "ListRecords",
-                      "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
-                    },
-                    "parameters": {
-                      "entityName": "powerpagecomponents",
-                      "$select": "powerpagecomponentid,name",
-                      "$filter": "powerpagecomponenttype eq 11 and _powerpagesiteid_value eq f44e98b4-3da3-4f8d-8f79-fbb244454741 and (name eq 'Full Access' or name eq 'Orders & Delivery' or name eq 'Finance & Documents' or name eq 'View Only') and powerpagecomponent_mspp_webrole_contact/any(c: c/contactid eq @{first(outputs('List_contacts_by_email')?['body/value'])?['contactid']})"
-                    }
-                  }
-                },
                 "Grant_is_active": {
                   "type": "If",
                   "runAfter": {
-                    "List_current_business_roles": [
+                    "Grant_role_name": [
                       "Succeeded"
                     ]
                   },
@@ -396,9 +429,53 @@
               },
               "else": {
                 "actions": {
+                  "Was_applied": {
+                    "type": "If",
+                    "runAfter": {},
+                    "expression": {
+                      "and": [
+                        {
+                          "equals": [
+                            "@outputs('Get_grant')?['body/chp_status']",
+                            775000001
+                          ]
+                        }
+                      ]
+                    },
+                    "actions": {
+                      "Remove_roles_on_mismatch": {
+                        "type": "Foreach",
+                        "runAfter": {},
+                        "foreach": "@outputs('List_current_business_roles')?['body/value']",
+                        "actions": {
+                          "Unrelate_role_on_mismatch": {
+                            "type": "OpenApiConnection",
+                            "runAfter": {},
+                            "inputs": {
+                              "host": {
+                                "connectionName": "shared_commondataserviceforapps",
+                                "operationId": "DisassociateEntities",
+                                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+                              },
+                              "parameters": {
+                                "entityName": "contacts",
+                                "recordId": "@first(outputs('List_contacts_by_email')?['body/value'])?['contactid']",
+                                "associationEntityRelationship": "powerpagecomponent_mspp_webrole_contact",
+                                "$id": "@items('Remove_roles_on_mismatch')?['@odata.id']"
+                              }
+                            }
+                          }
+                        }
+                      }
+                    }
+                  },
                   "Set_status_Customer_mismatch": {
                     "type": "OpenApiConnection",
-                    "runAfter": {},
+                    "runAfter": {
+                      "Was_applied": [
+                        "Succeeded"
+                      ]
+                    },
                     "inputs": {
                       "host": {
                         "connectionName": "shared_commondataserviceforapps",
