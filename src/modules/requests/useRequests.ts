@@ -3,7 +3,8 @@ import { serverLogic } from '@/api/serverLogic'
 import type { RequestDto, RequestTaxonomyDto } from '@/api/types'
 
 export function useRequests() {
-  return useQuery({ queryKey: ['requests'], queryFn: () => serverLogic<RequestDto[]>('requests') })
+  // monday's webhook updates Dataverse within seconds; re-checking while the page is open shows it without a reload.
+  return useQuery({ queryKey: ['requests'], queryFn: () => serverLogic<RequestDto[]>('requests'), refetchInterval: 30_000 })
 }
 
 /** Categories, types and groups change rarely, so cache them for minutes. */

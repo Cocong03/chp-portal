@@ -706,7 +706,7 @@ async function post() {
         var result = parseResult(
             Server.Connector.Dataverse.RetrieveMultipleRecords(
                 "chp_complainttypes",
-                "$select=chp_name,chp_category,chp_assignedgroup&$top=1&$filter=chp_active eq true and chp_category eq " + odataLiteral(category) + " and chp_name eq " + odataLiteral(type),
+                "$select=chp_name,chp_category,chp_assignedgroup&$top=1&$filter=" + encodeURIComponent("chp_active eq true and chp_category eq " + odataLiteral(category) + " and chp_name eq " + odataLiteral(type)),
                 true
             ),
             "dataverse"

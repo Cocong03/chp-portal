@@ -65,8 +65,8 @@ type Values = z.infer<ReturnType<typeof buildSchema>>
 
 function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTaxonomyDto; onClose: () => void }) {
   const queryClient = useQueryClient()
-  const sites = useSites().data ?? []
-  const orders = useOrderNumbers().data ?? []
+  const sites = useSites()
+  const orders = useOrderNumbers()
   const file = useAttachment('request')
   const send = useMutation({ mutationFn: (body: RequestSubmitDto) => serverLogic<SubmitResultDto>('requests', { method: 'POST', body }) })
 
@@ -185,13 +185,14 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
                 name={`fields.${key}`}
                 defaultValue=""
                 render={({ field }) => {
-                  const choose = (items: { value: string; label: string }[], placeholder: string) => (
-                    <Select value={field.value ?? ''} onValueChange={field.onChange}>
+                  // A picker with nothing to list (loading, failed or empty) would open as a blank box, so it stays closed and says why.
+                  const choose = (items: { value: string; label: string }[] | undefined, placeholder: string, status: string) => (
+                    <Select value={field.value ?? ''} onValueChange={field.onChange} disabled={!items?.length}>
                       <SelectTrigger id={id} className="w-full" aria-invalid={!!fieldError(key)}>
-                        <SelectValue placeholder={placeholder} />
+                        <SelectValue placeholder={items?.length ? placeholder : status} />
                       </SelectTrigger>
                       <SelectContent>
-                        {items.map((item) => (
+                        {items?.map((item) => (
                           <SelectItem key={item.value} value={item.value}>
                             {item.label}
                           </SelectItem>
@@ -199,9 +200,13 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
                       </SelectContent>
                     </Select>
                   )
-                  if (meta.kind === 'order') return choose(orders.map((so) => ({ value: so, label: so })), 'Select a sales order…')
+                  if (meta.kind === 'order') {
+                    const status = orders.isPending ? 'Loading sales orders…' : orders.isError ? "Couldn't load your sales orders" : 'No sales orders on your account'
+                    return choose(orders.data?.map((so) => ({ value: so, label: so })), 'Select a sales order…', status)
+                  }
                   if (meta.kind === 'site') {
-                    return choose(sites.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` })), 'Select a delivery site…')
+                    const status = sites.isPending ? 'Loading delivery sites…' : sites.isError ? "Couldn't load your delivery sites" : 'No delivery sites on your account'
+                    return choose(sites.data?.map((s) => ({ value: s.code, label: `${s.code} — ${s.name}` })), 'Select a delivery site…', status)
                   }
                   if (meta.kind === 'date') return <DateField id={id} value={field.value ?? ''} onChange={field.onChange} />
                   return <Input id={id} {...field} value={field.value ?? ''} placeholder={meta.placeholder} aria-invalid={!!fieldError(key)} />
