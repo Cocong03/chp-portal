@@ -655,6 +655,10 @@ async function post() {
     // #endregion bc-helpers
 
     var METHODS = { Email: 775000000, Mobile: 775000001 };
+    // Own-key checks: a plain object lookup also matches inherited members such as constructor or toString.
+    function isOwn(map, key) {
+        return Object.keys(map).indexOf(key) !== -1;
+    }
     var EMAIL = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
     // Philippine mobile, as in the wireframe sample: 0917 552 6613, 09175526613 or +63 917 552 6613.
     var MOBILE = /^(\+63|0)9\d{2}[ -]?\d{3}[ -]?\d{4}$/;
@@ -771,7 +775,7 @@ async function post() {
         var name = file && typeof file.name === "string" ? file.name.trim() : "";
         var ext = name.indexOf(".") > 0 ? name.split(".").pop().toLowerCase() : "";
         var base64 = file && typeof file.base64 === "string" ? file.base64 : "";
-        return MIME[ext] && name.length <= 260 && BASE64.test(base64) && decodedSize(base64) <= MAX_FILE ? { name: name, base64: base64, mime: MIME[ext] } : null;
+        return isOwn(MIME, ext) && name.length <= 260 && base64.length % 4 === 0 && BASE64.test(base64) && decodedSize(base64) <= MAX_FILE ? { name: name, base64: base64, mime: MIME[ext] } : null;
     }
 
     function invalid(field) {
@@ -791,8 +795,8 @@ async function post() {
         var cfg = parseConfig(row);
         var contactMethod = text(body.contactMethod);
         var contactValue = text(body.contactValue);
-        if (!METHODS[contactMethod] || !(contactMethod === "Email" ? EMAIL : MOBILE).test(contactValue)) {
-            return invalid(METHODS[contactMethod] ? "contactValue" : "contactMethod");
+        if (!isOwn(METHODS, contactMethod) || !(contactMethod === "Email" ? EMAIL : MOBILE).test(contactValue)) {
+            return invalid(isOwn(METHODS, contactMethod) ? "contactValue" : "contactMethod");
         }
         var details = text(body.details);
         if (!details || details.length > 4000) {
@@ -848,6 +852,8 @@ async function post() {
         };
         if (file) {
             create.chp_attachmentname = file.name;
+            // Deep insert: the note exists the moment the request does, so the sync flow never sees one without the other.
+            create.chp_request_Annotations = [{ subject: file.name, filename: file.name, mimetype: file.mime, documentbody: file.base64 }];
         }
         written(Server.Connector.Dataverse.CreateRecord("chp_requests", JSON.stringify(create)));
         // ponytail: reads back the contact's newest request instead of relying on the create answer's shape; two saves in
@@ -862,21 +868,9 @@ async function post() {
         );
         var created = ((latest && latest.value) || [])[0];
         if (!created) {
-            throw new Error("request created but not found");
-        }
-        if (file) {
-            written(
-                Server.Connector.Dataverse.CreateRecord(
-                    "annotations",
-                    JSON.stringify({
-                        subject: file.name,
-                        filename: file.name,
-                        mimetype: file.mime,
-                        documentbody: file.base64,
-                        "objectid_chp_request@odata.bind": "/chp_requests(" + created.chp_requestid + ")"
-                    })
-                )
-            );
+            // The request exists: answering an error would make the customer submit it again.
+            Server.Logger.Warn("requests POST created a request but could not read it back");
+            return { ref: "" };
         }
         return { ref: created.chp_reference };
     });
