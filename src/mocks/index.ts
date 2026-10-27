@@ -5,6 +5,7 @@ import { draftsMock } from './drafts'
 import { ledgerMock } from './ledger'
 import { ORDER_OPTIONS_SAMPLE, orderQuoteMock, SOURCE_PLANTS_SAMPLE } from './orderOptions'
 import { ordersMock } from './orders'
+import { complaintsMock, requestsMock } from './service'
 
 export interface MockRequest {
   method: string
@@ -63,6 +64,8 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
   drafts: draftsMock,
   ledger: ledgerMock,
   orders: ordersMock,
+  requests: requestsMock,
+  complaints: complaintsMock,
   'order-options': () => ORDER_OPTIONS_SAMPLE,
   'source-plants': () => SOURCE_PLANTS_SAMPLE,
   'portal-items': () => ORDER_OPTIONS_SAMPLE.items,
