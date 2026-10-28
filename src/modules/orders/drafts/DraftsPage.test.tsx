@@ -149,7 +149,7 @@ test('the tabs read Orders, Blanket Orders, New Order, Drafts and mark Drafts cu
   openDrafts()
   await table()
   const links = within(tabs()).getAllByRole('link')
-  expect(links.map((link) => link.textContent)).toEqual(['Orders', 'Blanket Orders', 'New Order', 'Drafts 1'])
+  expect(links.map((link) => link.textContent)).toEqual(['Orders', 'Blanket Orders', 'New Order', 'Drafts 1', 'Pending Approval'])
   expect(links[3]).toHaveAttribute('aria-current', 'page')
   expect(document.title).toBe('Drafts — Concreat Connect')
 })

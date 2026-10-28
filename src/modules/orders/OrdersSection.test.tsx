@@ -39,7 +39,7 @@ test('Blanket Orders is the second Orders tab and opens the Blanket Orders list'
   const user = userEvent.setup()
   signInAs('full@test.ph', '/orders')
   const tabs = await screen.findByRole('navigation', { name: 'Orders sections' }, { timeout: 5000 })
-  expect(within(tabs).getAllByRole('link').map((link) => link.textContent)).toEqual(['Orders', 'Blanket Orders', 'New Order', expect.stringMatching(/^Drafts/)])
+  expect(within(tabs).getAllByRole('link').map((link) => link.textContent)).toEqual(['Orders', 'Blanket Orders', 'New Order', expect.stringMatching(/^Drafts/), 'Pending Approval'])
   await user.click(within(tabs).getByRole('link', { name: 'Blanket Orders' }))
   expect(await screen.findByRole('table', { name: 'Blanket Orders' })).toBeInTheDocument()
   expect(within(tabs).getByRole('link', { name: 'Blanket Orders' })).toHaveAttribute('aria-current', 'page')

@@ -1,4 +1,4 @@
-import type { BlanketOrdersDto, OrderDto, OrdersPageDto, OrderStatus, OrderSubmitDto } from '@/api/types'
+import type { BlanketOrdersDto, OrderDto, OrdersPageDto, OrderStatus, OrderSubmitDto, PendingOrderDto } from '@/api/types'
 import type { MockRequest } from './index'
 
 // Wireframe CATALOG and ORDERS (Mockup-chp-v2.html). Totals here are mock data only; the real ones come from BC.
@@ -49,10 +49,18 @@ export const MOCK_BLANKET_ORDERS: OrderDto[] = [
   toOrder(['BSO-20441', '2026-07-10', '', 'PO-8500-B', 'PLANT1', 'Open', 'Delivery', null, null, [['CEM-T1-40KG', 2000]]]),
 ].map((order) => ({ ...order, edd: null }))
 
+// Wireframe PENDING (plus the credit team's comment on the declined one).
+const MOCK_PENDING: PendingOrderDto[] = [
+  { id: 'pending-1', submitted: '2026-09-13', po: 'PO-8902', site: 'PLANT3', est: 215000, status: 'Awaiting credit approval', reason: 'Account has a past due balance', comment: '' },
+  { id: 'pending-2', submitted: '2026-09-10', po: 'PO-8887', site: 'PLANT1', est: 76500, status: 'Awaiting credit approval', reason: 'Order exceeds available credit', comment: '' },
+  { id: 'pending-3', submitted: '2026-09-05', po: 'PO-8850', site: 'PLANT2', est: 140000, status: 'Declined', reason: 'Order exceeds available credit', comment: 'Please settle the past due first.' },
+]
+
 /** Dev-server stand-in for the orders Server Logic (same query parameters, same answers). */
-export function ordersMock({ method, query = {}, body }: MockRequest): OrdersPageDto | BlanketOrdersDto | OrderDto | OrderSubmitDto | { notFound: true } {
+export function ordersMock({ method, query = {}, body }: MockRequest): OrdersPageDto | BlanketOrdersDto | OrderDto | OrderSubmitDto | PendingOrderDto[] | { notFound: true } {
   // A credit order is held for the credit team (S3-04); cash is created.
   if (method === 'POST') return (body as { paymentMethod?: string } | undefined)?.paymentMethod === 'credit' ? { pending: true } : { so: 'SO-100500' }
+  if (query.view === 'pending') return MOCK_PENDING
   if (query.type === 'blanket') {
     if (query.id) return MOCK_BLANKET_ORDERS.find((o) => o.so === query.id) ?? { notFound: true }
     return { orders: MOCK_BLANKET_ORDERS.map(({ lines: _lines, ...summary }) => summary) }

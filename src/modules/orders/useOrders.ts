@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { serverLogic } from '@/api/serverLogic'
-import type { BlanketOrdersDto, OrderDto, OrderKind, OrdersPageDto } from '@/api/types'
+import type { BlanketOrdersDto, OrderDto, OrderKind, OrdersPageDto, PendingOrderDto } from '@/api/types'
 
 export interface OrderFilters {
   q: string
@@ -34,6 +34,15 @@ export function useBlanketOrders() {
   return useQuery({
     queryKey: ['blanket-orders'],
     queryFn: () => serverLogic<BlanketOrdersDto>('orders', { query: { type: 'blanket' } }),
+    staleTime: 60_000,
+  })
+}
+
+/** The account's credit orders held for the credit team or declined (S3-11). */
+export function usePendingOrders() {
+  return useQuery({
+    queryKey: ['orders', 'pending'],
+    queryFn: () => serverLogic<PendingOrderDto[]>('orders', { query: { view: 'pending' } }),
     staleTime: 60_000,
   })
 }
