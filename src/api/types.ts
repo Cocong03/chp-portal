@@ -86,6 +86,14 @@ export interface OrderDto extends OrderSummaryDto {
   lines: OrderLineDto[]
 }
 
+/** Which BC document an order read is about: a Sales Order or a Blanket Sales Order (S3-16, `?type=blanket`). */
+export type OrderKind = 'order' | 'blanket'
+
+/** GET /_api/serverlogics/orders?type=blanket: the customer's Blanket Sales Orders, newest first. */
+export interface BlanketOrdersDto {
+  orders: OrderSummaryDto[]
+}
+
 export interface OrdersPageDto {
   orders: OrderSummaryDto[]
   total: number

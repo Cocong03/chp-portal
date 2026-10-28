@@ -1,7 +1,7 @@
 adx_serverlogic_adx_webrole:
   - 56b29291-b981-4ef0-865b-41c1e9523a97
   - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
-description: 'Signed-in customer''s BC Sales Orders: list and detail with lines (S2-04); POST submits a cash New Order (S3-10)'
+description: 'Signed-in customer''s BC Sales Orders and Blanket Sales Orders (type=blanket, S3-16): list and detail with lines; POST submits a cash New Order (S3-10)'
 display_name: 'Orders (BC Sales Orders)'
 id: d4aa8f60-765c-4274-9110-a308e1933142
 name: orders

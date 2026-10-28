@@ -18,13 +18,22 @@ export function fromDraft(payload: DraftPayload, options: OrderOptionsDto, sites
     if (typeof saved[key] === typeof form[key]) form[key] = saved[key]
   }
   const result = form as unknown as NewOrderForm
-  const lines = Array.isArray(saved.lines) ? (saved.lines as { code?: unknown; qty?: unknown }[]) : []
+  const lines = Array.isArray(saved.lines) ? (saved.lines as { code?: unknown; qty?: unknown; price?: unknown }[]) : []
   result.lines = lines.length
     ? lines.map((line) => ({
         code: options.items.some((item) => item.code === line.code) ? (line.code as string) : '',
         qty: typeof line.qty === 'number' ? line.qty : 1,
+        // Blanket drafts (S3-16) carry the typed price.
+        ...(typeof line.price === 'number' ? { price: line.price } : {}),
       }))
     : defaults.lines
+  if (result.orderType !== 'single' && result.orderType !== 'blanket') result.orderType = defaults.orderType
+  // Typeof can't vet an array (null is an "object" too): keep only well-formed rows. A cleared quantity was saved as null
+  // (JSON has no NaN) and comes back blank, keeping the row's item and date.
+  const schedule = Array.isArray(saved.schedule) ? (saved.schedule as Record<string, unknown>[]) : []
+  result.schedule = schedule
+    .filter((row) => row && typeof row.item === 'string' && (typeof row.qty === 'number' || row.qty === null) && typeof row.date === 'string')
+    .map((row) => ({ item: row.item as string, qty: typeof row.qty === 'number' ? row.qty : NaN, date: row.date as string }))
   const site = typeof saved.site === 'string' ? saved.site : ''
   result.site = !sites || sites.some((each) => each.code === site) ? site : ''
   if (!options.plants.some((plant) => plant.code === result.source)) result.source = ''

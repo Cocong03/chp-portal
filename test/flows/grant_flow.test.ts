@@ -30,7 +30,7 @@ const REVOKED = 775000004
 test('the flow also runs when a grant is deactivated or activated', () => {
   const trigger = definition.triggers.When_an_access_grant_is_added_or_modified.inputs.parameters
   expect(trigger['subscriptionRequest/filteringattributes'].split(',')).toEqual(
-    expect.arrayContaining(['chp_email', 'chp_bccustomerno', 'chp_webrole', 'statecode']),
+    expect.arrayContaining(['chp_email', 'chp_bccustomerno', 'chp_company', 'chp_webrole', 'statecode']),
   )
 })
 
@@ -83,4 +83,46 @@ test('reads the grant by id first and never takes its columns from the trigger p
   })
   const body = JSON.stringify(definition.actions)
   expect(body.match(/triggerOutputs\(\)\?\['body\/(?!chp_accessgrantid')[^']+'\]/g) ?? []).toEqual([])
+})
+
+// S1-12 (2026-10-27): customer numbers repeat across BC companies, so a grant matches on customer no. AND company.
+test('reads the grant company and compares company ids case-insensitively', () => {
+  expect(definition.actions.Get_grant.inputs.parameters.$select.split(',')).toEqual(
+    expect.arrayContaining(['_chp_company_value', 'chp_status']),
+  )
+  const company = findAction(definition.actions, 'Get_grant_company')
+  expect(company.inputs.parameters).toMatchObject({
+    entityName: 'chp_bccompanies', recordId: "@outputs('Get_grant')?['body/_chp_company_value']", $select: 'chp_bccompanyguid',
+  })
+  expect(findAction(definition.actions, 'Get_parent_account').inputs.parameters.$select).toBe('chp_bccustomerno,chp_bccompanyid')
+  const conditions = JSON.stringify(findAction(definition.actions, 'Customer_matches').expression)
+  expect(conditions).toContain(`"@actions('Get_grant_company')?['status']","Succeeded"`)
+  expect(conditions).toContain(
+    `"@toLower(string(outputs('Get_parent_account')?['body/chp_bccompanyid']))","@toLower(string(outputs('Get_grant_company')?['body/chp_bccompanyguid']))"`,
+  )
+})
+
+test('a mismatch removes roles only when the grant was Applied', () => {
+  const mismatch = findAction(definition.actions, 'Customer_matches').else.actions
+  const wasApplied = mismatch.Was_applied
+  expect(JSON.stringify(wasApplied.expression)).toContain(`"@outputs('Get_grant')?['body/chp_status']",775000001`)
+  const remove = wasApplied.actions.Remove_roles_on_mismatch
+  expect(remove.type).toBe('Foreach')
+  expect(JSON.stringify(remove.foreach)).toContain("outputs('List_current_business_roles')")
+  expect(remove.actions.Unrelate_role_on_mismatch.inputs.host.operationId).toBe('DisassociateEntities')
+  expect(mismatch.Set_status_Customer_mismatch.runAfter).toEqual({ Was_applied: ['Succeeded'] })
+})
+
+test('the business roles are listed before the match check so a mismatch can remove them', () => {
+  expect(findAction(definition.actions, 'Customer_matches').runAfter).toEqual({ List_current_business_roles: ['Succeeded'] })
+})
+
+// Final review 2026-10-27: an admin who edits an Applied grant's email to another person's address must not strip that
+// person's roles (they come from their own grant). Only the contact the grant was applied to loses them.
+test('a mismatch removes roles only from the contact the grant was applied to', () => {
+  expect(definition.actions.Get_grant.inputs.parameters.$select.split(',')).toContain('_chp_contact_value')
+  const wasApplied = JSON.stringify(findAction(definition.actions, 'Customer_matches').else.actions.Was_applied.expression)
+  expect(wasApplied).toContain(
+    `"@outputs('Get_grant')?['body/_chp_contact_value']","@first(outputs('List_contacts_by_email')?['body/value'])?['contactid']"`,
+  )
 })

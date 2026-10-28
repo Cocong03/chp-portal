@@ -126,7 +126,7 @@ Every Server Logic function starts the same way:
 
 The POC flow already does BC lookup → Contact → single-use invitation → email, and it works end to end. Production changes:
 
-- Query the **BC team's customer/contact API** instead of the standard `v2.0/customers`. The BC package's match rule is "Customer whose registered Contact has this email". **Company scope: Solid Cement only for now** (decision Oct 1, 2026); APO Cement is added later by configuration (plan task S1-12). An email that matches more than one customer follows rule **Q10** (Registration doc §7).
+- Query the **BC team's customer/contact API** instead of the standard `v2.0/customers`. The BC package's match rule is "Customer whose registered Contact has this email". **Company scope: every active row of `chp_bccompany`** (Solid Cement and APO Cement since 2026-10-27, S1-12; a new company is a new row). An email that matches more than one customer, in one company or across companies, is blocked (rule **Q10**, Registration doc §7). Access grants carry the company too, because BC customer numbers repeat across companies.
 - Find or create the **Account** (by `chp_bccustomerno` + company), set `parentcustomerid`, and create the Account Link row.
 - **Role on activation (decision D4):** activation grants no business role by default. CHP ops assigns one of the four roles in Portal Management, per the "no in-portal user management" direction. Alternative: auto-grant `Full Access` when the email is the BC customer card's primary email.
 
@@ -154,7 +154,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 ### Secrets and BC access
 
 - BC access goes through an **Entra app registration** (client credentials), registered **inside BC** with a permission set limited to the Concreat Hub API pages (read, plus Sales Order create). Do not reuse the "Monday CRM" app.
-- Client secret: **Azure Key Vault → Dataverse environment variable (secret type) → site setting**, read with `Server.SiteSetting`. Non-secret config (BC tenant, environment name, company IDs, API base path) goes in plain environment variables, so it differs per environment without code changes.
+- Client secret: **Azure Key Vault → Dataverse environment variable (secret type) → site setting**, read with `Server.SiteSetting`. Non-secret config (BC tenant, environment name, API base path) goes in plain environment variables, so it differs per environment without code changes. BC company IDs are rows in `chp_bccompany`, seeded per environment (decided 2026-10-27).
 - Tenant admins can **disable external calls from Server Logic** (a GA governance control). This must stay enabled for Concreat Hub's environment.
 - **Dev exception (2026-10-04):** the BC client secret is a plain-text environment variable with no default value, set by hand in Dev only. Key Vault is required before UAT (plan task S1-14).
 
@@ -172,7 +172,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **Dashboard — Announcement** | Dataverse `chp_announcement` (newest active row, set by the account team in Concreat Connect Admin) | – | `announcement` Server Logic, read live with `skipCache` (decided 2026-10-09: the Web API served this Global-read table from a shared cache for up to 15 min) |
 | **Orders list / filters / paging / export** | BC Sales Orders + archive (status mapping below) | – | `orders` GET (server-side filter/page; `all=true` for export) |
 | **Order view / Reorder / Trip ID** | BC SO + lines + Trip ID field | – | `orders` GET `?id=` |
-| **Blanket Orders tab / Blanket entry** | BC Blanket Sales Orders + schedule | BC Sales Order referencing Blanket SO # | `blanket-orders`, `orders` POST |
+| **Blanket Orders tab / Blanket entry** | BC Blanket Sales Orders + schedule | BC Sales Order referencing Blanket SO # | `orders?type=blanket` (list + detail, S3-16 decided 2026-10-27), `orders` POST |
 | **New Order — options** (items, UOM, customer prices, plants/Source, ship-tos, payment method/terms) | BC | – | `order-options` |
 | **New Order — quote** (priced lines, freight ₱3,500/₱0, other charges, credit check) | BC price calc + freight ext + credit ext | – | `order-quote` POST |
 | **New Order — submit** | – | BC Sales Order incl. receiving details, freight/other-charge lines | `orders` POST (re-quotes + re-checks credit server-side) |
@@ -202,11 +202,10 @@ One Server Logic record per resource. Function names follow the HTTP verb. Serve
 | `me` | GET | all | Contact name, active account (customer no/name, company), roles. Phase 2: linked accounts |
 | `announcement` | GET | all | Newest active Dashboard announcement `{ title, message }` or `null`, read live (`skipCache`) |
 | `dashboard` | GET | all | Credit (limit, exposure, available), ledger tiles, SO status counts. **One call, fanned out server-side** |
-| `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export |
+| `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export · `?type=blanket` Blanket SOs list (newest 200) and `&id=` detail (S3-16) |
 | `orders` | POST | Full, Orders&Delivery | Submit: re-quote → re-check credit → create BC SO (or approval path). Requires an **idempotency key** from the client |
 | `order-options` | GET | Full, Orders&Delivery | Items/UOM/customer price, plants (plain labels), ship-tos, payment method + terms, standard freight |
 | `order-quote` | POST | Full, Orders&Delivery | BC-priced lines, freight, other charges, totals, credit verdict + message |
-| `blanket-orders` | GET | Full, Orders&Delivery | Blanket SOs + schedule + remaining quantities |
 | `ledger` | GET | Full, Finance | Entries with date range / type / reference search, paged |
 | `documents` | GET | Full, Finance | Document list with type filter + search |
 | `document-file` | GET | Full, Finance | `{ fileName, contentType, base64 }` (HttpClient bodies are strings, so BC must return PDFs as base64 JSON) |
@@ -275,7 +274,7 @@ The shared Postman collection is a **reused "Monday CRM Integration – DEV" col
 | **Available credit** (limit, exposure, available, past-due flag), live | No | **Available Credit** extension as an API |
 | Freight rate + other charges for a draft order | No | Quote-style endpoint (no SO created) |
 | Pending-approval orders + reason; approval outcome | No | Decision D1 |
-| Blanket Sales Orders + schedule + remaining qty | No | New API |
+| Blanket Sales Orders + schedule + remaining qty | Headers and lines: Yes (`mcrmSalesOrders` `documentType` Blanket Order, `chpSalesOrderLines`) · schedule + remaining qty: No | Schedule and remaining qty per line; writable `unitPrice` on `mcrmSalesOrderLines` for Blanket Orders |
 | Customer Ledger Entries (doc no, type, ext. doc no, posting/due date, original/remaining, open/closed) + balance/balance due/overdue | No | New API (these are standard BC fields) |
 | Posted invoices, credit memos, posted whse. shipments, payments + **PDF as base64** | No | New API; PDFs via BC report engine |
 | Phase 2: linked accounts for an email (company, customerNo, customerName, address, website, vatRegNumber) | No | Linked-accounts extension (Phase 2) |
@@ -293,6 +292,8 @@ Publisher **Concreat Holdings**, prefix `chp_`, solution `ConcreatHub` (created 
 | Account *(standard)* | `chp_bccustomerno`, `chp_bccompanyid`, `chp_bccompanyname` | read: Self/Account via contact (for `me`) |
 | Contact *(standard)* | `parentcustomerid` = active account | Self read |
 | `chp_accountlink` | contact, account | Contact scope read (Phase 2 picker) |
+| `chp_bccompany` | name (→ Account `chp_bccompanyname`), BC company ID (`chp_bccompanyguid`), active | none (read by the activation and grant flows only) |
+| `chp_accessgrant` | email, **company** (lookup `chp_bccompany`), BC customer no., role, status | none (Concreat Connect Admin only) |
 | `chp_orderdraft` | contact, account, name, `chp_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal), used through the `drafts` Server Logic, which sets contact and account from the session |
 | `chp_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
 | `chp_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
@@ -332,10 +333,10 @@ src/
 |---|---|---|---|
 | Power Platform env | Development Test - MT (current) | TBD | TBD |
 | BC environment | SANDBOXUS (current POC) or a Concreat sandbox | Concreat sandbox | Concreat production |
-| BC companies | env var per company: **Solid Cement** now; APO Cement added later | same | same |
+| BC companies | `chp_bccompany` rows: **Solid Cement**, **APO Cement** | rows seeded per environment | same |
 
 - One **solution** containing the site, tables, flows, Server Logic, environment-variable definitions and connection references, promoted with **Power Platform Pipelines** (`/plan-alm`, `/setup-pipeline`).
-- All BC coordinates (tenant, env name, company IDs, API path) are **environment variables**. Secrets live in Key Vault references.
+- All BC coordinates (tenant, env name, API path) are **environment variables**; company IDs are `chp_bccompany` rows. Secrets live in Key Vault references.
 - Cloud flows must be **re-registered** in each target environment (Power Pages ALM requirement).
 - Site visibility stays **private** until go-live (Q7).
 
@@ -364,8 +365,8 @@ src/
 | Q6 | Account & User Mgmt visibility per role (missing from role map) | All roles read; Full Access revokes | Rene |
 | Q7 | Go-live URL, custom domain, site visibility → Public | Needed before external UAT | CHP IT |
 | Q8 | Email sender for activation/notifications | Shared mailbox (e.g. `noreply@…`) with Send As | CHP IT |
-| Q10 | Email registered on more than one BC customer (within Solid Cement now, across companies later) | Block activation and route to the service center (Registration doc §7) | Rene + BC team |
-| Q11 | When APO Cement goes live on the portal | Start with **Solid Cement only** (decided Oct 1, 2026); APO via plan task S1-12 | Rene |
+| Q10 | Email registered on more than one BC customer, in one company or across companies | **Decided:** block activation and notify ops (2026-10-07; across companies since S1-12, 2026-10-27) | Rene + BC team |
+| Q11 | When APO Cement goes live on the portal | APO is enabled on Dev (S1-12, 2026-10-27); production go-live date still to confirm | Rene |
 | Q9 | BC API service limits for expected concurrency | Load-test `dashboard` and `orders` against the BC sandbox early | BC team |
 
 ---

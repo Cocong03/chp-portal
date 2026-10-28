@@ -1,4 +1,4 @@
-import type { OrderDto, OrdersPageDto, OrderStatus, OrderSubmitDto } from '@/api/types'
+import type { BlanketOrdersDto, OrderDto, OrdersPageDto, OrderStatus, OrderSubmitDto } from '@/api/types'
 import type { MockRequest } from './index'
 
 // Wireframe CATALOG and ORDERS (Mockup-chp-v2.html). Totals here are mock data only; the real ones come from BC.
@@ -29,7 +29,7 @@ const RAW: Raw[] = [
   ['SO-100327', '2026-06-03', '2026-06-10', 'PO-8371', 'PLANT1', 'Invoiced', 'Delivery', ['TRIP-40358', '2026-06-02'], null, [['CEM-T1-40KG', 450], ['CEM-T1-BULK', 6]]],
 ]
 
-export const MOCK_ORDERS: OrderDto[] = RAW.map(([so, date, edd, po, site, status, ship, trip, bso, lines]) => {
+function toOrder([so, date, edd, po, site, status, ship, trip, bso, lines]: Raw): OrderDto {
   const orderLines = lines.map(([code, qty]) => {
     const item = CATALOG[code]
     return { code, description: item.desc, qty, uom: item.uom, unitPrice: item.price, lineTotal: item.price * qty }
@@ -40,11 +40,22 @@ export const MOCK_ORDERS: OrderDto[] = RAW.map(([so, date, edd, po, site, status
     total: orderLines.reduce((sum, line) => sum + line.lineTotal, 0),
     lines: orderLines,
   }
-})
+}
+
+export const MOCK_ORDERS: OrderDto[] = RAW.map(toOrder)
+
+// Wireframe BLANKET_ORDERS: a Blanket Sales Order is its own record (BSO numbering), on its own tab.
+export const MOCK_BLANKET_ORDERS: OrderDto[] = [
+  toOrder(['BSO-20441', '2026-07-10', '', 'PO-8500-B', 'PLANT1', 'Open', 'Delivery', null, null, [['CEM-T1-40KG', 2000]]]),
+].map((order) => ({ ...order, edd: null }))
 
 /** Dev-server stand-in for the orders Server Logic (same query parameters, same answers). */
-export function ordersMock({ method, query = {} }: MockRequest): OrdersPageDto | OrderDto | OrderSubmitDto | { notFound: true } {
+export function ordersMock({ method, query = {} }: MockRequest): OrdersPageDto | BlanketOrdersDto | OrderDto | OrderSubmitDto | { notFound: true } {
   if (method === 'POST') return { so: 'SO-100500' }
+  if (query.type === 'blanket') {
+    if (query.id) return MOCK_BLANKET_ORDERS.find((o) => o.so === query.id) ?? { notFound: true }
+    return { orders: MOCK_BLANKET_ORDERS.map(({ lines: _lines, ...summary }) => summary) }
+  }
   if (query.id) return MOCK_ORDERS.find((o) => o.so === query.id) ?? { notFound: true }
   const q = (query.q ?? '').trim().toLowerCase()
   const rows = MOCK_ORDERS.filter(

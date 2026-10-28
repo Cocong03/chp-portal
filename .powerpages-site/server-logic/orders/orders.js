@@ -365,6 +365,10 @@ async function get() {
     var LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,AmountIncludingVAT";
     var ARCHIVE_LINE_FIELDS = "documentNo,itemNo,description,quantity,unitOfMeasureCode,unitPrice,amountIncludingVAT";
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
+    // Blanket Sales Orders (S3-16): BC encodes the space in the enum value.
+    var BLANKET = "Blanket_x0020_Order";
+    // ponytail: newest 200 blanket orders, no pager (the wireframe has none); page when a customer outgrows it.
+    var BLANKET_CAP = "200";
 
     function param(name) {
         var params = Server.Context.QueryParameters || {};
@@ -385,8 +389,9 @@ async function get() {
         return value && value !== "0001-01-01" ? value : null;
     }
 
-    function owned(row, scope) {
-        return row.sellToCustomerNo === scope.customerNo && row.documentType === "Order";
+    // documentType defaults to a Sales Order; blanket reads pass BLANKET.
+    function owned(row, scope, documentType) {
+        return row.sellToCustomerNo === scope.customerNo && row.documentType === (documentType || "Order");
     }
 
     // The Trip ID assigned date stays null until BC provides it (S2-03). Only archive rows carry versionNo, and the
@@ -563,9 +568,37 @@ async function get() {
         return pageOf(merged, merged.length, page, all);
     }
 
+    function blanketFilter(scope) {
+        return "sellToCustomerNo eq " + odataLiteral(scope.customerNo) + " and documentType eq '" + BLANKET + "'";
+    }
+
+    // The Blanket Orders tab: no search, filters or pages.
+    async function blanketList(scope) {
+        var found = await bcGet(
+            scope,
+            "mcrmSalesOrders",
+            odataQuery({ $filter: blanketFilter(scope), $select: ORDER_FIELDS, $orderby: "orderDate desc,salesOrderNo desc", $top: BLANKET_CAP })
+        );
+        return { orders: ((found && found.value) || []).filter((row) => owned(row, scope, BLANKET)).map(toSummary) };
+    }
+
+    // Blanket orders are never archived as invoiced, so there's no archive fallback.
+    async function blanketDetail(scope, id) {
+        var found = await bcGet(scope, "mcrmSalesOrders", odataQuery({ $filter: "salesOrderNo eq " + odataLiteral(id) + " and " + blanketFilter(scope), $select: ORDER_FIELDS }));
+        var order = ((found && found.value) || []).find((row) => row.salesOrderNo === id && owned(row, scope, BLANKET));
+        if (!order) {
+            return { notFound: true };
+        }
+        var lines = await bcGet(scope, "chpSalesOrderLines", odataQuery({ $filter: "documentNo eq " + odataLiteral(id), $select: LINE_FIELDS, $top: "500" }));
+        return withLines(order, lines, id);
+    }
+
     Server.Logger.Log("orders GET called");
     return respond(() => scopedRead(async (scope) => {
         var id = param("id");
+        if (param("type") === "blanket") {
+            return id ? blanketDetail(scope, id) : blanketList(scope);
+        }
         if (id) {
             return detail(scope, id);
         }

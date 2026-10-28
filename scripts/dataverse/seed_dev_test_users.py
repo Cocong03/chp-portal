@@ -23,11 +23,8 @@ USERS = [
 
 dv = Dataverse()
 
-# BC company id comes from the environment variable, never hardcoded.
-definition = dv.get("environmentvariabledefinitions?$select=defaultvalue&$filter=schemaname eq 'chp_BCSolidCementCompanyId'"
-                    "&$expand=environmentvariabledefinition_environmentvariablevalue($select=value)")['value'][0]
-values = definition['environmentvariabledefinition_environmentvariablevalue']
-company_id = values[0]['value'] if values else definition['defaultvalue']
+# BC company id comes from the BC Companies table (S1-12), never hardcoded.
+company_id = dv.get(f"chp_bccompanies?$select=chp_bccompanyguid&$filter=chp_name eq '{CUSTOMER['company']}'")['value'][0]['chp_bccompanyguid']
 
 roles = {r['mspp_name']: r['mspp_webroleid'] for r in dv.get(
     f"mspp_webroles?$select=mspp_name&$filter=_mspp_websiteid_value eq {SITE_ID}")['value']}

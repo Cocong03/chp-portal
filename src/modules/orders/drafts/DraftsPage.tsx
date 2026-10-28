@@ -13,18 +13,24 @@ import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Skeleton } from '@/ui/skeleton'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
-import { quoteRequest } from '../new/form'
+import { quoteRequest, typedSubtotal } from '../new/form'
 import { useOrderOptions } from '../new/useOrderOptions'
 import { quoteQuery } from '../new/useOrderQuote'
 import { useDeleteDraft, useDrafts } from './useDrafts'
 
-/** A draft's Est. total: BC's quote at today's prices (S3-06), shared with New Order's cache; "—" when it can't be priced. */
+/**
+ * A draft's Est. total: BC's quote at today's prices (S3-06), shared with New Order's cache; "—" when it can't be priced.
+ * A Blanket draft (S3-16) uses its typed prices with BC's freight and other charges, as New Order does.
+ */
 function EstTotal({ draft, items }: { draft: DraftDto; items: OrderOptionsDto['items'] }) {
   const { request } = quoteRequest({ ...draft.payload.form }, items)
   const key = request && JSON.stringify(request)
   const quote = useQuery({ ...quoteQuery(key ?? ''), enabled: key !== null })
   if (key && quote.isPending) return <Skeleton className="ml-auto h-4 w-20" />
-  return quote.data && key ? peso(quote.data.total) : '—'
+  if (!quote.data || !key) return '—'
+  if (draft.payload.orderType !== 'blanket') return peso(quote.data.total)
+  const typed = typedSubtotal(draft.payload.form.lines, items)
+  return typed === null ? '—' : peso(typed + quote.data.freight + quote.data.otherCharges)
 }
 
 /** Drafts tab (S3-12), built to the wireframe's `#panel-drafts` and `#delete-draft-modal`. */

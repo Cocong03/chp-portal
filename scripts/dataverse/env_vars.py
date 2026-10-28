@@ -22,7 +22,6 @@ dv = Dataverse()
 # Existing definitions whose Dev value changes (BC environment renamed TRAINING → DEV, 2026-10-04).
 VALUES = {
     'chp_BCEnvironmentName': 'DEV',
-    'chp_BCSolidCementCompanyId': 'd2e4496e-be79-f111-8070-6045bd2058e3',
     'chp_SenderMailbox': args.sender,
     'chp_PowerPagesSiteId': 'f44e98b4-3da3-4f8d-8f79-fbb244454741',
     # Public PNG for emails (the private portal can't serve it to mail clients). Dev: public image host (2026-10-07).

@@ -6,31 +6,42 @@ import { Input } from '@/ui/input'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
-import type { NewOrderForm } from './form'
+import { newScheduleRow } from '../schedule'
+import { validPrice, type NewOrderForm } from './form'
+import { scheduleItems } from './DeliveryScheduleCard'
 import { SegmentedToggle } from './SegmentedToggle'
 import type { OrderQuote } from './useOrderQuote'
 
 const num = 'text-right font-mono tabular-nums'
 
-/** Order type and the lines table, priced by BC's quote. Blanket Order stays off until S3-16. */
+/**
+ * Order type and the lines table. Single Orders are priced by BC's quote; a Blanket Order (S3-16) takes the customer's
+ * agreed unit price per line instead (BC prices blanket lines at ₱0).
+ */
 export function OrderLinesCard({ options, quote }: { options: OrderOptionsDto; quote: OrderQuote }) {
-  const { control, register } = useFormContext<NewOrderForm>()
+  const { control, register, getValues, setValue } = useFormContext<NewOrderForm>()
   const { fields, append, remove } = useFieldArray({ control, name: 'lines' })
-  const lines = useWatch({ control, name: 'lines' })
+  const [lines, orderType] = useWatch({ control, name: ['lines', 'orderType'] })
+  const blanket = orderType === 'blanket'
+  function changeType(type: NewOrderForm['orderType']) {
+    setValue('orderType', type)
+    // Like the wireframe: the schedule opens with one delivery on the first line item.
+    if (type === 'blanket' && getValues('schedule').length === 0) setValue('schedule', [newScheduleRow(scheduleItems(getValues('lines'), options.items))])
+  }
   const price = (index: number, value: number | undefined) =>
     value !== undefined ? peso(value) : quote.status === 'pending' && quote.chosen(index) ? <Skeleton className="ml-auto h-4 w-16" /> : '—'
   return (
     <SectionCard title="Order lines">
       <SegmentedToggle
         label="Order type"
-        value="single"
+        value={orderType}
         options={[
           { value: 'single', label: 'Single Order' },
-          { value: 'blanket', label: 'Blanket Order', disabled: true },
+          { value: 'blanket', label: 'Blanket Order' },
         ]}
-        onChange={() => {}}
+        onChange={changeType}
       />
-      <p className="mt-2 mb-3.5 text-[12.5px] text-muted-foreground">For orders with agreed pricing, choose Blanket Order.</p>
+      {blanket ? <div className="mb-3.5" /> : <p className="mt-2 mb-3.5 text-[12.5px] text-muted-foreground">For orders with agreed pricing, choose Blanket Order.</p>}
       <div className="overflow-x-auto">
         <table aria-label="Order lines" className="w-full text-[13px]">
           <thead className="text-left text-[11.5px] font-semibold tracking-wide text-muted-foreground uppercase">
@@ -72,7 +83,7 @@ export function OrderLinesCard({ options, quote }: { options: OrderOptionsDto; q
                         </Select>
                       )}
                     />
-                    {priced?.message && <p className="mt-1 max-w-[280px] text-[12px] text-warning">{priced.message}</p>}
+                    {!blanket && priced?.message && <p className="mt-1 max-w-[280px] text-[12px] text-warning">{priced.message}</p>}
                   </td>
                   <td className="py-2 pr-2">
                     <Input
@@ -85,8 +96,28 @@ export function OrderLinesCard({ options, quote }: { options: OrderOptionsDto; q
                     />
                   </td>
                   <td className="py-2 pr-2 font-mono">{item?.uom ?? '—'}</td>
-                  <td className={`py-2 pr-2 ${num}`}>{price(index, priced?.unitPrice)}</td>
-                  <td className={`py-2 pr-2 ${num}`}>{price(index, priced?.lineAmount)}</td>
+                  {blanket ? (
+                    <>
+                      <td className="py-2 pr-2">
+                        <Input
+                          type="number"
+                          min={0.01}
+                          step={0.01}
+                          aria-label={`Unit price, line ${index + 1}`}
+                          className={`ml-auto w-28 ${num}`}
+                          {...register(`lines.${index}.price`, { valueAsNumber: true })}
+                        />
+                      </td>
+                      <td className={`py-2 pr-2 ${num}`}>
+                        {validPrice(line.price) && Number(line.qty) > 0 ? peso(Math.round(Number(line.qty) * line.price * 100) / 100) : '—'}
+                      </td>
+                    </>
+                  ) : (
+                    <>
+                      <td className={`py-2 pr-2 ${num}`}>{price(index, priced?.unitPrice)}</td>
+                      <td className={`py-2 pr-2 ${num}`}>{price(index, priced?.lineAmount)}</td>
+                    </>
+                  )}
                   <td className="py-2">
                     <Button type="button" variant="ghost" size="sm" aria-label={`Remove line ${index + 1}`} onClick={() => remove(index)}>
                       ✕

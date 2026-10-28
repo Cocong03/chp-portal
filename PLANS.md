@@ -1,8 +1,8 @@
-# Active: Update Orders page and Order Table
+# Active: Authentication Update to include the APO Cement Corporation Company
 
-See implementation plans at docs\Concreat_Hub_Implementation_Plan.md
+For task context see implementation plans list at docs\Concreat_Hub_Implementation_Plan.md
 
 ## Requirements
 
-- BC team update the api for sales order archive endpoint and Invoice status is now one row per order. It shows the final status so please update the invoice in dashboard overview and orders. Could you confirm the endpoint and check?
-- Add skeleton loading when searching and filtering, clicking pagination with next and prev
+- Implement activation account in APO Cement Corporation company not just SOLID CEMENT CORPORATION if the email is existed customers can activate it. However it must be unique to all email since there's no switch account yet and it account switching is on Phase 2.
+- I've the Company ID for Apo Cement Corporation company in BC, Let me know if you need it

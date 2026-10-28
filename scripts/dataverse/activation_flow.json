@@ -34,14 +34,6 @@
         "description": "BC API Base Path"
       }
     },
-    "BC Solid Cement Company ID (chp_BCSolidCementCompanyId)": {
-      "defaultValue": "",
-      "type": "String",
-      "metadata": {
-        "schemaName": "chp_BCSolidCementCompanyId",
-        "description": "BC Solid Cement Company ID"
-      }
-    },
     "BC Client ID (chp_BCClientId)": {
       "defaultValue": "",
       "type": "String",
@@ -179,11 +171,28 @@
         ]
       }
     },
+    "Init_Matches": {
+      "type": "InitializeVariable",
+      "inputs": {
+        "variables": [
+          {
+            "name": "Matches",
+            "type": "array",
+            "value": []
+          }
+        ]
+      },
+      "runAfter": {
+        "Init_Username": [
+          "Succeeded"
+        ]
+      }
+    },
     "Email": {
       "type": "Compose",
       "inputs": "@toLower(trim(coalesce(triggerBody()?['text'], '')))",
       "runAfter": {
-        "Init_Username": [
+        "Init_Matches": [
           "Succeeded"
         ]
       }
@@ -272,185 +281,216 @@
         ]
       }
     },
-    "BC_base_url": {
+    "BC_api_root": {
       "type": "Compose",
-      "inputs": "https://api.businesscentral.dynamics.com/v2.0/@{parameters('BC Tenant ID (chp_BCTenantId)')}/@{parameters('BC Environment Name (chp_BCEnvironmentName)')}@{parameters('BC API Base Path (chp_BCApiBasePath)')}/companies(@{parameters('BC Solid Cement Company ID (chp_BCSolidCementCompanyId)')})/",
+      "inputs": "https://api.businesscentral.dynamics.com/v2.0/@{parameters('BC Tenant ID (chp_BCTenantId)')}/@{parameters('BC Environment Name (chp_BCEnvironmentName)')}@{parameters('BC API Base Path (chp_BCApiBasePath)')}/",
       "runAfter": {
         "Get_BC_token": [
           "Succeeded"
         ]
       }
     },
-    "Get_BC_contacts": {
-      "type": "Http",
+    "List_companies": {
+      "type": "OpenApiConnection",
       "inputs": {
-        "method": "GET",
-        "uri": "@{outputs('BC_base_url')}MCRMContacts",
-        "headers": {
-          "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
-          "Accept": "application/json"
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "ListRecords",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
         },
-        "queries": {
-          "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true and type eq 'Person'",
-          "$select": "no,type,companyNo,name,customerPortalAccess",
-          "$top": "20"
-        }
-      },
-      "runtimeConfiguration": {
-        "secureData": {
-          "properties": [
-            "inputs",
-            "outputs"
-          ]
-        }
+        "parameters": {
+          "entityName": "chp_bccompanies",
+          "$select": "chp_bccompanyid,chp_bccompanyguid,chp_name",
+          "$filter": "statecode eq 0"
+        },
+        "authentication": "@parameters('$authentication')"
       },
       "runAfter": {
-        "BC_base_url": [
+        "BC_api_root": [
           "Succeeded"
         ]
       }
     },
-    "Company_no_list": {
-      "type": "Select",
-      "inputs": {
-        "from": "@body('Get_BC_contacts')?['value']",
-        "select": "@item()?['companyNo']"
-      },
-      "runAfter": {
-        "Get_BC_contacts": [
-          "Succeeded"
-        ]
-      }
-    },
-    "Company_nos": {
-      "type": "Query",
-      "inputs": {
-        "from": "@union(body('Company_no_list'), body('Company_no_list'))",
-        "where": "@not(equals(coalesce(item(), ''), ''))"
-      },
-      "runAfter": {
-        "Company_no_list": [
-          "Succeeded"
-        ]
-      }
-    },
-    "No_BC_contact": {
-      "type": "If",
-      "expression": {
-        "equals": [
-          "@equals(length(body('Company_nos')), 0)",
-          true
-        ]
-      },
+    "For_each_company": {
+      "type": "Foreach",
+      "foreach": "@outputs('List_companies')?['body/value']",
       "actions": {
-        "Return_no_match": {
-          "type": "Response",
-          "kind": "PowerPages",
+        "Company_url": {
+          "type": "Compose",
+          "inputs": "@{outputs('BC_api_root')}companies(@{items('For_each_company')?['chp_bccompanyguid']})/",
+          "runAfter": {}
+        },
+        "Get_BC_contacts": {
+          "type": "Http",
           "inputs": {
-            "statusCode": 200,
-            "body": {
-              "status": "ok"
+            "method": "GET",
+            "uri": "@{outputs('Company_url')}MCRMContacts",
+            "headers": {
+              "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
+              "Accept": "application/json"
             },
-            "schema": {
-              "type": "object",
-              "properties": {
-                "status": {
-                  "title": "status",
-                  "x-ms-dynamically-added": true,
-                  "type": "string"
+            "queries": {
+              "$filter": "tolower(eMail) eq '@{outputs('Email_literal')}' and customerPortalAccess eq true and type eq 'Person'",
+              "$select": "no,type,companyNo,name,customerPortalAccess",
+              "$top": "20"
+            }
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          },
+          "runAfter": {
+            "Company_url": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Company_no_list": {
+          "type": "Select",
+          "inputs": {
+            "from": "@body('Get_BC_contacts')?['value']",
+            "select": "@item()?['companyNo']"
+          },
+          "runAfter": {
+            "Get_BC_contacts": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Company_nos": {
+          "type": "Query",
+          "inputs": {
+            "from": "@union(body('Company_no_list'), body('Company_no_list'))",
+            "where": "@not(equals(coalesce(item(), ''), ''))"
+          },
+          "runAfter": {
+            "Company_no_list": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Has_BC_contacts": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@greater(length(body('Company_nos')), 0)",
+              true
+            ]
+          },
+          "actions": {
+            "Relation_filters": {
+              "type": "Select",
+              "inputs": {
+                "from": "@body('Company_nos')",
+                "select": "@concat('contactNo eq ''', replace(item(), '''', ''''''), '''')"
+              },
+              "runAfter": {}
+            },
+            "Get_BC_relations": {
+              "type": "Http",
+              "inputs": {
+                "method": "GET",
+                "uri": "@{outputs('Company_url')}mcrmBusinessRelation",
+                "headers": {
+                  "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
+                  "Accept": "application/json"
+                },
+                "queries": {
+                  "$filter": "(@{join(body('Relation_filters'), ' or ')}) and linktoTable eq 'Customer'",
+                  "$select": "contactNo,vendorNo"
                 }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              },
+              "runAfter": {
+                "Relation_filters": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Customer_no_list": {
+              "type": "Select",
+              "inputs": {
+                "from": "@body('Get_BC_relations')?['value']",
+                "select": "@item()?['vendorNo']"
+              },
+              "runAfter": {
+                "Get_BC_relations": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "Customer_nos": {
+              "type": "Query",
+              "inputs": {
+                "from": "@union(body('Customer_no_list'), body('Customer_no_list'))",
+                "where": "@not(equals(coalesce(item(), ''), ''))"
+              },
+              "runAfter": {
+                "Customer_no_list": [
+                  "Succeeded"
+                ]
+              }
+            },
+            "For_each_customer": {
+              "type": "Foreach",
+              "foreach": "@body('Customer_nos')",
+              "actions": {
+                "Append_match": {
+                  "type": "AppendToArrayVariable",
+                  "inputs": {
+                    "name": "Matches",
+                    "value": {
+                      "companyRowId": "@items('For_each_company')?['chp_bccompanyid']",
+                      "companyId": "@items('For_each_company')?['chp_bccompanyguid']",
+                      "companyName": "@items('For_each_company')?['chp_name']",
+                      "customerNo": "@items('For_each_customer')",
+                      "personName": "@first(body('Get_BC_contacts')?['value'])?['name']"
+                    }
+                  },
+                  "runAfter": {}
+                }
+              },
+              "runAfter": {
+                "Customer_nos": [
+                  "Succeeded"
+                ]
               }
             }
           },
-          "runAfter": {}
-        },
-        "Stop_no_match": {
-          "type": "Terminate",
-          "inputs": {
-            "runStatus": "Succeeded"
-          },
           "runAfter": {
-            "Return_no_match": [
+            "Company_nos": [
               "Succeeded"
             ]
           }
         }
       },
       "runAfter": {
-        "Company_nos": [
+        "List_companies": [
           "Succeeded"
         ]
-      }
-    },
-    "Relation_filters": {
-      "type": "Select",
-      "inputs": {
-        "from": "@body('Company_nos')",
-        "select": "@concat('contactNo eq ''', replace(item(), '''', ''''''), '''')"
-      },
-      "runAfter": {
-        "No_BC_contact": [
-          "Succeeded"
-        ]
-      }
-    },
-    "Get_BC_relations": {
-      "type": "Http",
-      "inputs": {
-        "method": "GET",
-        "uri": "@{outputs('BC_base_url')}mcrmBusinessRelation",
-        "headers": {
-          "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
-          "Accept": "application/json"
-        },
-        "queries": {
-          "$filter": "(@{join(body('Relation_filters'), ' or ')}) and linktoTable eq 'Customer'",
-          "$select": "contactNo,vendorNo"
-        }
       },
       "runtimeConfiguration": {
-        "secureData": {
-          "properties": [
-            "inputs",
-            "outputs"
-          ]
+        "concurrency": {
+          "repetitions": 1
         }
-      },
-      "runAfter": {
-        "Relation_filters": [
-          "Succeeded"
-        ]
-      }
-    },
-    "Customer_no_list": {
-      "type": "Select",
-      "inputs": {
-        "from": "@body('Get_BC_relations')?['value']",
-        "select": "@item()?['vendorNo']"
-      },
-      "runAfter": {
-        "Get_BC_relations": [
-          "Succeeded"
-        ]
-      }
-    },
-    "Customer_nos": {
-      "type": "Query",
-      "inputs": {
-        "from": "@union(body('Customer_no_list'), body('Customer_no_list'))",
-        "where": "@not(equals(coalesce(item(), ''), ''))"
-      },
-      "runAfter": {
-        "Customer_no_list": [
-          "Succeeded"
-        ]
       }
     },
     "No_customer": {
       "type": "If",
       "expression": {
         "equals": [
-          "@equals(length(body('Customer_nos')), 0)",
+          "@equals(length(variables('Matches')), 0)",
           true
         ]
       },
@@ -489,7 +529,19 @@
         }
       },
       "runAfter": {
-        "Customer_nos": [
+        "For_each_company": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Match_labels": {
+      "type": "Select",
+      "inputs": {
+        "from": "@variables('Matches')",
+        "select": "@concat(item()?['companyName'], ' ', item()?['customerNo'])"
+      },
+      "runAfter": {
+        "No_customer": [
           "Succeeded"
         ]
       }
@@ -498,7 +550,7 @@
       "type": "If",
       "expression": {
         "equals": [
-          "@greater(length(body('Customer_nos')), 1)",
+          "@greater(length(variables('Matches')), 1)",
           true
         ]
       },
@@ -514,7 +566,7 @@
             "parameters": {
               "emailMessage/To": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
               "emailMessage/Subject": "Concreat Connect: activation blocked — email on several customers",
-              "emailMessage/Body": "<p>An activation request was blocked: email on several customers.</p><p>Email: @{outputs('Email')}</p><p>Customer numbers: @{join(body('Customer_nos'), ', ')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
+              "emailMessage/Body": "<p>An activation request was blocked: email on several customers.</p><p>Email: @{outputs('Email')}</p><p>Customers: @{join(body('Match_labels'), ', ')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
               "emailMessage/Importance": "Normal"
             },
             "authentication": "@parameters('$authentication')"
@@ -559,16 +611,25 @@
         }
       },
       "runAfter": {
-        "No_customer": [
+        "Match_labels": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Match": {
+      "type": "Compose",
+      "inputs": "@first(variables('Matches'))",
+      "runAfter": {
+        "Several_customers": [
           "Succeeded"
         ]
       }
     },
     "Customer_no": {
       "type": "Compose",
-      "inputs": "@first(body('Customer_nos'))",
+      "inputs": "@outputs('Match')?['customerNo']",
       "runAfter": {
-        "Several_customers": [
+        "Match": [
           "Succeeded"
         ]
       }
@@ -586,7 +647,7 @@
       "type": "Http",
       "inputs": {
         "method": "GET",
-        "uri": "@{outputs('BC_base_url')}mcrmCustomers",
+        "uri": "@{outputs('BC_api_root')}companies(@{outputs('Match')?['companyId']})/mcrmCustomers",
         "headers": {
           "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
           "Accept": "application/json"
@@ -630,7 +691,7 @@
         "parameters": {
           "entityName": "accounts",
           "$select": "accountid",
-          "$filter": "chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_bccompanyid eq '@{parameters('BC Solid Cement Company ID (chp_BCSolidCementCompanyId)')}'",
+          "$filter": "chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_bccompanyid eq '@{outputs('Match')?['companyId']}'",
           "$top": 1
         },
         "authentication": "@parameters('$authentication')"
@@ -694,8 +755,8 @@
                 "entityName": "accounts",
                 "item/name": "@{outputs('Customer_name')}",
                 "item/chp_bccustomerno": "@{outputs('Customer_no')}",
-                "item/chp_bccompanyid": "@{parameters('BC Solid Cement Company ID (chp_BCSolidCementCompanyId)')}",
-                "item/chp_bccompanyname": "Solid Cement"
+                "item/chp_bccompanyid": "@{outputs('Match')?['companyId']}",
+                "item/chp_bccompanyname": "@{outputs('Match')?['companyName']}"
               },
               "authentication": "@parameters('$authentication')"
             },
@@ -842,7 +903,7 @@
                 "parameters": {
                   "emailMessage/To": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
                   "emailMessage/Subject": "Concreat Connect: activation blocked — contact already linked to another customer",
-                  "emailMessage/Body": "<p>An activation request was blocked: contact already linked to another customer.</p><p>Email: @{outputs('Email')}</p><p>Customer number requested: @{outputs('Customer_no')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
+                  "emailMessage/Body": "<p>An activation request was blocked: contact already linked to another customer.</p><p>Email: @{outputs('Email')}</p><p>Customer requested: @{outputs('Match')?['companyName']} @{outputs('Customer_no')}</p><p>Please follow up with the customer. No invitation was sent.</p>",
                   "emailMessage/Importance": "Normal"
                 },
                 "authentication": "@parameters('$authentication')"
@@ -981,14 +1042,6 @@
       },
       "else": {
         "actions": {
-          "BC_person": {
-            "type": "Query",
-            "inputs": {
-              "from": "@body('Get_BC_contacts')?['value']",
-              "where": "@equals(item()?['type'], 'Person')"
-            },
-            "runAfter": {}
-          },
           "Create_contact": {
             "type": "OpenApiConnection",
             "inputs": {
@@ -999,18 +1052,14 @@
               },
               "parameters": {
                 "entityName": "contacts",
-                "item/lastname": "@{coalesce(first(body('BC_person'))?['name'], outputs('Customer_name'))}",
+                "item/lastname": "@{coalesce(outputs('Match')?['personName'], outputs('Customer_name'))}",
                 "item/emailaddress1": "@{outputs('Email')}",
                 "item/parentcustomerid_account@odata.bind": "accounts(@{variables('AccountId')})",
                 "item/adx_identity_emailaddress1confirmed": true
               },
               "authentication": "@parameters('$authentication')"
             },
-            "runAfter": {
-              "BC_person": [
-                "Succeeded"
-              ]
-            }
+            "runAfter": {}
           },
           "Set_ContactId_new": {
             "type": "SetVariable",
@@ -1111,7 +1160,7 @@
         "parameters": {
           "entityName": "chp_accessgrants",
           "$select": "chp_accessgrantid,chp_bccustomerno",
-          "$filter": "chp_email eq '@{outputs('Email_literal')}' and chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_status eq 775000000"
+          "$filter": "chp_email eq '@{outputs('Email_literal')}' and chp_bccustomerno eq '@{outputs('Customer_literal')}' and chp_status eq 775000000 and _chp_company_value eq @{outputs('Match')?['companyRowId']}"
         },
         "authentication": "@parameters('$authentication')"
       },

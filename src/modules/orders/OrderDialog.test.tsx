@@ -92,3 +92,48 @@ test('while loading, the dialog keeps its layout: field labels, the lines table 
   expect(within(lines).getByRole('columnheader', { name: 'Unit price' })).toBeInTheDocument()
   expect(within(lines).getByRole('row', { name: /Order total/ })).toBeInTheDocument()
 })
+
+test('blanket View: Blanket SO # is —, no Trip ID note, and Manage schedule hands over the BSO', async () => {
+  const user = userEvent.setup()
+  const onManageSchedule = vi.fn()
+  renderApp(<OrderDialog id="BSO-20441" kind="blanket" onClose={() => {}} onManageSchedule={onManageSchedule} />)
+  const dialog = await screen.findByRole('dialog', { name: 'BSO-20441' })
+  expect(await within(dialog).findByRole('row', { name: /CEM-T1-40KG/ })).toHaveTextContent('2,000')
+  expect(within(dialog).getByText('Blanket SO #').nextSibling).toHaveTextContent('—')
+  expect(within(dialog).queryByText(/No Trip ID number yet/)).not.toBeInTheDocument()
+  await user.click(within(dialog).getByRole('button', { name: 'Manage schedule' }))
+  expect(onManageSchedule).toHaveBeenCalledWith('BSO-20441')
+})
+
+test("blanket View shows — for a line BC priced at 0, and BC's order total", async () => {
+  answerOrder({
+    so: 'BSO000000011', date: '2026-10-27', po: '', site: 'PLANT1', ship: 'Delivery', bso: null, trip: null, edd: null, total: 150, status: 'Open',
+    lines: [{ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', qty: 10, uom: 'BAG', unitPrice: 0, lineTotal: 0 }],
+  })
+  renderApp(<OrderDialog id="BSO000000011" kind="blanket" onClose={() => {}} />)
+  const lines = await screen.findByRole('table', { name: 'Order lines' })
+  const row = await within(lines).findByRole('row', { name: /CEM-T1-40KG/ })
+  expect(within(row).getAllByText('—')).toHaveLength(2)
+  expect(row).not.toHaveTextContent('₱0.00')
+  expect(within(lines).getByRole('row', { name: /Order total/ })).toHaveTextContent('₱150.00')
+})
+
+test('a sales order View has no Manage schedule button', async () => {
+  renderApp(<OrderDialog id="SO-100482" onClose={() => {}} />)
+  const dialog = await screen.findByRole('dialog', { name: 'SO-100482' })
+  await within(dialog).findByRole('row', { name: /CEM-T1-40KG/ })
+  expect(within(dialog).queryByRole('button', { name: 'Manage schedule' })).not.toBeInTheDocument()
+})
+
+test('blanket View shows — for an Order total BC left at 0', async () => {
+  answerOrder({
+    so: 'BSO000000012', date: '2026-10-27', po: '', site: 'PLANT1', ship: 'Pickup', bso: null, trip: null, edd: null, total: 0, status: 'Open',
+    lines: [{ code: 'CEM-T1-40KG', description: 'Portland Cement Type I — 40kg Bag', qty: 10, uom: 'BAG', unitPrice: 0, lineTotal: 0 }],
+  })
+  renderApp(<OrderDialog id="BSO000000012" kind="blanket" onClose={() => {}} />)
+  const lines = await screen.findByRole('table', { name: 'Order lines' })
+  const total = await within(lines).findByRole('row', { name: /Order total/ })
+  await within(lines).findByRole('row', { name: /CEM-T1-40KG/ })
+  expect(total).toHaveTextContent('—')
+  expect(total).not.toHaveTextContent('₱0.00')
+})

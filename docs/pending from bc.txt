@@ -15,3 +15,4 @@ APIs the next portal pages need (not built yet)
 10. Available Credit (S2-09): credit limit, exposure, available and past due, all live. It must update as soon as an SO is created. The dashboard and order checkout need it.
 11. Documents (S2-15): posted invoices, credit memos, posted warehouse shipments and payments, each with its PDF as base64. The Document Center needs this.
 12. Blanket Sales Orders (S3-15, lower priority): schedule and remaini
+13. Blanket Orders (S3-16): add a writable `unitPrice` on `mcrmSalesOrderLines`, kept as sent for Blanket Orders. BC prices blanket lines at 0 today (tested 2026-10-27 in Postman; BSO000000011 for C00000002 is a test record and can be deleted).

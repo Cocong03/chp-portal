@@ -25,6 +25,7 @@ const SAMPLE: DraftDto = {
       instructions: 'Loading type: Loose pile',
       site: 'PLANT2',
       poRef: 'PO-8915',
+      schedule: [],
     },
   },
 }

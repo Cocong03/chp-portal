@@ -11,6 +11,7 @@ PRIVILEGES = [
     ('prvWritechp_accessgrant', 'Global'),
     ('prvAppendchp_accessgrant', 'Global'), ('prvAppendTochp_accessgrant', 'Global'),
     ('prvReadContact', 'Global'), ('prvAppendToContact', 'Global'),
+    ('prvReadchp_bccompany', 'Global'), ('prvAppendTochp_bccompany', 'Global'),  # grant Company lookup (S1-12)
     ('prvCreatechp_announcement', 'Global'), ('prvReadchp_announcement', 'Global'),
     ('prvWritechp_announcement', 'Global'), ('prvDeletechp_announcement', 'Global'),
 ]

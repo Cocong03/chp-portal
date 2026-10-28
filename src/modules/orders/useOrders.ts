@@ -1,6 +1,6 @@
 import { keepPreviousData, useQuery } from '@tanstack/react-query'
 import { serverLogic } from '@/api/serverLogic'
-import type { OrderDto, OrdersPageDto } from '@/api/types'
+import type { BlanketOrdersDto, OrderDto, OrderKind, OrdersPageDto } from '@/api/types'
 
 export interface OrderFilters {
   q: string
@@ -29,12 +29,22 @@ export function useOrders(filters: OrderFilters) {
   })
 }
 
-/** One order with its lines, fetched fresh each time the dialog opens. `null` = not found (missing or another customer's). */
-export function useOrder(id: string | null) {
+/** The customer's Blanket Sales Orders (S3-16): one list, no filters or pages. */
+export function useBlanketOrders() {
   return useQuery({
-    queryKey: ['order', id],
+    queryKey: ['blanket-orders'],
+    queryFn: () => serverLogic<BlanketOrdersDto>('orders', { query: { type: 'blanket' } }),
+    staleTime: 60_000,
+  })
+}
+
+/** One order (or Blanket Sales Order) with its lines, fetched fresh each time the dialog opens. `null` = not found (missing or another customer's). */
+export function useOrder(id: string | null, kind: OrderKind = 'order') {
+  return useQuery({
+    queryKey: kind === 'blanket' ? ['order', 'blanket', id] : ['order', id],
     queryFn: async (): Promise<OrderDto | null> => {
-      const answer = await serverLogic<OrderDto | { notFound: true }>('orders', { query: { id: id! } })
+      const query: Record<string, string> = kind === 'blanket' ? { type: 'blanket', id: id! } : { id: id! }
+      const answer = await serverLogic<OrderDto | { notFound: true }>('orders', { query })
       return 'notFound' in answer ? null : answer
     },
     enabled: !!id,

@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react'
 import { Controller, useFormContext, useWatch } from 'react-hook-form'
-import type { SiteDto } from '@/api/types'
+import type { OrderOptionsDto, SiteDto } from '@/api/types'
 import { peso } from '@/lib/format'
 import { cn } from '@/lib/utils'
 import { useDashboard } from '@/modules/dashboard/useDashboard'
@@ -11,7 +11,7 @@ import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
-import type { NewOrderForm } from './form'
+import { BLANKET_SUBMIT_NOTE, typedSubtotal, type NewOrderForm } from './form'
 import type { OrderQuote } from './useOrderQuote'
 
 function Row({ label, value, total }: { label: string; value: ReactNode; total?: boolean }) {
@@ -23,9 +23,13 @@ function Row({ label, value, total }: { label: string; value: ReactNode; total?:
   )
 }
 
-/** Credit standing (BC's credit overview, via the dashboard endpoint), Order summary (BC's quote, S3-06) and Submit (S3-10). */
+/**
+ * Credit standing (BC's credit overview, via the dashboard endpoint), Order summary (BC's quote, S3-06) and Submit (S3-10).
+ * A Blanket Order (S3-16) sums the typed prices for its subtotal, keeps BC's freight and other charges, and can't be submitted.
+ */
 export function SummaryCards({
   quote,
+  items,
   sites,
   onSaveDraft,
   saving,
@@ -33,6 +37,7 @@ export function SummaryCards({
   submitting,
 }: {
   quote: OrderQuote
+  items: OrderOptionsDto['items']
   sites: SiteDto[]
   onSaveDraft: () => void
   saving: boolean
@@ -40,11 +45,16 @@ export function SummaryCards({
   submitting: boolean
 }) {
   const { control, register } = useFormContext<NewOrderForm>()
-  const [siteCode, paymentMethod] = useWatch({ control, name: ['site', 'paymentMethod'] })
+  const [siteCode, paymentMethod, orderType, lines] = useWatch({ control, name: ['site', 'paymentMethod', 'orderType', 'lines'] })
+  const blanket = orderType === 'blanket'
   // BC's quote only (S3-06): "—" with nothing to price or a failed quote, never a partial or made-up total.
   const priced = quote.quote
   const amount = (key: 'subtotal' | 'freight' | 'otherCharges' | 'total') =>
     priced ? peso(priced[key]) : quote.status === 'pending' ? <Skeleton className="h-4 w-20" /> : '—'
+  // Blanket: the customer's prices for the subtotal (display only), BC's charges on top; "—" until both are there.
+  const typed = blanket ? typedSubtotal(lines, items) : null
+  const blanketAmount = (key: 'subtotal' | 'total') =>
+    typed === null ? '—' : key === 'subtotal' ? peso(typed) : priced ? peso(typed + priced.freight + priced.otherCharges) : amount('total')
   const site = sites.find((each) => each.code === siteCode)
   const dashboard = useDashboard()
   const credit = dashboard.data?.account
@@ -91,10 +101,10 @@ export function SummaryCards({
           <Input id="po-ref" placeholder="e.g. PO-8915" maxLength={35} {...register('poRef')} />
         </div>
         <Row label="Lines" value={quote.count} />
-        <Row label="Subtotal" value={amount('subtotal')} />
+        <Row label="Subtotal" value={blanket ? blanketAmount('subtotal') : amount('subtotal')} />
         <Row label="Transport / Freight" value={amount('freight')} />
         <Row label="Other charges" value={amount('otherCharges')} />
-        <Row label="Order total" value={amount('total')} total />
+        <Row label="Order total" value={blanket ? blanketAmount('total') : amount('total')} total />
         {quote.status === 'error' && (
           <div className="mt-2">
             <QueryError onRetry={quote.retry} />
@@ -115,11 +125,12 @@ export function SummaryCards({
             type="button"
             className="flex-1"
             onClick={onSubmit}
-            disabled={!priced || priced.lines.some((line) => line.unitPrice <= 0) || submitting}
+            disabled={blanket || !priced || priced.lines.some((line) => line.unitPrice <= 0) || submitting}
           >
             {submitting ? 'Submitting…' : 'Submit for approval'}
           </Button>
         </div>
+        {blanket && <p className="mt-2 text-[12.5px] text-muted-foreground">{BLANKET_SUBMIT_NOTE}</p>}
       </SectionCard>
     </>
   )

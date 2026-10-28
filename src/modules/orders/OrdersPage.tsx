@@ -22,7 +22,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Toolbar } from "@/ui/Toolbar";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/ui/tooltip";
 import { OrderDialog } from "./OrderDialog";
-import { ORDER_STATUSES, OrderStatusPill, ShipBadge } from "./orderDisplay";
+import { ORDER_STATUSES, OrderStatusPill, ShipBadge, SiteCell } from "./orderDisplay";
 import { ordersQuery, useOrders, type OrderFilters } from "./useOrders";
 
 const NO_ORDERS: OrderSummaryDto[] = [];
@@ -39,22 +39,7 @@ function columns(sites: SiteDto[], onView: (so: string) => void): DataColumn<Ord
     {
       id: "site",
       header: "Delivery site",
-      cell: ({ row }) => {
-        const site = sites.find((s) => s.code === row.original.site);
-        return row.original.site ? (
-          <>
-            <span className="font-mono">{row.original.site}</span>
-            {site && (
-              <>
-                <br />
-                <span className="text-xs text-faint">{site.name}</span>
-              </>
-            )}
-          </>
-        ) : (
-          "—"
-        );
-      },
+      cell: ({ row }) => <SiteCell code={row.original.site} sites={sites} />,
     },
     { id: "ship", header: "Ship", cell: ({ row }) => <ShipBadge ship={row.original.ship} /> },
     { id: "bso", header: "Blanket SO #", cell: ({ row }) => row.original.bso ?? "—", meta: mono },

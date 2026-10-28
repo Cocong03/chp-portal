@@ -57,6 +57,31 @@ test('lists drafts newest first with label, Single tag, last saved, site and Est
   expect(rows[0]).toHaveTextContent('—')
 })
 
+/** Turns the seeded Single draft (10 bags, Delivery) into a Blanket draft with these line prices. */
+function seedBlanket(price: number | undefined) {
+  const seed = draftsMock({ method: 'GET', query: { id: SEED_ID } }) as unknown as { payload: { form: Record<string, unknown> } }
+  const form = { ...seed.payload.form, orderType: 'blanket', lines: [{ code: 'CEM-T1-40KG', qty: 10, price }], schedule: [] }
+  draftsMock({ method: 'PUT', query: { id: SEED_ID }, body: { payload: { version: 1, orderType: 'blanket', form } } })
+}
+
+test("a blanket draft's Est. total is its typed prices plus BC's freight and other charges", async () => {
+  seedBlanket(200)
+  openDrafts()
+  const [row] = within(await table()).getAllByRole('row').slice(1)
+  expect(within(row).getByText('Blanket')).toBeInTheDocument()
+  // 10 × ₱200 typed, plus the dev mock's ₱10 freight and ₱5 fuel per bag for delivery; never BC's ₱245.
+  expect(await within(row).findByText('₱2,150.00')).toBeInTheDocument()
+})
+
+test('a blanket draft with a missing price shows —', async () => {
+  seedBlanket(undefined)
+  openDrafts()
+  const [row] = within(await table()).getAllByRole('row').slice(1)
+  // Once the quote is in (no skeleton), the total is "—", never BC's priced total.
+  await waitFor(() => expect(within(row).getAllByText('—').length).toBeGreaterThan(0))
+  expect(row).not.toHaveTextContent('₱')
+})
+
 test('a site that no longer exists shows —', async () => {
   draftsMock({ method: 'PUT', query: { id: SEED_ID }, body: { payload: { version: 1, orderType: 'single', form: { lines: [], shipmentMethod: 'pickup', site: 'OLD' } } } })
   openDrafts()
@@ -120,11 +145,11 @@ test('a failed delete keeps the row and shows the toast', async () => {
   expect(screen.getByText('Draft #1')).toBeInTheDocument()
 })
 
-test('the tabs read Orders, New Order, Drafts and mark Drafts current; the page sets its title', async () => {
+test('the tabs read Orders, Blanket Orders, New Order, Drafts and mark Drafts current; the page sets its title', async () => {
   openDrafts()
   await table()
   const links = within(tabs()).getAllByRole('link')
-  expect(links.map((link) => link.textContent)).toEqual(['Orders', 'New Order', 'Drafts 1'])
-  expect(links[2]).toHaveAttribute('aria-current', 'page')
+  expect(links.map((link) => link.textContent)).toEqual(['Orders', 'Blanket Orders', 'New Order', 'Drafts 1'])
+  expect(links[3]).toHaveAttribute('aria-current', 'page')
   expect(document.title).toBe('Drafts — Concreat Connect')
 })
