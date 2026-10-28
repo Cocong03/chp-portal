@@ -7,14 +7,18 @@ import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Skeleton } from '@/ui/skeleton'
-import { StatusPill } from '@/ui/StatusPill'
+import { type PillTone, StatusPill } from '@/ui/StatusPill'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/ui/table'
 import { SiteCell } from './orderDisplay'
 import { usePendingOrders } from './useOrders'
 
-const TONE: Record<PendingOrderDto['status'], 'warn' | 'bad'> = { 'Awaiting credit approval': 'warn', Declined: 'bad' }
+const TONE: Record<PendingOrderDto['status'], PillTone> = {
+  'Awaiting credit approval': 'warn',
+  'Approved — being processed': 'progress',
+  Declined: 'bad',
+}
 
-/** Pending Approval tab (S3-11), built to the wireframe's `#panel-pending`: credit orders held for the credit team, or declined. */
+/** Pending Approval tab (S3-11), built to the wireframe's `#panel-pending`: credit orders held, approved but not yet in BC, or declined. */
 export function PendingApprovalPage() {
   usePageTitle('Pending Approval')
   const orders = usePendingOrders()

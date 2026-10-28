@@ -191,7 +191,7 @@ export interface PendingOrderDto {
   po: string
   site: string
   est: number
-  status: 'Awaiting credit approval' | 'Declined'
+  status: 'Awaiting credit approval' | 'Approved — being processed' | 'Declined'
   reason: string
   comment: string
 }

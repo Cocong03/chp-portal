@@ -465,17 +465,20 @@ test('blanket detail escapes quotes in the id', async () => {
 const CREDITS = [
   { chp_creditapprovalid: 'r-2', createdon: '2026-10-28T03:00:00Z', chp_poref: 'PO-8902', chp_site: 'PLANT3', chp_estimatedtotal: 215000, chp_status: 775000000, chp_reason: 'Account has a past due balance', chp_comment: null },
   { chp_creditapprovalid: 'r-1', createdon: '2026-10-27T03:00:00Z', chp_poref: null, chp_site: '65072350', chp_estimatedtotal: 76500, chp_status: 775000002, chp_reason: 'Order exceeds available credit', chp_comment: 'Please settle the past due first.' },
+  { chp_creditapprovalid: 'r-0', createdon: '2026-10-26T03:00:00Z', chp_poref: 'PO-8801', chp_site: 'PLANT1', chp_estimatedtotal: 50000, chp_status: 775000001, chp_reason: 'Order exceeds available credit', chp_comment: 'OK' },
 ]
 
-test('pending: the session account held and declined orders, labelled, newest first', async () => {
+test('pending: the session account held, approved-not-in-BC and declined orders, labelled, newest first', async () => {
   const { server, reads } = fakeServer({ query: { view: 'pending' }, credits: CREDITS })
   expect(JSON.parse(await load(server).get())).toEqual([
     { id: 'r-2', submitted: '2026-10-28T03:00:00Z', po: 'PO-8902', site: 'PLANT3', est: 215000, status: 'Awaiting credit approval', reason: 'Account has a past due balance', comment: '' },
     { id: 'r-1', submitted: '2026-10-27T03:00:00Z', po: '', site: '65072350', est: 76500, status: 'Declined', reason: 'Order exceeds available credit', comment: 'Please settle the past due first.' },
+    { id: 'r-0', submitted: '2026-10-26T03:00:00Z', po: 'PO-8801', site: 'PLANT1', est: 50000, status: 'Approved — being processed', reason: 'Order exceeds available credit', comment: 'OK' },
   ])
   expect(reads[0].set).toBe('chp_creditapprovals')
   expect(reads[0].query).toContain('_chp_account_value eq acc-2')
-  expect(reads[0].query).toContain('chp_status ne 775000001')
+  // Approved rows leave the tab only once they carry an SO number (in Orders then).
+  expect(reads[0].query).toContain('(chp_status ne 775000001 or chp_salesorderno eq null)')
   expect(reads[0].query).toContain('$orderby=createdon desc')
 })
 

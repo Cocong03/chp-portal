@@ -110,7 +110,7 @@ export interface PendingOrderDto {
   po: string // '' when none
   site: string // chp_site (ship-to code, or plant code for Pick up)
   est: number // chp_estimatedtotal
-  status: 'Awaiting credit approval' | 'Declined'
+  status: 'Awaiting credit approval' | 'Approved — being processed' | 'Declined'
   reason: string
   comment: string // '' when none
 }
@@ -156,7 +156,8 @@ Solution-aware, definition in `scripts/dataverse/credit_approval_flow.json`, dep
 - Drafts keep **Credit** (remove the "Credit becomes Cash" overlay in `draftPayload.ts` and its test's expectation for credit; keep the time-window migration).
 
 **Pending Approval tab** (`src/modules/orders/PendingApprovalPage.tsx`, route `/orders/pending`, title *"Pending Approval — Concreat Connect"*), in `OrdersSection`'s tab strip in the wireframe's order:
-- Columns (wireframe `#panel-pending`): **Submitted** · **PO reference** · **Delivery site** · **Estimated total** (right, peso) · **Status** (pill: Awaiting credit approval = warn, Declined = bad) · **Why it needs review** (reason; when there's a comment, a second muted line *"Credit team: <comment>"* — wireframe gap, decision 11).
+- Columns (wireframe `#panel-pending`): **Submitted** · **PO reference** · **Delivery site** · **Estimated total** (right, peso) · **Status** (pill: Awaiting credit approval = warn, Approved — being processed = progress, Declined = bad) · **Why it needs review** (reason; when there's a comment, a second muted line *"Credit team: <comment>"* — wireframe gap, decision 11).
+- Rows: Awaiting and Declined rows, plus **Approved rows with no SO number** shown as *Approved — being processed* (decided 2026-10-28). An approved order leaves the tab once `chp_salesorderno` is set: the flow sets it on success; when BC creation failed, the credit team asks the portal developer, who records the SO number on the row after the order is created in BC.
 - Empty: *"No orders are waiting for approval."* Loading skeleton, `QueryError` with Retry, as the other tabs.
 - Roles: the tab and the endpoint follow the Orders roles (Full Access, Orders & Delivery).
 - No row actions (decision 12).

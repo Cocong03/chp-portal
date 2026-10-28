@@ -23,6 +23,7 @@ afterEach(() => vi.mocked(serverLogic).mockImplementation(actualServerLogic))
 const ROWS: PendingOrderDto[] = [
   { id: 'a', submitted: '2026-09-13', po: 'PO-8902', site: 'PLANT3', est: 215000, status: 'Awaiting credit approval', reason: 'Account has a past due balance', comment: '' },
   { id: 'b', submitted: '2026-09-05', po: '', site: 'PLANT2', est: 140000, status: 'Declined', reason: 'Order exceeds available credit', comment: 'Please settle the past due first.' },
+  { id: 'c', submitted: '2026-09-01', po: 'PO-8801', site: 'PLANT1', est: 50000, status: 'Approved — being processed', reason: 'Order exceeds available credit', comment: '' },
 ]
 const open = (state?: unknown) => renderApp(<PendingApprovalPage />, { route: { pathname: '/orders/pending', state } })
 
@@ -39,6 +40,7 @@ test("lists held and declined orders with reason and the credit team's comment",
   expect(declined).toHaveTextContent('Declined')
   expect(declined).toHaveTextContent('Credit team: Please settle the past due first.')
   expect(within(declined).getAllByRole('cell')[1]).toHaveTextContent('—')
+  expect(within(table).getByRole('row', { name: /PO-8801/ })).toHaveTextContent('Approved — being processed')
   expect(within(table).queryByRole('button')).not.toBeInTheDocument()
 })
 
