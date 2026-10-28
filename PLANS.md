@@ -1,9 +1,8 @@
-# Active: Blanket Orders
+# Active: Authentication Update to include the APO Cement Corporation Company
 
-See implementation plans at docs\Concreat_Hub_Implementation_Plan.md
+For task context see implementation plans list at docs\Concreat_Hub_Implementation_Plan.md
 
 ## Requirements
 
-- Implement the blanket orders feature in S3-16
-- In unit price it's a free text where customer freely put a unit price
-- For blanket delivery schedule just build it but do not yet integrate with monday.com when click the save schedule
+- Implement activation account in APO Cement Corporation company not just SOLID CEMENT CORPORATION if the email is existed customers can activate it. However it must be unique to all email since there's no switch account yet and it account switching is on Phase 2.
+- I've the Company ID for Apo Cement Corporation company in BC, Let me know if you need it
