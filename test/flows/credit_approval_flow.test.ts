@@ -33,6 +33,9 @@ test('asks the credit team group, first to respond, with no item link and no tim
   for (const field of ['chp_reason', 'chp_availablecredit', 'chp_overdueamount', 'chp_estimatedtotal', "body('Line_rows')"]) {
     expect(p['WebhookApprovalCreationInput/details'], field).toContain(field)
   }
+  // The company by name only: its BC id means nothing to the credit team (2026-10-28).
+  expect(p['WebhookApprovalCreationInput/details']).toContain("body/chp_bccompanyname']}\n")
+  expect(p['WebhookApprovalCreationInput/details']).not.toContain('companyId')
 })
 
 test('Approve marks the row Approved before BC; Reject marks it Declined and never calls BC', () => {
