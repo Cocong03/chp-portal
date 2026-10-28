@@ -176,7 +176,7 @@ Enforcement happens in three places. Only the last two are security; the first i
 | **New Order — options** (items, UOM, customer prices, plants/Source, ship-tos, payment method/terms) | BC | – | `order-options` |
 | **New Order — quote** (priced lines, freight ₱3,500/₱0, other charges, credit check) | BC price calc + freight ext + credit ext | – | `order-quote` POST |
 | **New Order — submit** | – | BC Sales Order incl. receiving details, freight/other-charge lines | `orders` POST (re-quotes + re-checks credit server-side) |
-| **Pending Approval tab** | BC (SOs pending credit approval + reason) | – | `orders?view=pending` (see decision D1) |
+| **Pending Approval tab** | – | Dataverse `chp_creditapproval` (Awaiting and Declined rows, Account scope) | `orders?view=pending` (decision D1, S3-11) |
 | **Drafts tab** | Dataverse `Order Draft` (JSON payload) | Dataverse | `drafts` Server Logic (Dataverse connector, Contact-scope table permission; S3-B spec 2026-10-21) |
 | **+ New Multiple Order (Excel)** | – | Dataverse `Excel Order Upload` (file + notes) | Web API → flow notifies service center |
 | **Customer Ledger** | BC Customer Ledger Entries | – | `ledger` |
@@ -203,7 +203,7 @@ One Server Logic record per resource. Function names follow the HTTP verb. Serve
 | `announcement` | GET | all | Newest active Dashboard announcement `{ title, message }` or `null`, read live (`skipCache`) |
 | `dashboard` | GET | all | Credit (limit, exposure, available), ledger tiles, SO status counts. **One call, fanned out server-side** |
 | `orders` | GET | Full, Orders&Delivery | List with `q, status, site, from, to, page` (10/page) · `?id=` detail · `?view=pending` · `?all=true` for export · `?type=blanket` Blanket SOs list (newest 200) and `&id=` detail (S3-16) |
-| `orders` | POST | Full, Orders&Delivery | Submit: re-quote → re-check credit → create BC SO (or approval path). Requires an **idempotency key** from the client |
+| `orders` | POST | Full, Orders&Delivery | Submit: re-quote → re-check credit → create BC SO, or hold a credit order in Dataverse for approval (S3-04). Requires an **idempotency key** from the client |
 | `order-options` | GET | Full, Orders&Delivery | Items/UOM/customer price, plants (plain labels), ship-tos, payment method + terms, standard freight |
 | `order-quote` | POST | Full, Orders&Delivery | BC-priced lines, freight, other charges, totals, credit verdict + message |
 | `ledger` | GET | Full, Finance | Entries with date range / type / reference search, paged |
@@ -236,22 +236,33 @@ sequenceDiagram
   BC-->>SL: priced lines, charges, credit {limit, exposure, available, pastDue}
   SL-->>U: totals + credit verdict (warning shown, never blocks)
   U->>SL: POST orders {draft + idempotencyKey}
-  SL->>BC: re-quote + re-check credit (never trust the client total)
-  alt total ≤ available AND no past-due
+  SL->>BC: re-quote + read credit overview (never trust the client total)
+  alt cash, or credit with total ≤ available AND no past-due
     SL->>BC: create Sales Order (receiving details, freight & charge lines)
     BC-->>SL: SO number
-    SL-->>U: Confirmed SO-xxxxxx
-  else over available OR past-due
-    SL->>BC: create SO in approval path (D1)
-    SL-->>U: "Routed to our credit team" → Pending Approval tab
-    BC-)PA: approval request (BC workflow or flow)
-    PA-)CR: notify
+    SL-->>U: Confirmed SO-xxxxxx (credit: "auto-approved")
+  else credit, over available OR past-due
+    SL->>SL: create chp_creditapproval (Awaiting) in Dataverse, nothing sent to BC
+    SL-->>U: "Sent to our credit team" → Pending Approval tab
+    SL-)PA: row added → Approvals "Start and wait for an approval"
+    PA-)CR: Outlook approval to the CHP Credit Team group
+    CR--)PA: Approve / Reject + comment
+    alt Approve
+      PA->>BC: create Sales Order (stored request body, once)
+      PA->>PA: row Approved + SO no.
+    else Reject
+      PA->>PA: row Declined + comment (stays on Pending Approval)
+    end
   end
 ```
 
-**Decision D1: where does a "pending credit approval" order live?**
-- **Recommended: in BC**, as a Sales Order held by **BC's approval workflow** (or a BC-extension status) carrying the reason (*exceeds available credit* / *past-due balance*). The Credit team already works in BC, the portal's Pending Approval tab is just a filtered BC read, and "auto-approved confirmation once cleared" means BC releasing it. It is a single source of truth, with no two-phase commit between Dataverse and BC.
-- Alternative: a Dataverse `Order Submission` staging row, plus a flow that creates the BC SO after Credit approves. This is simpler on the BC side, but it creates a second order store and a sync failure mode.
+**Decision D1 (decided 2026-10-28, S3-04/S3-11; differs from the earlier recommendation): where does a "pending credit approval" order live?**
+- **In Dataverse**, in `chp_creditapproval`. It is a customer *request* that doesn't exist in BC yet, like a draft, so rule 1 holds: it stores the customer's choices, the reason and an estimated total for display, never BC prices as a record of truth. The row is removed from Pending Approval's active list only by BC creating the order (Approved rows show under Orders); Declined rows stay on the tab.
+- **Approval runs in Power Automate Approvals** (Approve/Reject, first to respond), assigned to the CHP credit team's Microsoft 365 group (env var `chp_CreditApprovalGroup`) and answered from **Outlook**. The flow is asynchronous back-office work, so rule 7 holds.
+- **BC only ever sees approved orders**, created on Approve. The decision, approver and comment are stored only in Dataverse and **never written to BC**. No email goes to the customer; the portal shows the outcome.
+- **When approval is needed:** credit orders only, when the re-quoted total exceeds BC's `availableCredit` or `overdueAmount > 0`. Cash orders never need approval. Credit is offered to every customer.
+- **Confirmed 2026-10-28:** credit payment method code is `CREDIT`; `mcrmCustCreditOverviews` is the source of truth for available credit and overdue (calculated as CHP's formula); BC accepts an approved order for a customer who is over limit or past due.
+- Rejected alternative: holding the order in BC's approval workflow (the earlier recommendation), because the Credit team approves from Outlook and BC would need a pending state it doesn't have.
 
 ---
 
@@ -273,7 +284,7 @@ The shared Postman collection is a **reused "Monday CRM Integration – DEV" col
 | Create Sales Order with receiving details, loading type, call-before-delivery, instructions, time window, freight & other-charge lines | Create yes; new fields no | Depends on the **Receiving-details** and **Freight & Other Charges** extensions |
 | **Available credit** (limit, exposure, available, past-due flag), live | No | **Available Credit** extension as an API |
 | Freight rate + other charges for a draft order | No | Quote-style endpoint (no SO created) |
-| Pending-approval orders + reason; approval outcome | No | Decision D1 |
+| ~~Pending-approval orders + reason; approval outcome~~ | n/a | Not needed from BC: held in Dataverse (D1, decided 2026-10-28). BC only receives approved orders |
 | Blanket Sales Orders + schedule + remaining qty | Headers and lines: Yes (`mcrmSalesOrders` `documentType` Blanket Order, `chpSalesOrderLines`) · schedule + remaining qty: No | Schedule and remaining qty per line; writable `unitPrice` on `mcrmSalesOrderLines` for Blanket Orders |
 | Customer Ledger Entries (doc no, type, ext. doc no, posting/due date, original/remaining, open/closed) + balance/balance due/overdue | No | New API (these are standard BC fields) |
 | Posted invoices, credit memos, posted whse. shipments, payments + **PDF as base64** | No | New API; PDFs via BC report engine |
@@ -357,7 +368,7 @@ src/
 
 | # | Decision / question | Recommendation | Owner |
 |---|---|---|---|
-| D1 | Where pending-credit-approval orders live | BC approval workflow (§7) | BC team + PASI |
+| D1 | Where pending-credit-approval orders live | **Decided 2026-10-28:** Dataverse `chp_creditapproval` + Power Automate Approvals (Outlook), BC order created only on Approve (§7) | CHP / PASI |
 | D2 | Customer-specific pricing source | BC price-calculation endpoint, not raw price lists | BC team |
 | D3 | Where Requests/Complaints/site requests are worked by CHP ("internal service-center system", never named in the wireframe) | Dataverse tables + flow notification. If CHP runs **Dynamics 365 Customer Service**, create Cases instead. **2026-10-27: CHP works these in monday.com boards**; a flow creates the monday.com item from the Dataverse row (board mapping and open asks in the implementation plan, "Service center = monday.com") | CHP / Rene |
 | D4 | Role granted on activation | None; ops assigns a role in Portal Management | Rene |
