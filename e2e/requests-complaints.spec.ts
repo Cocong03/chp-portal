@@ -30,6 +30,29 @@ test('a request submitted in the portal is listed as Submitted with an RQ- refer
   await expect(top).toContainText('Submitted')
 })
 
+test('a request with an affected user, mobile contact, additional info and a PDF is listed as Submitted', async ({ page }) => {
+  await page.goto('/requests')
+  await page.getByRole('button', { name: 'New request' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New request' })
+
+  await dialog.getByLabel('Category', { exact: true }).click()
+  await page.getByRole('option', { name: 'CHP Ordering Tool' }).click()
+  await dialog.getByLabel('Request type').click()
+  await page.getByRole('option', { name: 'Technical Support' }).click()
+  await dialog.getByLabel('Affected user email').fill('e2e.user@sample-customer.ph')
+  await dialog.getByLabel('Request details').fill(`${STAMP} tool`)
+  await dialog.getByLabel('Additional information (optional)').fill('Automated check of the additional info column.')
+  await dialog.getByRole('radio', { name: 'Mobile' }).click()
+  await dialog.getByLabel('Mobile number').fill('0917 552 6613')
+  await dialog.getByLabel('Attach a supporting document (optional)').setInputFiles({ name: 'e2e.pdf', mimeType: 'application/pdf', buffer: PDF })
+  await dialog.getByRole('button', { name: 'Submit request' }).click()
+
+  await expect(page.getByText(/Request RQ-\d+ submitted\./)).toBeVisible()
+  const top = page.getByRole('table').getByRole('row').nth(1)
+  await expect(top).toContainText(`${STAMP} tool`)
+  await expect(top).toContainText('Submitted')
+})
+
 test('a Delivery request with a trip, order and site is listed as Submitted', async ({ page }) => {
   await page.goto('/requests')
   await page.getByRole('button', { name: 'New request' }).click()
@@ -97,6 +120,8 @@ test('a Delivery & Handling complaint with a delivery site is listed as Submitte
   await ((await sites.count()) ? sites.first() : page.getByRole('option', { name: 'Not Applicable' })).click()
   await dialog.getByLabel('Subject').fill(`${STAMP} site`)
   await dialog.getByLabel('Description').fill('Automated check of the delivery site code; safe to ignore.')
+  await dialog.getByRole('radio', { name: 'Mobile' }).click()
+  await dialog.getByRole('textbox', { name: 'Mobile number' }).fill('+639175526613')
   await dialog.getByRole('checkbox').check()
   await dialog.getByRole('button', { name: 'Submit', exact: true }).click()
 
