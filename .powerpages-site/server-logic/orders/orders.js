@@ -1161,8 +1161,9 @@ async function post() {
                 return { pending: true };
             }
         }
-        // ponytail: no duplicate guard yet (a portal reference field on mcrmSalesOrders is pending with BC); the SPA sends
-        // once per click and keeps Submit disabled while it waits.
+        // ponytail: no duplicate guard yet (a portal reference field on mcrmSalesOrders is pending with BC), on this path or
+        // the held one above: a double submit can create two BC orders, or two chp_creditapprovals rows and so two approvals.
+        // The SPA sends once per click and keeps Submit disabled while it waits.
         var created = await bcPost(scope, "mcrmSalesOrders", order);
         if (!created || !created.salesOrderNo) {
             throw new Error("bc-post mcrmSalesOrders: no salesOrderNo");

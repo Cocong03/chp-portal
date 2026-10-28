@@ -38,7 +38,7 @@ CHP moved credit orders from Phase 2 into Release 1 (2026-10-28). Since S3-10, R
 ## Changes to the architecture (record in the same commit)
 
 - **D1 is decided, differently from the architecture's recommendation.** §7 recommended holding pending orders in BC's own approval workflow. Decided instead: the pending order lives in **Dataverse** (`chp_creditapproval`), the approval runs in **Power Automate Approvals**, and BC only ever sees approved orders. Update §5 (Pending Approval tab: source is Dataverse, not BC), §7 (sequence and D1), §8 (the "Pending-approval orders + reason; approval outcome" row) and the decisions table.
-- **Rule 1 still holds.** A held order is a customer *request* that doesn't exist in BC, like a draft. Dataverse stores the customer's choices, the reason and an **estimated** total for display. It never stores BC prices per line, credit figures as a record of truth, or anything after BC creates the order (only the SO number, as a link).
+- **Rule 1 still holds.** A held order is a customer *request* that doesn't exist in BC, like a draft. Dataverse stores the customer's choices, the reason and an **estimated** total for display. It never stores BC prices per line as a record, credit figures as a record of truth, or anything after BC creates the order (only the SO number, as a link). `chp_payload.lines` (the per-line quote: `unitPrice`, `amount`) is a display copy for the approver, not a record of BC prices; BC prices the order again when it's created.
 - **Rule 7 still holds.** The flow is asynchronous back-office work, never on a read path. Submit, Pending Approval and the order list read Dataverse and BC directly.
 
 ## 1. Flow of a credit order
@@ -127,20 +127,21 @@ Any new shared code goes in `server-logic-src/bc-helpers.js` and is stamped (`no
 Solution-aware, definition in `scripts/dataverse/credit_approval_flow.json`, deployed by `portal_flows.py` (new `FLOWS` entry). New connection reference **`chp_approvals`** (`shared_approvals`); reuses `chp_dataverse` and `chp_outlook`.
 
 1. **Trigger:** Dataverse *When a row is added* on `chp_creditapproval` (the grant flow's `SubscribeWebhookTrigger` pattern, message Create).
-2. **Start and wait for an approval**, Approve/Reject – First to respond, assigned to env var **`chp_CreditApprovalGroup`** (new, in `ConcreatHub`; Dev value `chp-credit-team@automations365.com`).
+2. **Guard:** read the row (`chp_status`, `chp_salesorderno`); unless it is still *Awaiting credit approval* with no SO number, stop (Succeeded). A resubmitted run never asks the credit team again, and a later Reject never overwrites an Approved row.
+3. **Start and wait for an approval**, Approve/Reject – First to respond, assigned to env var **`chp_CreditApprovalGroup`** (new, in `ConcreatHub`; Dev value `chp-credit-team@automations365.com`).
    - **Title:** `Credit approval: <customer name> (<customer no.>) — ₱<est. total>`
    - **Details** (Markdown): company, customer, submitted by (contact name + email), PO ref, shipment method, site or plant, requested/pick-up date, lines table (item, qty, UOM, unit price, amount), estimated total, available credit and overdue at submit, **reason**.
    - **Item link:** none *(my call: approvers have no portal access; BC has nothing to link to yet)*.
    - **Timeout:** none of our own (decision 20). Power Automate ends any flow run after **30 days**; if nobody has answered by then, the run stops, the row stays *Awaiting credit approval*, and the approval email no longer works. The flow does nothing special in that case.
-3. **Approved:**
+4. **Approved:**
    1. Update row: status Approved, approver name/email, comment, decided on.
    2. If `chp_salesorderno` is already set, stop (a resubmitted run never creates a second order).
    3. Get a BC token and POST `chp_payload.salesOrder` to `companies(<payload.companyId>)/mcrmSalesOrders`, as the activation flow calls BC (HTTP + client credentials from the BC env vars). **Retry policy: none** on this POST.
-   4. Store `salesOrderNo` in `chp_salesorderno`.
-   5. **BC fails:** the row stays Approved with no SO number; the flow emails the credit team group (Outlook `SendEmailV2` from `chp_SenderMailbox`) *"Approved order for <customer> couldn't be created in Business Central: <error>. Please create it in BC."* and ends **Failed** so it shows in run history. *(my call)*
-4. **Declined:** update the row (status Declined, approver, comment, decided on).
-5. Everything the flow reads about the order comes from the row; nothing comes from the approval response except the decision, approver and comment.
-6. **No email to the customer** in any branch (decision 10).
+   4. Store `salesOrderNo` in `chp_salesorderno`. If BC answers 2xx without a `salesOrderNo`, nothing is saved; the flow emails the credit team that BC answered without an order number (*"Check Business Central for this order before creating it."*) and ends **Failed**. If saving the SO number fails, the flow emails the credit team that the order was created in BC as <SO no.> but the portal couldn't record it (*"Do not create it again."*) and ends **Failed**.
+   5. **BC fails:** the row stays Approved with no SO number; the flow emails the credit team group (Outlook `SendEmailV2` as the Outlook connection user) *"Approved order for <customer> couldn't be created in Business Central: <error>. Check Business Central for this order before creating it."* (a timeout may still have created it) and ends **Failed** so it shows in run history. *(my call)*
+5. **Declined:** update the row (status Declined, approver, comment, decided on).
+6. Everything the flow reads about the order comes from the row; nothing comes from the approval response except the decision, approver and comment.
+7. **No email to the customer** in any branch (decision 10).
 
 ## 5. Screens
 
