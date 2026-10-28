@@ -71,7 +71,7 @@ Examples:
 3. **Scope every BC call from the session, never from the request.** Every Server Logic function: `Server.User` → contact → active Account (`chp_bccustomerno`, `chp_bccompanyid`) → BC company + customer filter. Ignore any customer/company id sent by the client. Detail endpoints verify that the BC record belongs to the session customer.
 4. **Escape every user value placed in an OData `$filter`** (double single quotes).
 5. **No business math in the SPA.** Prices, freight, other charges and available credit come from BC. The SPA only sums for display. Order submit re-quotes and re-checks credit on the server and never trusts client totals.
-6. **Dataverse owns only portal data:** Contact/Account identity, `chp_accountlink`, web roles, drafts, requests, complaints, site requests, Excel uploads, taxonomy tables, announcement. Account stores only BC identity keys (customer no., name, company).
+6. **Dataverse owns only portal data:** Contact/Account identity, `chp_accountlink`, web roles, drafts, credit approvals (held credit orders), requests, complaints, site requests, Excel uploads, taxonomy tables, announcement. Account stores only BC identity keys (customer no., name, company).
 7. **Power Automate is never on a synchronous read path.** Use it for activation, routing submissions, notifications.
 8. **Security is server-side.** Web roles on every Server Logic record and table permissions (mostly Account scope via `parentcustomerid`). Client-side role checks are UX only.
 9. **Design for multiple linked accounts per contact** (Phase 2 switcher) even though Nov 15 ships one link per contact.
@@ -153,7 +153,7 @@ pac pages upload-code-site --rootPath .   # deploy to the confirmed environment
 
 ## Open decisions (check the architecture doc for status)
 
-D1 pending-credit-approval orders in BC · D2 BC price-calculation endpoint · D3 service-center system (Dataverse vs D365 Customer Service) · D4 role on activation · Q6 Account & User Mgmt visibility per role · Q10 email on more than one BC customer (recommended: block) · Q11 APO Cement go-live date.
+D2 BC price-calculation endpoint · D3 service-center system (Dataverse vs D365 Customer Service) · D4 role on activation · Q6 Account & User Mgmt visibility per role · Q10 email on more than one BC customer (recommended: block) · Q11 APO Cement go-live date.
 
 # Testing
 

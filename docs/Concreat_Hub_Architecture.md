@@ -306,6 +306,7 @@ Publisher **Concreat Holdings**, prefix `chp_`, solution `ConcreatHub` (created 
 | `chp_bccompany` | name (→ Account `chp_bccompanyname`), BC company ID (`chp_bccompanyguid`), active | none (read by the activation and grant flows only) |
 | `chp_accessgrant` | email, **company** (lookup `chp_bccompany`), BC customer no., role, status | none (Concreat Connect Admin only) |
 | `chp_orderdraft` | contact, account, name, `chp_payload` (JSON), modified | **Contact** scope CRUD (drafts are personal), used through the `drafts` Server Logic, which sets contact and account from the session |
+| `chp_creditapproval` | contact, account, status, reason, estimated total, payload (exact BC order body), SO no., approver/comment/decided on | Account scope read + create (Full Access, Orders & Delivery); only the flow updates rows |
 | `chp_excelorderupload` | account, contact, file, notes, status | Account scope create/read |
 | `chp_siterequest` | account, type (new/change/remove), ship-to code, address, city/province, contact 1–3, email, landmark, shipment method, status | Account scope create/read |
 | `chp_request` | account, submitted by, category, request type, assigned group, contact method/value/person, details, category fields, status, attachments | Account scope create/read |
