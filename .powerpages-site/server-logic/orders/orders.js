@@ -1048,7 +1048,7 @@ async function post() {
     }
 
     // The session customer's past due amount and available credit from BC (same read as the dashboard's). Throws when BC
-    // fails or has no row: a credit decision is never made on defaulted figures.
+    // fails, has no row or leaves a figure out: a credit decision is never made on defaulted figures.
     async function creditOverview(scope) {
         var result = await bcGet(
             scope,
@@ -1056,10 +1056,10 @@ async function post() {
             odataQuery({ $filter: "customerNo eq " + odataLiteral(scope.customerNo), $select: "customerNo,overdueAmount,availableCredit", $top: "1" })
         );
         var row = ((result && result.value) || []).find((each) => each.customerNo === scope.customerNo);
-        if (!row) {
-            throw new Error("bc-get mcrmCustCreditOverviews: no row for the customer");
+        if (!row || !Number.isFinite(row.overdueAmount) || !Number.isFinite(row.availableCredit)) {
+            throw new Error("bc-get mcrmCustCreditOverviews: no credit figures for the customer");
         }
-        return { overdue: Number(row.overdueAmount) || 0, available: Number(row.availableCredit) || 0 };
+        return { overdue: row.overdueAmount, available: row.availableCredit };
     }
 
     // Why a credit order needs the credit team ("" when it can be released): past due first, then over credit.

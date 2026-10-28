@@ -203,7 +203,11 @@ test('a held pick up order stores the plant as its site and the date as its name
   expect(created[0].row).toMatchObject({ chp_site: 'SOLID', chp_name: 'C00000002 · 2026-10-26', chp_poref: '' })
 })
 
-test.each([['credit figures missing', { credit: null }], ['credit read fails', { creditFails: true }]])(
+test.each([
+  ['credit figures missing', { credit: null }],
+  ['credit read fails', { creditFails: true }],
+  ['past due amount missing', { credit: { availableCredit: 50000 } }],
+])(
   '%s: safe error, no order, nothing held',
   async (_n, opts) => {
     const { server, orders, created } = fakeServer(CREDIT, opts)
