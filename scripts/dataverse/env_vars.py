@@ -26,6 +26,8 @@ VALUES = {
     'chp_PowerPagesSiteId': 'f44e98b4-3da3-4f8d-8f79-fbb244454741',
     # Public PNG for emails (the private portal can't serve it to mail clients). Dev: public image host (2026-10-07).
     'chp_EmailLogoUrl': 'https://i.ibb.co/hFmK4Hd3/concreat-logo-email.png',
+    # Mailbox/group that receives held credit orders for approval (S3-04). Dev: test group.
+    'chp_CreditApprovalGroup': 'chp-credit-team@automations365.com',
 }
 # New definitions: (schema name, display name). Values: only chp_PowerPagesSiteId above; the two BC ones by hand.
 NEW = [
@@ -33,6 +35,7 @@ NEW = [
     ('chp_BCClientSecret', 'BC Client Secret (Dev: plain text, no default; Key Vault before UAT, S1-14)'),
     ('chp_PowerPagesSiteId', 'Power Pages Site ID'),
     ('chp_EmailLogoUrl', 'Email Logo URL'),
+    ('chp_CreditApprovalGroup', 'Credit Approval Group'),
 ]
 
 

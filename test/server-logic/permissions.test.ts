@@ -56,3 +56,15 @@ test.each([
   expect(p!.text).toContain('- 11bb7218-55fb-4cae-b8a1-5af2f41237c5') // Orders & Delivery
   expect(p!.text).not.toContain('b2780841-e908-44f8-b7d8-dfd367bfeeb2') // never all Authenticated Users
 })
+
+test('credit approvals: the account sees its held orders; only the flow changes them', () => {
+  const p = named('Credit approval - account (read, create)')!
+  expect(p.field('entitylogicalname')).toBe('chp_creditapproval')
+  expect(p.field('scope')).toBe('756150002') // Account
+  expect(p.field('accountrelationship')).toBe('chp_account_chp_creditapproval')
+  for (const privilege of ['read', 'create', 'append', 'appendto']) expect(p.field(privilege), privilege).toBe('true')
+  for (const privilege of ['write', 'delete']) expect(p.field(privilege), privilege).toBe('false')
+  expect(p.text).toContain('- 56b29291-b981-4ef0-865b-41c1e9523a97')
+  expect(p.text).toContain('- 11bb7218-55fb-4cae-b8a1-5af2f41237c5')
+  expect(p.text).not.toContain('b2780841-e908-44f8-b7d8-dfd367bfeeb2')
+})

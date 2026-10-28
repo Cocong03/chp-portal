@@ -1,0 +1,14 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+accountrelationship: chp_account_chp_creditapproval
+append: true
+appendto: true
+create: true
+delete: false
+entitylogicalname: chp_creditapproval
+entityname: Credit approval - account (read, create)
+id: 3d8f6a52-9c1e-4b7a-a0d4-6e2b15c7f904
+read: true
+scope: 756150002
+write: false
