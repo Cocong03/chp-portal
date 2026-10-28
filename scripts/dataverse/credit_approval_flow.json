@@ -50,14 +50,6 @@
         "description": "BC Client Secret"
       }
     },
-    "Sender Mailbox (chp_SenderMailbox)": {
-      "defaultValue": "",
-      "type": "String",
-      "metadata": {
-        "schemaName": "chp_SenderMailbox",
-        "description": "Sender Mailbox"
-      }
-    },
     "Credit Approval Group (chp_CreditApprovalGroup)": {
       "defaultValue": "",
       "type": "String",
@@ -345,7 +337,6 @@
               "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
             },
             "parameters": {
-              "emailMessage/From": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
               "emailMessage/To": "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
               "emailMessage/Subject": "Approved credit order couldn't be created in Business Central",
               "emailMessage/Body": "<p>Approved order for @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) couldn't be created in Business Central.</p><p>PO ref: @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}<br>Estimated total: ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}<br>Approved by: @{outputs('First_response')?['responder']?['displayName']}</p><p>Business Central error: @{coalesce(body('Create_BC_order')?['error']?['message'], actions('Create_BC_order')?['error']?['message'], 'no response')}</p><p>Please create it in Business Central.</p>",

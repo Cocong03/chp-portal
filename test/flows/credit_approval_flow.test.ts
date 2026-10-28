@@ -70,10 +70,9 @@ test('a BC failure emails the credit team and ends the run Failed', () => {
 test('sends no email to the customer', () => {
   const mails = actions.filter(([, a]) => a.inputs?.host?.operationId === 'SendEmailV2')
   expect(mails.map(([n]) => n)).toEqual(['Email_credit_team'])
-  expect(mails[0][1].inputs.parameters).toMatchObject({
-    'emailMessage/From': "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
-    'emailMessage/To': "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
-  })
+  expect(mails[0][1].inputs.parameters['emailMessage/To']).toBe("@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}")
+  // Sent as the Outlook connection user, like the other portal flows (controller ruling, fix round 1).
+  expect(mails[0][1].inputs.parameters['emailMessage/From']).toBeUndefined()
 })
 
 test('hides the client secret and the token from run history', () => {
@@ -85,7 +84,7 @@ test('hides the client secret and the token from run history', () => {
 test('reads every environment-specific value from a ConcreatHub environment variable, never a literal', () => {
   const schemaNames = Object.values(definition.parameters).map((p) => (p as Action).metadata?.schemaName).filter(Boolean)
   expect(schemaNames.sort()).toEqual(
-    ['chp_BCApiBasePath', 'chp_BCClientId', 'chp_BCClientSecret', 'chp_BCEnvironmentName', 'chp_BCTenantId', 'chp_CreditApprovalGroup', 'chp_SenderMailbox'],
+    ['chp_BCApiBasePath', 'chp_BCClientId', 'chp_BCClientSecret', 'chp_BCEnvironmentName', 'chp_BCTenantId', 'chp_CreditApprovalGroup'],
   )
   for (const p of Object.values(definition.parameters) as Action[]) if (p.metadata?.schemaName) expect(p.defaultValue).toBe('')
   expect(text).not.toMatch(/f44e98b4|d2e4496e|6b92847e|188fc244|chp-portal-dev|automations365|chp-credit-team/)
