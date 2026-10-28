@@ -608,8 +608,9 @@ async function get() {
 }
 
 // Submit (S3-10): BC prices the order again, then it's created as a BC Sales Order (Open; BC staff take it from there).
-// Cash only: credit orders and their approval path are Phase 2 (decided 2026-10-26). Prices and totals from the browser
-// are never read; the customer comes from the session.
+// Credit orders (S3-04) are created the same way when BC's credit overview allows them (total within available credit,
+// nothing past due); otherwise they're held in chp_creditapprovals for the credit team and nothing is sent to BC.
+// Prices, totals and credit figures from the browser are never read; the customer comes from the session.
 async function post() {
     // #region bc-helpers (generated from server-logic-src/bc-helpers.js — do not edit)
     // Shared BC helpers (S1-06). Server Logic has no module loading, so scripts/stamp-server-logic-helpers.mjs copies this
@@ -960,6 +961,8 @@ async function post() {
     var TIME_WINDOWS = ["24H", "DAY", "EARLY", "NIGHT"];
     // ponytail: BC's Payment Method code for Cash is assumed to be CASH; confirm with BC.
     var CASH = "CASH";
+    // BC's Payment Method code for Credit (confirmed with BC 2026-10-28).
+    var CREDIT = "CREDIT";
 
     // "" when empty, the trimmed text when it fits, null when it's too long or not text.
     function optional(value, max) {
@@ -989,7 +992,7 @@ async function post() {
             return null;
         }
         var choices = orderChoices(body);
-        if (!choices || body.paymentMethod !== "cash") {
+        if (!choices || (body.paymentMethod !== "cash" && body.paymentMethod !== "credit")) {
             return null;
         }
         var delivery = choices.delivery;
@@ -1005,17 +1008,17 @@ async function post() {
             timeWindow: delivery ? (TIME_WINDOWS.indexOf(body.timeWindow) >= 0 ? body.timeWindow : null) : ""
         };
         var valid = Object.keys(details).every((key) => details[key] !== null) && (!details.email || details.email.indexOf("@") > 0);
-        return valid ? { choices: choices, details: details } : null;
+        return valid ? { choices: choices, details: details, paymentMethod: body.paymentMethod } : null;
     }
 
     // mcrmSalesOrders with its lines (deep insert). Every line needs sourcePlant or BC prices nothing (2026-10-25); the
     // header's locationCode is the same plant. Empty fields are left out for BC to default.
-    function salesOrder(scope, choices, details) {
+    function salesOrder(scope, choices, details, paymentMethodCode) {
         var order = {
             sellToCustomerNo: scope.customerNo,
             shipmentMethodCode: choices.delivery ? "DELIVERY" : "PICKUP",
             locationCode: choices.source,
-            paymentMethodCode: CASH
+            paymentMethodCode: paymentMethodCode
         };
         var fields = choices.delivery
             ? {
@@ -1044,6 +1047,64 @@ async function post() {
         return order;
     }
 
+    // The session customer's past due amount and available credit from BC (same read as the dashboard's). Throws when BC
+    // fails or has no row: a credit decision is never made on defaulted figures.
+    async function creditOverview(scope) {
+        var result = await bcGet(
+            scope,
+            "mcrmCustCreditOverviews",
+            odataQuery({ $filter: "customerNo eq " + odataLiteral(scope.customerNo), $select: "customerNo,overdueAmount,availableCredit", $top: "1" })
+        );
+        var row = ((result && result.value) || []).find((each) => each.customerNo === scope.customerNo);
+        if (!row) {
+            throw new Error("bc-get mcrmCustCreditOverviews: no row for the customer");
+        }
+        return { overdue: Number(row.overdueAmount) || 0, available: Number(row.availableCredit) || 0 };
+    }
+
+    // Why a credit order needs the credit team ("" when it can be released): past due first, then over credit.
+    function heldReason(total, credit) {
+        var reasons = [];
+        if (credit.overdue !== 0) {
+            reasons.push("Account has a past due balance");
+        }
+        if (total > credit.available) {
+            reasons.push("Order exceeds available credit");
+        }
+        return reasons.join(" · ");
+    }
+
+    // A credit order waiting for the credit team; the exact BC body is kept so an approval creates what was submitted.
+    function holdOrder(scope, request, order, quotes, total, credit, reason, orderDate) {
+        var choices = request.choices;
+        var poRef = request.details.poRef;
+        var payload = {
+            version: 1,
+            companyId: scope.companyId,
+            salesOrder: order,
+            lines: choices.lines.map((line, i) => ({ code: line.code, qty: line.qty, uom: line.uom, unitPrice: quotes[i].unitPrice, amount: quotes[i].lineAmount }))
+        };
+        parseResult(
+            Server.Connector.Dataverse.CreateRecord(
+                "chp_creditapprovals",
+                JSON.stringify({
+                    chp_name: scope.customerNo + " · " + (poRef || orderDate),
+                    chp_status: 775000000,
+                    chp_reason: reason,
+                    chp_estimatedtotal: total,
+                    chp_availablecredit: credit.available,
+                    chp_overdueamount: credit.overdue,
+                    chp_poref: poRef,
+                    chp_site: choices.delivery ? choices.site : choices.source,
+                    chp_payload: JSON.stringify(payload),
+                    "chp_Contact@odata.bind": "/contacts(" + scope.contactId + ")",
+                    "chp_Account@odata.bind": "/accounts(" + scope.accountId + ")"
+                })
+            ),
+            "dataverse"
+        );
+    }
+
     Server.Logger.Log("orders POST called");
     return respond(async () => {
         var request = readRequest();
@@ -1052,18 +1113,34 @@ async function post() {
         }
         var scope = await sessionScope();
         var orderDate = manilaToday();
-        var quotes = await Promise.all(request.choices.lines.map((line) => quoteLine(scope, request.choices, line, orderDate)));
+        var credit = request.paymentMethod === "credit";
+        // Credit orders read BC's credit overview while the lines are quoted.
+        var reads = await Promise.all([
+            Promise.all(request.choices.lines.map((line) => quoteLine(scope, request.choices, line, orderDate))),
+            credit ? creditOverview(scope) : null
+        ]);
+        var quotes = reads[0];
         // BC may still discount the order below the quote (accepted 2026-10-26); a line it can't price stops it here.
         if (quotes.some((line) => line.unitPrice <= 0)) {
             return { notPriced: true };
         }
+        var order = salesOrder(scope, request.choices, request.details, credit ? CREDIT : CASH);
+        if (credit) {
+            var total = cents(quotes.reduce((sum, line) => sum + line.total, 0));
+            var reason = heldReason(total, reads[1]);
+            if (reason) {
+                holdOrder(scope, request, order, quotes, total, reads[1], reason, orderDate);
+                Server.Logger.Log("orders POST held for credit approval: " + reason);
+                return { pending: true };
+            }
+        }
         // ponytail: no duplicate guard yet (a portal reference field on mcrmSalesOrders is pending with BC); the SPA sends
         // once per click and keeps Submit disabled while it waits.
-        var created = await bcPost(scope, "mcrmSalesOrders", salesOrder(scope, request.choices, request.details));
+        var created = await bcPost(scope, "mcrmSalesOrders", order);
         if (!created || !created.salesOrderNo) {
             throw new Error("bc-post mcrmSalesOrders: no salesOrderNo");
         }
         Server.Logger.Log("orders POST created " + created.salesOrderNo);
-        return { so: created.salesOrderNo };
+        return credit ? { so: created.salesOrderNo, autoApproved: true } : { so: created.salesOrderNo };
     });
 }
