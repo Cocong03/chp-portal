@@ -164,9 +164,9 @@ export interface OrderQuoteDto {
   total: number
 }
 
-/** orders POST (S3-10): the order as the customer chose it; never a price or total (BC prices it again). Cash only until Phase 2. */
+/** orders POST (S3-10, S3-04): the order as the customer chose it; never a price or total (BC prices it again). */
 export interface OrderSubmitRequest extends OrderQuoteRequest {
-  paymentMethod: 'cash'
+  paymentMethod: 'cash' | 'credit'
   poRef: string
   pickupDate: string
   requestedDate: string
@@ -178,8 +178,23 @@ export interface OrderSubmitRequest extends OrderQuoteRequest {
   instructions: string
 }
 
-/** The new BC Sales Order's number, or notPriced when BC couldn't price a line on the second look. */
-export type OrderSubmitDto = { so: string } | { notPriced: true }
+/**
+ * The new BC Sales Order's number (autoApproved: a credit order BC released within credit, S3-04); pending: a credit order
+ * held for the credit team; notPriced when BC couldn't price a line on the second look.
+ */
+export type OrderSubmitDto = { so: string; autoApproved?: true } | { pending: true } | { notPriced: true }
+
+/** One row of GET /_api/serverlogics/orders?view=pending (S3-11): the account's held or declined credit orders. */
+export interface PendingOrderDto {
+  id: string
+  submitted: string
+  po: string
+  site: string
+  est: number
+  status: 'Awaiting credit approval' | 'Declined'
+  reason: string
+  comment: string
+}
 
 /** chp_payload of a draft (S3-12): the New Order form's choices. No prices, freight or credit; they're current on Continue. */
 export interface DraftPayload {

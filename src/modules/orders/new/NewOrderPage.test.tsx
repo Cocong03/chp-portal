@@ -1,7 +1,7 @@
 import { act, screen, waitFor, within } from '@testing-library/react'
 import { format } from 'date-fns'
 import userEvent, { type UserEvent } from '@testing-library/user-event'
-import { Route, Routes } from 'react-router-dom'
+import { Route, Routes, useLocation } from 'react-router-dom'
 import { toast } from 'sonner'
 import { ApiError, serverLogic } from '@/api/serverLogic'
 import type { DashboardDto, DraftPayload } from '@/api/types'
@@ -32,6 +32,7 @@ const T1_BAG = 'CEM-T1-40KG — Portland Cement Type I — 40kg Bag'
 const T2_BULK = 'CEM-T2-BULK — Portland Cement Type II — Bulk'
 const T1_BULK = 'CEM-T1-BULK — Portland Cement Type I — Bulk'
 const WARNING = '⚠ This order exceeds your available credit. You may still submit it for review by our credit team.'
+const PAST_DUE = '⚠ Your account has a past due balance. You may still submit this order for review by our credit team.'
 
 async function openForm() {
   const view = renderApp(<NewOrderPage />, { route: '/orders/new' })
@@ -44,6 +45,10 @@ const lineRow = (n: number) => within(screen.getByRole('table', { name: 'Order l
 async function pickItem(user: UserEvent, line: number, item: string) {
   await user.click(screen.getByRole('combobox', { name: `Item, line ${line}` }))
   await user.click(await screen.findByRole('option', { name: item }))
+}
+async function chooseCredit(user: UserEvent) {
+  await user.click(screen.getByRole('combobox', { name: 'Payment method' }))
+  await user.click(await screen.findByRole('option', { name: 'Credit' }))
 }
 async function setQty(user: UserEvent, line: number, qty: string) {
   const input = screen.getByRole('spinbutton', { name: `Quantity, line ${line}` })
@@ -213,7 +218,7 @@ test('removing every line leaves an empty, working table', async () => {
   expect(screen.getByRole('combobox', { name: 'Item, line 1' })).toBeInTheDocument()
 })
 
-// 2026-10-26: cash orders need no credit approval; the warning (and the credit team's review) comes back with Credit in Phase 2.
+// Cash orders need no credit approval (decided 2026-10-26); the warning is for Credit orders only.
 test('a cash order over the available credit shows no credit warning', async () => {
   const user = userEvent.setup()
   await openForm()
@@ -238,6 +243,24 @@ test("credit standing is BC's figures", async () => {
   expect(await screen.findByText('₱500,000.00')).toBeInTheDocument()
   expect(summary('Current exposure')).toHaveTextContent('₱203,220.00')
   expect(summary('Available credit')).toHaveTextContent('₱2,000.00')
+})
+
+const PAST_DUE_ACCOUNT = { balance: 174000, balanceDue: 24750, overdue: 24750, creditLimit: 500000, exposure: 203220, availableCredit: 296780 }
+
+test('credit with a past due balance shows the past-due warning', async () => {
+  const user = userEvent.setup()
+  answer('dashboard', { ...dashboardMock(), account: PAST_DUE_ACCOUNT } satisfies DashboardDto)
+  await openForm()
+  await waitFor(() => expect(summary('Credit limit')).toHaveTextContent('₱500,000.00'))
+  await chooseCredit(user)
+  expect(screen.getByText(PAST_DUE)).toBeInTheDocument()
+})
+
+test('cash never shows the past-due warning', async () => {
+  answer('dashboard', { ...dashboardMock(), account: PAST_DUE_ACCOUNT } satisfies DashboardDto)
+  await openForm()
+  await waitFor(() => expect(summary('Credit limit')).toHaveTextContent('₱500,000.00'))
+  expect(screen.queryByText(PAST_DUE)).not.toBeInTheDocument()
 })
 
 test('credit BC could not give shows dashes and never the warning', async () => {
@@ -427,8 +450,7 @@ test('fields hidden by the toggle keep their values', async () => {
   expect(screen.getByLabelText('Receiving person')).toHaveValue('Juan Dela Cruz')
 })
 
-// 2026-10-26: Cash only; Credit (and its Payment terms) is Phase 2.
-test('Cash with Prepayment terms; Credit is listed but not available yet', async () => {
+test('Credit can be chosen and shows Payment terms', async () => {
   const user = userEvent.setup()
   await openForm()
   expect(screen.getByRole('combobox', { name: 'Payment method' })).toHaveTextContent('Cash')
@@ -437,7 +459,12 @@ test('Cash with Prepayment terms; Credit is listed but not available yet', async
   expect(prepay).toHaveAttribute('readonly')
   expect(screen.queryByLabelText('Payment terms')).not.toBeInTheDocument()
   await user.click(screen.getByRole('combobox', { name: 'Payment method' }))
-  expect(await screen.findByRole('option', { name: 'Credit' })).toHaveAttribute('aria-disabled', 'true')
+  const credit = await screen.findByRole('option', { name: 'Credit' })
+  expect(credit).not.toHaveAttribute('aria-disabled')
+  await user.click(credit)
+  expect(screen.getByRole('combobox', { name: 'Payment method' })).toHaveTextContent('Credit')
+  expect(screen.getByLabelText('Payment terms')).toHaveAttribute('readonly')
+  expect(screen.queryByLabelText('Prepayment terms')).not.toBeInTheDocument()
 })
 
 test("Receiving time window offers BC's windows, 8:00 AM – 5:00 PM chosen", async () => {
@@ -812,6 +839,53 @@ describe('submit (S3-10)', () => {
     await user.click(submit())
     expect(toast.error).toHaveBeenCalledWith('Please enter a valid receiving email.')
     expect(orderPosts()).toEqual([])
+  })
+
+  /** Answers the orders POST only; the Orders list keeps its dev-server mock. */
+  function answerSubmit(value: unknown) {
+    vi.mocked(serverLogic).mockImplementation(async (name, options) =>
+      name === 'orders' && options?.method === 'POST' ? (value as never) : actualServerLogic(name, options),
+    )
+  }
+  /** Where New Order navigated to, and the state it passed (Pending Approval is its own task, S3-11). */
+  function LocationProbe() {
+    const location = useLocation()
+    return <output aria-label="Location">{`${location.pathname} ${JSON.stringify(location.state)}`}</output>
+  }
+
+  test('a held credit order opens Pending Approval and removes its draft', async () => {
+    const user = userEvent.setup()
+    renderApp(
+      <Routes>
+        <Route path="/orders/new" element={<NewOrderPage />} />
+        <Route path="/orders/pending" element={<LocationProbe />} />
+      </Routes>,
+      { route: `/orders/new?draft=${SEED_ID}` },
+    )
+    await screen.findByText(/Continuing Draft #1/)
+    await quoted('Order total', '₱2,600.00')
+    await chooseCredit(user)
+    await confirmSubmit(user)
+    expect(await screen.findByRole('status', { name: 'Location' })).toHaveTextContent('/orders/pending {"sentForReview":true}')
+    expect(orderPosts()[0][1]!.body).toMatchObject({ paymentMethod: 'credit' })
+    await waitFor(() =>
+      expect(vi.mocked(serverLogic)).toHaveBeenCalledWith('drafts', { method: 'DELETE', query: { id: SEED_ID } }),
+    )
+    await waitFor(() => expect(draftsMock({ method: 'GET' })).toEqual([]))
+  })
+
+  test('an auto-released credit order opens Orders with the auto-approved note', async () => {
+    const user = userEvent.setup()
+    answerSubmit({ so: 'SOR000000030', autoApproved: true })
+    openSection()
+    await screen.findByRole('table', { name: 'Order lines' })
+    await pickItem(user, 1, T1_BAG)
+    await quoted('Order total', '₱245.00')
+    await chooseCredit(user)
+    await confirmSubmit(user)
+    expect(await screen.findByText('SOR000000030 was auto-approved — within available credit, no past due balance.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Orders' })).toHaveAttribute('aria-current', 'page')
+    expect(orderPosts()[0][1]!.body).toMatchObject({ paymentMethod: 'credit' })
   })
 
   test('submitting a draft removes the draft', async () => {

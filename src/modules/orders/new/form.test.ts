@@ -40,3 +40,8 @@ test('submitRequest never sends a typed price', () => {
   const body = submitRequest(form({ lines: [{ code: 'CEM-T1-40KG', qty: 10, price: 200 }] }), items)
   expect(body?.lines).toEqual([{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10 }])
 })
+
+test('submitRequest sends the chosen payment method', () => {
+  expect(submitRequest(form({ lines: [{ code: 'CEM-T1-40KG', qty: 1 }] }), items)?.paymentMethod).toBe('cash')
+  expect(submitRequest(form({ lines: [{ code: 'CEM-T1-40KG', qty: 1 }], paymentMethod: 'credit' }), items)?.paymentMethod).toBe('credit')
+})

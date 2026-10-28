@@ -50,8 +50,9 @@ export const MOCK_BLANKET_ORDERS: OrderDto[] = [
 ].map((order) => ({ ...order, edd: null }))
 
 /** Dev-server stand-in for the orders Server Logic (same query parameters, same answers). */
-export function ordersMock({ method, query = {} }: MockRequest): OrdersPageDto | BlanketOrdersDto | OrderDto | OrderSubmitDto | { notFound: true } {
-  if (method === 'POST') return { so: 'SO-100500' }
+export function ordersMock({ method, query = {}, body }: MockRequest): OrdersPageDto | BlanketOrdersDto | OrderDto | OrderSubmitDto | { notFound: true } {
+  // A credit order is held for the credit team (S3-04); cash is created.
+  if (method === 'POST') return (body as { paymentMethod?: string } | undefined)?.paymentMethod === 'credit' ? { pending: true } : { so: 'SO-100500' }
   if (query.type === 'blanket') {
     if (query.id) return MOCK_BLANKET_ORDERS.find((o) => o.so === query.id) ?? { notFound: true }
     return { orders: MOCK_BLANKET_ORDERS.map(({ lines: _lines, ...summary }) => summary) }

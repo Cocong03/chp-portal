@@ -86,9 +86,9 @@ test('toPayload wraps the form with version 1 and its orderType', () => {
   expect(toPayload(saved)).toEqual({ version: 1, orderType: 'single', form: saved })
 })
 
-test('a draft saved before 2026-10-26: Credit becomes Cash and an old time window becomes 8:00 AM – 5:00 PM', () => {
+test('a draft saved before 2026-10-26: an old time window becomes 8:00 AM – 5:00 PM; Credit is kept', () => {
   const form = fromDraft(payload({ paymentMethod: 'credit', timeWindow: '1:00 – 3:00 PM' }), options, sites)
-  expect(form.paymentMethod).toBe('cash')
+  expect(form.paymentMethod).toBe('credit')
   expect(form.timeWindow).toBe('DAY')
 })
 

@@ -37,8 +37,8 @@ export function fromDraft(payload: DraftPayload, options: OrderOptionsDto, sites
   const site = typeof saved.site === 'string' ? saved.site : ''
   result.site = !sites || sites.some((each) => each.code === site) ? site : ''
   if (!options.plants.some((plant) => plant.code === result.source)) result.source = ''
-  // Cash only until Phase 2; drafts saved before 2026-10-26 hold the wireframe's time windows.
-  if (result.paymentMethod !== 'cash') result.paymentMethod = defaults.paymentMethod
+  // Drafts saved before 2026-10-26 hold the wireframe's time windows.
+  if (result.paymentMethod !== 'cash' && result.paymentMethod !== 'credit') result.paymentMethod = defaults.paymentMethod
   if (!TIME_WINDOWS.some((window) => window.value === result.timeWindow)) result.timeWindow = defaults.timeWindow
   if (result.shipmentMethod !== 'pickup' && result.shipmentMethod !== 'delivery') result.shipmentMethod = defaults.shipmentMethod
   return result

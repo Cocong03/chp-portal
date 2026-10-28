@@ -23,7 +23,7 @@ function Field({ id, label, hidden, wide, children }: { id: string; label: strin
 }
 
 /** One select bound to a form field. */
-function Choice({ id, name, items, onPicked }: { id: string; name: 'source' | 'timeWindow' | 'loadingType' | 'paymentMethod'; items: { value: string; label: string; disabled?: boolean }[]; onPicked?: () => void }) {
+function Choice({ id, name, items, onPicked }: { id: string; name: 'source' | 'timeWindow' | 'loadingType' | 'paymentMethod'; items: { value: string; label: string }[]; onPicked?: () => void }) {
   const { control } = useFormContext<NewOrderForm>()
   return (
     <Controller
@@ -42,7 +42,7 @@ function Choice({ id, name, items, onPicked }: { id: string; name: 'source' | 't
           </SelectTrigger>
           <SelectContent>
             {items.map((item) => (
-              <SelectItem key={item.value} value={item.value} disabled={item.disabled}>
+              <SelectItem key={item.value} value={item.value}>
                 {item.label}
               </SelectItem>
             ))}
@@ -119,8 +119,7 @@ export function FulfillmentCard({ options }: { options: OrderOptionsDto }) {
             name="paymentMethod"
             items={[
               { value: 'cash', label: 'Cash' },
-              // Phase 2 (decided 2026-10-26).
-              { value: 'credit', label: 'Credit', disabled: true },
+              { value: 'credit', label: 'Credit' },
             ]}
           />
         </Field>

@@ -128,7 +128,7 @@ function OrderForm({
     onError: () => toast.error("We couldn't save this draft. Please try again."),
   })
 
-  // S3-10: BC prices the order again and creates it; on success the draft it came from is removed.
+  // S3-10/S3-04: BC prices the order again and creates it (or the credit team gets it); either way the draft it came from is removed.
   const removeDraft = useDeleteDraft()
   const submit = useMutation({
     mutationFn: (body: OrderSubmitRequest) => serverLogic<OrderSubmitDto>('orders', { method: 'POST', body }),
@@ -139,9 +139,11 @@ function OrderForm({
         return
       }
       if (draft && draftId) removeDraft.mutate(draftId)
+      // ['orders'] covers ['orders', 'pending'] too.
       void client.invalidateQueries({ queryKey: ['orders'] })
       void client.invalidateQueries({ queryKey: ['dashboard'] })
-      navigate('/orders', { state: { submitted: answer.so } })
+      if ('pending' in answer) navigate('/orders/pending', { state: { sentForReview: true } })
+      else navigate('/orders', { state: { submitted: answer.so, autoApproved: answer.autoApproved } })
     },
     onError: () => toast.error("We couldn't submit this order. Please try again."),
   })

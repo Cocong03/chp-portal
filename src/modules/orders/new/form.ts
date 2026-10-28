@@ -54,7 +54,6 @@ export function newOrderDefaults(options: OrderOptionsDto, sites: SiteDto[]): Ne
     timeWindow: 'DAY',
     loadingType: LOADING_TYPES[0],
     callBefore: false,
-    // Cash only until Phase 2 (decided 2026-10-26).
     paymentMethod: 'cash',
     instructions: withAutoLine('', LOADING_TYPES[0], false),
     site: defaultSite(sites),
@@ -90,7 +89,7 @@ export function submitRequest(form: NewOrderForm, items: OrderOptionsDto['items'
   if (!request) return null
   return {
     ...request,
-    paymentMethod: 'cash',
+    paymentMethod: form.paymentMethod,
     poRef: form.poRef.trim(),
     pickupDate: form.pickupDate,
     requestedDate: form.requestedDate,

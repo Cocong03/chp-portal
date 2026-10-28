@@ -110,7 +110,12 @@ export function SummaryCards({
             <QueryError onRetry={quote.retry} />
           </div>
         )}
-        {/* Credit orders only (Phase 2): cash orders need no credit approval (decided 2026-10-26). */}
+        {/* Credit orders only (S3-04): cash orders need no credit approval (decided 2026-10-26). Either one sends the order to the credit team. */}
+        {paymentMethod === 'credit' && (credit?.overdue ?? 0) > 0 && (
+          <p className="mt-2 text-[12.5px] font-medium text-warning">
+            ⚠ Your account has a past due balance. You may still submit this order for review by our credit team.
+          </p>
+        )}
         {paymentMethod === 'credit' && priced && available !== null && priced.total > available && (
           <p className="mt-2 text-[12.5px] font-medium text-warning">
             ⚠ This order exceeds your available credit. You may still submit it for review by our credit team.

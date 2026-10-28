@@ -97,8 +97,8 @@ export function OrdersPage() {
   const [viewing, setViewing] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const queryClient = useQueryClient();
-  // Set by New Order after Submit (S3-10).
-  const submitted = (useLocation().state as { submitted?: string } | null)?.submitted;
+  // Set by New Order after Submit (S3-10); autoApproved: a credit order BC released within credit (S3-04).
+  const { submitted, autoApproved } = (useLocation().state as { submitted?: string; autoApproved?: boolean } | null) ?? {};
 
   // S3-14: every order matching the filters (all=true), not just this page.
   async function exportOrders() {
@@ -160,7 +160,7 @@ export function OrdersPage() {
       </PageHeader>
       {submitted && (
         <p role="status" className="mb-3.5 flex items-center gap-1.5 text-[12.5px] font-semibold text-success">
-          {submitted} was submitted.
+          {autoApproved ? `${submitted} was auto-approved — within available credit, no past due balance.` : `${submitted} was submitted.`}
           {/* The list is reloading from BC to show it. */}
           {orders.isFetching && <LoaderCircle aria-label="Updating your orders" className="size-3.5 animate-spin" />}
         </p>

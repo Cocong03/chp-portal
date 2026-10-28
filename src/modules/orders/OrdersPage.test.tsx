@@ -186,3 +186,12 @@ test('a failed export says so and the button works again', async () => {
   expect(XLSX.writeFile).not.toHaveBeenCalled()
   await waitFor(() => expect(screen.getByRole('button', { name: /CSV \/ Excel/ })).toBeEnabled())
 })
+
+test('after Submit, the note says the order was submitted, or auto-approved for a credit order BC released', async () => {
+  const { unmount } = renderApp(<OrdersPage />, { route: { pathname: '/orders', state: { submitted: 'SOR000000030' } } })
+  expect(await screen.findByText('SOR000000030 was submitted.')).toBeInTheDocument()
+  unmount()
+  renderApp(<OrdersPage />, { route: { pathname: '/orders', state: { submitted: 'SOR000000030', autoApproved: true } } })
+  expect(await screen.findByText('SOR000000030 was auto-approved — within available credit, no past due balance.')).toBeInTheDocument()
+  expect(screen.queryByText('SOR000000030 was submitted.')).not.toBeInTheDocument()
+})
