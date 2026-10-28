@@ -44,8 +44,11 @@ function fakeServer({
   archiveLines = [ARCHIVE_LINE] as unknown[],
   liveNos = undefined as string[] | undefined,
   bcDown = false,
+  credits = [] as unknown[],
+  noAccess = false,
 } = {}) {
   const http: string[] = []
+  const reads: { set: string; query: string }[] = []
   const server = {
     User: { contactid: 'c-1' },
     Context: { ServerLogicName: 'orders', QueryParameters: query, Body: '' },
@@ -53,6 +56,10 @@ function fakeServer({
     Logger: { Log() {}, Error() {}, Warn() {} },
     Connector: {
       Dataverse: {
+        RetrieveMultipleRecords: (set: string, query: string) => {
+          reads.push({ set, query })
+          return JSON.stringify({ value: credits })
+        },
         RetrieveRecord: () => ({
           contactid: 'c-1', emailaddress1: 'buyer@808.ph',
           parentcustomerid_account: { accountid: 'acc-2', name: '808 TRADING', chp_bccustomerno: 'C00000002', chp_bccompanyid: 'co-1' },
@@ -63,7 +70,7 @@ function fakeServer({
         GetAsync: async (url: string) => {
           const plain = decodeURIComponent(url)
           http.push(plain)
-          if (plain.includes('/MCRMContacts')) return ok({ value: [{ companyNo: 'CT1' }] })
+          if (plain.includes('/MCRMContacts')) return ok({ value: noAccess ? [] : [{ companyNo: 'CT1' }] })
           if (plain.includes('/mcrmBusinessRelation')) return ok({ value: [{ vendorNo: 'C00000002' }] })
           if (bcDown) return JSON.stringify({ StatusCode: 503, IsSuccessStatusCode: false, ReasonPhrase: 'Service Unavailable', Body: '' })
           if (plain.includes('/chpSalesOrderLines')) return ok({ value: lines })
@@ -82,7 +89,7 @@ function fakeServer({
       },
     },
   }
-  return { server, http }
+  return { server, http, reads }
 }
 
 const SAFE = "We couldn't load this information. Please try again."
@@ -453,4 +460,29 @@ test('blanket detail escapes quotes in the id', async () => {
   const { server, http } = fakeServer({ query: { type: 'blanket', id: "B'1" }, orders: [] })
   await load(server).get()
   expect(orderCalls(http)[0]).toContain(`salesOrderNo eq 'B''1' and ${BLANKET_BASE}`)
+})
+
+const CREDITS = [
+  { chp_creditapprovalid: 'r-2', createdon: '2026-10-28T03:00:00Z', chp_poref: 'PO-8902', chp_site: 'PLANT3', chp_estimatedtotal: 215000, chp_status: 775000000, chp_reason: 'Account has a past due balance', chp_comment: null },
+  { chp_creditapprovalid: 'r-1', createdon: '2026-10-27T03:00:00Z', chp_poref: null, chp_site: '65072350', chp_estimatedtotal: 76500, chp_status: 775000002, chp_reason: 'Order exceeds available credit', chp_comment: 'Please settle the past due first.' },
+]
+
+test('pending: the session account held and declined orders, labelled, newest first', async () => {
+  const { server, reads } = fakeServer({ query: { view: 'pending' }, credits: CREDITS })
+  expect(JSON.parse(await load(server).get())).toEqual([
+    { id: 'r-2', submitted: '2026-10-28T03:00:00Z', po: 'PO-8902', site: 'PLANT3', est: 215000, status: 'Awaiting credit approval', reason: 'Account has a past due balance', comment: '' },
+    { id: 'r-1', submitted: '2026-10-27T03:00:00Z', po: '', site: '65072350', est: 76500, status: 'Declined', reason: 'Order exceeds available credit', comment: 'Please settle the past due first.' },
+  ])
+  expect(reads[0].set).toBe('chp_creditapprovals')
+  expect(reads[0].query).toContain('_chp_account_value eq acc-2')
+  expect(reads[0].query).toContain('chp_status ne 775000001')
+  expect(reads[0].query).toContain('$orderby=createdon desc')
+})
+
+test('pending: never reads BC orders, and a blocked contact gets {blocked}', async () => {
+  const ok1 = fakeServer({ query: { view: 'pending' }, credits: CREDITS })
+  await load(ok1.server).get()
+  expect(orderCalls(ok1.http)).toEqual([])
+  const blocked = fakeServer({ query: { view: 'pending' }, credits: CREDITS, noAccess: true })
+  expect(JSON.parse(await load(blocked.server).get())).toEqual({ blocked: true })
 })

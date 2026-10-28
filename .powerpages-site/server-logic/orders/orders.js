@@ -593,9 +593,36 @@ async function get() {
         return withLines(order, lines, id);
     }
 
+    // The Pending Approval tab: this account's credit orders held for the credit team or declined (Approved ones are in BC).
+    // Only the session's account GUID and fixed status numbers go in the filter.
+    function pendingList(scope) {
+        var result = parseResult(
+            Server.Connector.Dataverse.RetrieveMultipleRecords(
+                "chp_creditapprovals",
+                "$select=chp_creditapprovalid,createdon,chp_poref,chp_site,chp_estimatedtotal,chp_status,chp_reason,chp_comment&$filter=_chp_account_value eq " +
+                    scope.accountId + " and chp_status ne 775000001&$orderby=createdon desc",
+                true
+            ),
+            "dataverse"
+        );
+        return ((result && result.value) || []).map((row) => ({
+            id: row.chp_creditapprovalid,
+            submitted: row.createdon,
+            po: row.chp_poref || "",
+            site: row.chp_site || "",
+            est: Number(row.chp_estimatedtotal) || 0,
+            status: row.chp_status === 775000002 ? "Declined" : "Awaiting credit approval",
+            reason: row.chp_reason || "",
+            comment: row.chp_comment || ""
+        }));
+    }
+
     Server.Logger.Log("orders GET called");
     return respond(() => scopedRead(async (scope) => {
         var id = param("id");
+        if (param("view") === "pending") {
+            return pendingList(scope);
+        }
         if (param("type") === "blanket") {
             return id ? blanketDetail(scope, id) : blanketList(scope);
         }
