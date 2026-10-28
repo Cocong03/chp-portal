@@ -35,11 +35,11 @@ const SENT = 775000001
 const FAILED = 775000002
 
 const FLOWS = [
-  { flow: 'request', file: 'request_send_flow.json', table: 'chp_request', idColumn: 'chp_requestid', neverWritten: ['salesOrder', 'relatedSalesOrder', 'site', 'assignedGroup'] },
-  { flow: 'complaint', file: 'complaint_send_flow.json', table: 'chp_complaint', idColumn: 'chp_complaintid', neverWritten: ['relatedOrder', 'salesOrder', 'site', 'assignedGroup'] },
+  { flow: 'request', file: 'request_send_flow.json', table: 'chp_request', idColumn: 'chp_requestid', neverWritten: ['salesOrder', 'relatedSalesOrder', 'site', 'assignedGroup'], typeKeys: ['category', 'requestType'] },
+  { flow: 'complaint', file: 'complaint_send_flow.json', table: 'chp_complaint', idColumn: 'chp_complaintid', neverWritten: ['relatedOrder', 'salesOrder', 'site', 'assignedGroup'], typeKeys: ['category', 'complaintType'] },
 ]
 
-describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritten }) => {
+describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritten, typeKeys }) => {
   const http = (definition: any) => allActions(definition.actions).filter(([, a]) => a.type === 'Http')
   const graphql = (definition: any) => http(definition).filter(([, a]) => typeof a.inputs.body?.query === 'string')
 
@@ -94,11 +94,20 @@ describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritt
     expect(query).toContain('file: $file')
   })
 
-  test('never creates labels on CHP\'s boards, and never writes the dropdown or formula columns', () => {
-    const definition = load(file)
-    const text = JSON.stringify(definition)
-    expect(text).not.toContain('create_labels_if_missing')
+  test('never writes the order, site or formula columns', () => {
+    const text = JSON.stringify(load(file))
     for (const key of neverWritten) expect(text).not.toContain(`['${key}']`)
+  })
+
+  test('category and type go to dropdown columns, adding a label monday does not list yet', () => {
+    // CHP moved Category / Request Type to dropdowns that lack some portal values; the user chose auto-added labels (2026-10-28).
+    const definition = load(file)
+    const rows = findAction(definition.actions, 'Row_columns').inputs as { id: string; value: unknown }[]
+    for (const key of typeKeys) {
+      const row = rows.find((r) => r.id === `@outputs('Columns')?['${key}']?['id']`)!
+      expect(row.value, key).toEqual({ labels: [expect.stringContaining('body/chp_')] })
+    }
+    expect(findAction(definition.actions, 'Create_item').inputs.body.query).toContain('create_labels_if_missing: true')
   })
 
   test('looks for an existing item with the same reference before creating one', () => {
@@ -113,7 +122,7 @@ describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritt
     expect(findAction(branch.actions, 'Create_item')).toBeUndefined()
     expect(findAction(branch.else.actions, 'Create_item')).toBeDefined()
     expect(findAction(definition.actions, 'Create_item').inputs.body.query).toBe(
-      'mutation ($board: ID!, $group: String!, $name: String!, $values: JSON!) { create_item(board_id: $board, group_id: $group, item_name: $name, column_values: $values) { id } }',
+      'mutation ($board: ID!, $group: String!, $name: String!, $values: JSON!) { create_item(board_id: $board, group_id: $group, item_name: $name, column_values: $values, create_labels_if_missing: true) { id } }',
     )
   })
 

@@ -485,14 +485,18 @@
                     "id": "@outputs('Columns')?['category']?['id']",
                     "raw": "@{outputs('Get_request')?['body/chp_category']}",
                     "value": {
-                      "label": "@{outputs('Get_request')?['body/chp_category']}"
+                      "labels": [
+                        "@{outputs('Get_request')?['body/chp_category']}"
+                      ]
                     }
                   },
                   {
                     "id": "@outputs('Columns')?['requestType']?['id']",
                     "raw": "@{outputs('Get_request')?['body/chp_requesttype']}",
                     "value": {
-                      "label": "@{outputs('Get_request')?['body/chp_requesttype']}"
+                      "labels": [
+                        "@{outputs('Get_request')?['body/chp_requesttype']}"
+                      ]
                     }
                   },
                   {
@@ -618,7 +622,7 @@
                     "Content-Type": "application/json"
                   },
                   "body": {
-                    "query": "mutation ($board: ID!, $group: String!, $name: String!, $values: JSON!) { create_item(board_id: $board, group_id: $group, item_name: $name, column_values: $values) { id } }",
+                    "query": "mutation ($board: ID!, $group: String!, $name: String!, $values: JSON!) { create_item(board_id: $board, group_id: $group, item_name: $name, column_values: $values, create_labels_if_missing: true) { id } }",
                     "variables": {
                       "board": "@parameters('monday.com Requests board ID (chp_MondayRequestsBoardId)')",
                       "group": "@if(empty(body('Matching_group')), first(first(body('Find_existing_item')?['data']?['boards'])?['groups'])?['id'], first(body('Matching_group'))?['id'])",
