@@ -36,7 +36,7 @@ FLOWS = [
      'and re-sends Failed or stuck Pending rows by bumping chp_syncattempts. S4-07. shortcut: re-sends every hour without '
      'a cap; add a max-attempts stop if ops see repeat failures.'),
     ('WEBHOOK', 'Concreat Connect – Service center status webhook', 'service_webhook_flow.json',
-     'Called by the monday.com boards\' webhooks when a column changes: re-reads that one item from monday and writes its '
+     'Called by the monday.com boards\' webhooks when the status column changes: re-reads that one item from monday and writes its '
      'status back to Dataverse in real time. S4-07. The trigger URL is the secret; monday_webhooks.py registers it.'),
 ]
 

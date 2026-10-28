@@ -2,11 +2,13 @@
 Runs ONLY against org1945492c, after `requests_flows.py --only WEBHOOK` has created the flow.
 
 The flow's trigger URL carries its own signature, so it is a secret like the token: both are read in memory and never
-printed. Each board gets one `change_column_value` webhook; the flow re-reads the item, so only real status reaches Dataverse.
+printed. Each board gets one `change_specific_column_value` webhook on its status column (from the column map env var), so
+other column edits don't run the flow; the flow re-reads the item, so only real status reaches Dataverse.
 
 Usage (from the repo root; .env or the shell holds DATAVERSE_URL=https://org1945492c.crm.dynamics.com):
     CHP_SOLUTION=ConcreatHubRequests python scripts/dataverse/monday_webhooks.py
 """
+import json
 import os
 import sys
 
@@ -24,7 +26,7 @@ assert SOLUTION == 'ConcreatHubRequests', 'set CHP_SOLUTION=ConcreatHubRequests'
 
 WEBHOOK_FLOW = 'Concreat Connect – Service center status webhook'  # as named in requests_flows.py
 TRIGGER = 'monday_webhook'
-EVENT = 'change_column_value'
+EVENT = 'change_specific_column_value'
 dv = Dataverse()
 
 
@@ -60,14 +62,19 @@ def gql(query, variables):
     return answer['data']
 
 
-for schema in ('chp_MondayRequestsBoardId', 'chp_MondayComplaintsBoardId'):
+for schema, columns in (('chp_MondayRequestsBoardId', 'chp_MondayRequestsColumns'),
+                        ('chp_MondayComplaintsBoardId', 'chp_MondayComplaintsColumns')):
     board = env_value(schema)
+    config = {'columnId': json.loads(env_value(columns))['status']['id']}
     hooks = gql('query ($b: ID!) { webhooks(board_id: $b) { id event config } }', {'b': board})['webhooks']
-    # The URL is not returned by monday, so an existing hook of this event is taken as ours; delete it in monday to re-register.
-    mine = [h for h in hooks if h['event'] == EVENT]
+    # The URL is not returned by monday, so an existing hook of this event on the status column is taken as ours;
+    # delete it in monday to re-register.
+    # monday returns config as a Ruby-style hash ('{"columnId" => "status"}'), not JSON, so match the quoted id.
+    mine = [h for h in hooks if h['event'] == EVENT and f'"{config["columnId"]}"' in (h.get('config') or '')]
     if mine:
         print(f'= {schema} {board}: webhook {mine[0]["id"]} already registered')
         continue
-    created = gql('mutation ($b: ID!, $u: String!) { create_webhook(board_id: $b, url: $u, event: change_column_value) { id } }',
-                  {'b': board, 'u': url})['create_webhook']
-    print(f'+ {schema} {board}: webhook {created["id"]}')
+    created = gql('mutation ($b: ID!, $u: String!, $c: JSON!) '
+                  '{ create_webhook(board_id: $b, url: $u, event: change_specific_column_value, config: $c) { id } }',
+                  {'b': board, 'u': url, 'c': json.dumps(config)})['create_webhook']
+    print(f'+ {schema} {board}: webhook {created["id"]} on column {config["columnId"]}')
