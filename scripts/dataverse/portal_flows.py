@@ -4,8 +4,9 @@ Each flow's definition is the JSON file named in FLOWS (next to this file). Envi
 the ConcreatHub environment variables at run time; the definitions hold none of them.
 
 Usage (from the repo root):
-  python scripts/dataverse/portal_flows.py [--outlook-connection <connection name>] [--only <key>]
---outlook-connection is needed only the first time, to create the chp_outlook connection reference.
+  python scripts/dataverse/portal_flows.py [--outlook-connection <name>] [--approvals-connection <name>] [--only <key>]
+--outlook-connection and --approvals-connection are needed only the first time, to create the chp_outlook and
+chp_approvals connection references.
 """
 import argparse
 import json
@@ -19,6 +20,7 @@ SOLUTION_ID = 'ed4d4ea0-74bd-f111-aaad-7ced8dfe9114'
 REFS = {
     'shared_commondataserviceforapps': ('chp_dataverse', 'Concreat Hub – Dataverse'),
     'shared_office365': ('chp_outlook', 'Concreat Hub – Office 365 Outlook'),
+    'shared_approvals': ('chp_approvals', 'Concreat Hub – Approvals'),
 }
 FLOWS = [
     # (key, name, definition file, description)
@@ -28,27 +30,33 @@ FLOWS = [
      'Tells the Set password page whether an activation link is still valid (valid | invalid). S1-03.'),
     ('PASSWORD_RESET', 'Concreat Connect – Send password reset', 'password_reset_flow.json',
      "Delivers Power Pages' password reset email as a branded Outlook email. S1-03."),
+    ('CREDIT_APPROVAL', 'Concreat Connect – Credit approval', 'credit_approval_flow.json',
+     'Credit orders held by the portal: Outlook approval by the credit team, BC order on Approve. S3-04.'),
 ]
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--outlook-connection', help='Office 365 Outlook connection name')
+parser.add_argument('--approvals-connection', help='Approvals connection name')
 parser.add_argument('--only', help='deploy only this flow key, e.g. CHECK_LINK')
 args = parser.parse_args()
 
 dv = Dataverse()
 here = os.path.dirname(__file__)
 
+CONNECTION_ARGS = {'shared_office365': ('outlook_connection', '--outlook-connection'),
+                   'shared_approvals': ('approvals_connection', '--approvals-connection')}
 for api, (ref, display) in REFS.items():
+    arg, flag = CONNECTION_ARGS.get(api, (None, None))
     if dv.get(f"connectionreferences?$select=connectionreferenceid&$filter=connectionreferencelogicalname eq '{ref}'")['value']:
         print(f'= connection reference {ref} exists')
-    elif api == 'shared_office365' and args.outlook_connection:
+    elif arg and getattr(args, arg):
         dv.post('connectionreferences', {'connectionreferencelogicalname': ref, 'connectionreferencedisplayname': display,
                                          'connectorid': f'/providers/Microsoft.PowerApps/apis/{api}',
-                                         'connectionid': args.outlook_connection})
+                                         'connectionid': getattr(args, arg)})
         print(f'+ connection reference {ref}')
     else:
         raise SystemExit(f'connection reference {ref} is missing' +
-                         (' — pass --outlook-connection <name>' if api == 'shared_office365' else ' — run grant_flow.py first'))
+                         (f' — pass {flag} <name>' if flag else ' — run grant_flow.py first'))
 
 clientrefs = {api: {'runtimeSource': 'embedded', 'connection': {'connectionReferenceLogicalName': ref}, 'api': {'name': api}}
               for api, (ref, _) in REFS.items()}

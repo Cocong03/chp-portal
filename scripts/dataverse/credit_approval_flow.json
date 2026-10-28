@@ -1,0 +1,412 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "BC Tenant ID (chp_BCTenantId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCTenantId",
+        "description": "BC Tenant ID"
+      }
+    },
+    "BC Environment Name (chp_BCEnvironmentName)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCEnvironmentName",
+        "description": "BC Environment Name"
+      }
+    },
+    "BC API Base Path (chp_BCApiBasePath)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCApiBasePath",
+        "description": "BC API Base Path"
+      }
+    },
+    "BC Client ID (chp_BCClientId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCClientId",
+        "description": "BC Client ID"
+      }
+    },
+    "BC Client Secret (chp_BCClientSecret)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_BCClientSecret",
+        "description": "BC Client Secret"
+      }
+    },
+    "Sender Mailbox (chp_SenderMailbox)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_SenderMailbox",
+        "description": "Sender Mailbox"
+      }
+    },
+    "Credit Approval Group (chp_CreditApprovalGroup)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_CreditApprovalGroup",
+        "description": "Credit Approval Group"
+      }
+    }
+  },
+  "triggers": {
+    "When_a_credit_approval_is_added": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "SubscribeWebhookTrigger",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 1,
+          "subscriptionRequest/entityname": "chp_creditapproval",
+          "subscriptionRequest/scope": 4
+        },
+        "authentication": "@parameters('$authentication')"
+      }
+    }
+  },
+  "actions": {
+    "Payload": {
+      "type": "Compose",
+      "inputs": "@json(triggerOutputs()?['body/chp_payload'])",
+      "runAfter": {}
+    },
+    "Get_contact": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "contacts",
+          "recordId": "@triggerOutputs()?['body/_chp_contact_value']",
+          "$select": "fullname,emailaddress1"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Payload": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Get_account": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "accounts",
+          "recordId": "@triggerOutputs()?['body/_chp_account_value']",
+          "$select": "name,chp_bccompanyname"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Get_contact": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Line_rows": {
+      "type": "Select",
+      "inputs": {
+        "from": "@outputs('Payload')?['lines']",
+        "select": "@concat('| ', item()?['code'], ' | ', string(item()?['qty']), ' | ', item()?['uom'], ' | ₱', formatNumber(item()?['unitPrice'], 'N2', 'en-US'), ' | ₱', formatNumber(item()?['amount'], 'N2', 'en-US'), ' |')"
+      },
+      "runAfter": {
+        "Get_account": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Start_and_wait_for_an_approval": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_approvals",
+          "operationId": "StartAndWaitForAnApproval",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_approvals"
+        },
+        "parameters": {
+          "approvalType": "Basic",
+          "WebhookApprovalCreationInput/title": "Credit approval: @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) — ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}",
+          "WebhookApprovalCreationInput/assignedTo": "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
+          "WebhookApprovalCreationInput/details": "- **Company:** @{outputs('Get_account')?['body/chp_bccompanyname']} (@{outputs('Payload')?['companyId']})\n- **Customer:** @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']})\n- **Submitted by:** @{outputs('Get_contact')?['body/fullname']} (@{outputs('Get_contact')?['body/emailaddress1']})\n- **PO ref:** @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}\n- **Shipment method:** @{if(equals(outputs('Payload')?['salesOrder']?['shipmentMethodCode'], 'DELIVERY'), 'Delivery', 'Pick up')}\n- **@{if(equals(outputs('Payload')?['salesOrder']?['shipmentMethodCode'], 'DELIVERY'), 'Delivery site', 'Pick-up plant')}:** @{triggerOutputs()?['body/chp_site']}\n- **@{if(equals(outputs('Payload')?['salesOrder']?['shipmentMethodCode'], 'DELIVERY'), 'Requested delivery date', 'Pick-up date')}:** @{coalesce(outputs('Payload')?['salesOrder']?['requestDeliveryDate'], outputs('Payload')?['salesOrder']?['shipmentDate'], '—')}\n\n| Item | Qty | UOM | Unit price | Amount |\n|---|---:|---|---:|---:|\n@{join(body('Line_rows'), decodeUriComponent('%0A'))}\n\n- **Estimated total:** ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}\n- **Available credit at submit:** ₱@{formatNumber(triggerOutputs()?['body/chp_availablecredit'], 'N2', 'en-US')}\n- **Overdue at submit:** ₱@{formatNumber(triggerOutputs()?['body/chp_overdueamount'], 'N2', 'en-US')}\n- **Reason:** @{triggerOutputs()?['body/chp_reason']}",
+          "WebhookApprovalCreationInput/enableNotifications": true
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Line_rows": [
+          "Succeeded"
+        ]
+      }
+    },
+    "First_response": {
+      "type": "Compose",
+      "inputs": "@first(outputs('Start_and_wait_for_an_approval')?['body/responses'])",
+      "runAfter": {
+        "Start_and_wait_for_an_approval": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Approved": {
+      "type": "If",
+      "expression": {
+        "equals": [
+          "@outputs('Start_and_wait_for_an_approval')?['body/outcome']",
+          "Approve"
+        ]
+      },
+      "actions": {
+        "Set_status_Approved": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "chp_creditapprovals",
+              "recordId": "@triggerOutputs()?['body/chp_creditapprovalid']",
+              "item/chp_status": 775000001,
+              "item/chp_approvername": "@{outputs('First_response')?['responder']?['displayName']}",
+              "item/chp_approveremail": "@{outputs('First_response')?['responder']?['email']}",
+              "item/chp_comment": "@{outputs('First_response')?['comments']}",
+              "item/chp_decidedon": "@outputs('Start_and_wait_for_an_approval')?['body/completionDate']"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {}
+        },
+        "Get_credit_approval": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "GetItem",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "chp_creditapprovals",
+              "recordId": "@triggerOutputs()?['body/chp_creditapprovalid']",
+              "$select": "chp_salesorderno"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Set_status_Approved": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Already_created": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@empty(outputs('Get_credit_approval')?['body/chp_salesorderno'])",
+              false
+            ]
+          },
+          "actions": {
+            "Stop_already_created": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Succeeded"
+              },
+              "runAfter": {}
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Get_credit_approval": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Get_BC_token": {
+          "type": "Http",
+          "inputs": {
+            "method": "POST",
+            "uri": "https://login.microsoftonline.com/@{parameters('BC Tenant ID (chp_BCTenantId)')}/oauth2/v2.0/token",
+            "headers": {
+              "Content-Type": "application/x-www-form-urlencoded"
+            },
+            "body": "grant_type=client_credentials&client_id=@{encodeUriComponent(parameters('BC Client ID (chp_BCClientId)'))}&client_secret=@{encodeUriComponent(parameters('BC Client Secret (chp_BCClientSecret)'))}&scope=@{encodeUriComponent('https://api.businesscentral.dynamics.com/.default')}"
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          },
+          "runAfter": {
+            "Already_created": [
+              "Succeeded"
+            ]
+          }
+        },
+        "BC_api_root": {
+          "type": "Compose",
+          "inputs": "https://api.businesscentral.dynamics.com/v2.0/@{parameters('BC Tenant ID (chp_BCTenantId)')}/@{parameters('BC Environment Name (chp_BCEnvironmentName)')}@{parameters('BC API Base Path (chp_BCApiBasePath)')}/",
+          "runAfter": {
+            "Get_BC_token": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Create_BC_order": {
+          "type": "Http",
+          "inputs": {
+            "method": "POST",
+            "uri": "@{outputs('BC_api_root')}companies(@{outputs('Payload')?['companyId']})/mcrmSalesOrders",
+            "headers": {
+              "Authorization": "Bearer @{body('Get_BC_token')?['access_token']}",
+              "Accept": "application/json",
+              "Content-Type": "application/json"
+            },
+            "body": "@outputs('Payload')?['salesOrder']",
+            "retryPolicy": {
+              "type": "none"
+            }
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs"
+              ]
+            }
+          },
+          "runAfter": {
+            "BC_api_root": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Save_SO_number": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+            },
+            "parameters": {
+              "entityName": "chp_creditapprovals",
+              "recordId": "@triggerOutputs()?['body/chp_creditapprovalid']",
+              "item/chp_salesorderno": "@{body('Create_BC_order')?['salesOrderNo']}"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Create_BC_order": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Email_credit_team": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "emailMessage/From": "@{parameters('Sender Mailbox (chp_SenderMailbox)')}",
+              "emailMessage/To": "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
+              "emailMessage/Subject": "Approved credit order couldn't be created in Business Central",
+              "emailMessage/Body": "<p>Approved order for @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) couldn't be created in Business Central.</p><p>PO ref: @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}<br>Estimated total: ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}<br>Approved by: @{outputs('First_response')?['responder']?['displayName']}</p><p>Business Central error: @{coalesce(body('Create_BC_order')?['error']?['message'], actions('Create_BC_order')?['error']?['message'], 'no response')}</p><p>Please create it in Business Central.</p>",
+              "emailMessage/Importance": "High"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Create_BC_order": [
+              "Failed",
+              "TimedOut"
+            ]
+          }
+        },
+        "Stop_BC_failed": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "BCOrderNotCreated",
+              "message": "The approved credit order couldn't be created in Business Central. The credit team was emailed."
+            }
+          },
+          "runAfter": {
+            "Email_credit_team": [
+              "Succeeded"
+            ]
+          }
+        }
+      },
+      "else": {
+        "actions": {
+          "Set_status_Declined": {
+            "type": "OpenApiConnection",
+            "inputs": {
+              "host": {
+                "connectionName": "shared_commondataserviceforapps",
+                "operationId": "UpdateOnlyRecord",
+                "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+              },
+              "parameters": {
+                "entityName": "chp_creditapprovals",
+                "recordId": "@triggerOutputs()?['body/chp_creditapprovalid']",
+                "item/chp_status": 775000002,
+                "item/chp_approvername": "@{outputs('First_response')?['responder']?['displayName']}",
+                "item/chp_approveremail": "@{outputs('First_response')?['responder']?['email']}",
+                "item/chp_comment": "@{outputs('First_response')?['comments']}",
+                "item/chp_decidedon": "@outputs('Start_and_wait_for_an_approval')?['body/completionDate']"
+              },
+              "authentication": "@parameters('$authentication')"
+            },
+            "runAfter": {}
+          }
+        }
+      },
+      "runAfter": {
+        "First_response": [
+          "Succeeded"
+        ]
+      }
+    }
+  },
+  "outputs": {}
+}
