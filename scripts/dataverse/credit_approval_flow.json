@@ -137,6 +137,63 @@
         ]
       }
     },
+    "Get_status_before_approval": {
+      "type": "OpenApiConnection",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "operationId": "GetItem",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps"
+        },
+        "parameters": {
+          "entityName": "chp_creditapprovals",
+          "recordId": "@triggerOutputs()?['body/chp_creditapprovalid']",
+          "$select": "chp_status,chp_salesorderno"
+        },
+        "authentication": "@parameters('$authentication')"
+      },
+      "runAfter": {
+        "Line_rows": [
+          "Succeeded"
+        ]
+      }
+    },
+    "Still_awaiting": {
+      "type": "If",
+      "expression": {
+        "and": [
+          {
+            "equals": [
+              "@outputs('Get_status_before_approval')?['body/chp_status']",
+              775000000
+            ]
+          },
+          {
+            "equals": [
+              "@empty(outputs('Get_status_before_approval')?['body/chp_salesorderno'])",
+              true
+            ]
+          }
+        ]
+      },
+      "actions": {},
+      "else": {
+        "actions": {
+          "Stop_already_decided": {
+            "type": "Terminate",
+            "inputs": {
+              "runStatus": "Succeeded"
+            },
+            "runAfter": {}
+          }
+        }
+      },
+      "runAfter": {
+        "Get_status_before_approval": [
+          "Succeeded"
+        ]
+      }
+    },
     "Start_and_wait_for_an_approval": {
       "type": "OpenApiConnectionWebhook",
       "inputs": {
@@ -155,7 +212,7 @@
         "authentication": "@parameters('$authentication')"
       },
       "runAfter": {
-        "Line_rows": [
+        "Still_awaiting": [
           "Succeeded"
         ]
       }
@@ -307,6 +364,58 @@
             ]
           }
         },
+        "No_SO_number": {
+          "type": "If",
+          "expression": {
+            "equals": [
+              "@empty(body('Create_BC_order')?['salesOrderNo'])",
+              true
+            ]
+          },
+          "actions": {
+            "Email_no_SO_number": {
+              "type": "OpenApiConnection",
+              "inputs": {
+                "host": {
+                  "connectionName": "shared_office365",
+                  "operationId": "SendEmailV2",
+                  "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+                },
+                "parameters": {
+                  "emailMessage/To": "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
+                  "emailMessage/Subject": "Approved credit order: Business Central answered without an order number",
+                  "emailMessage/Body": "<p>Business Central answered the approved order for @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) without an order number.</p><p>PO ref: @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}<br>Estimated total: ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}<br>Approved by: @{outputs('First_response')?['responder']?['displayName']}</p><p>Check Business Central for this order before creating it.</p>",
+                  "emailMessage/Importance": "High"
+                },
+                "authentication": "@parameters('$authentication')"
+              },
+              "runAfter": {}
+            },
+            "Stop_no_SO_number": {
+              "type": "Terminate",
+              "inputs": {
+                "runStatus": "Failed",
+                "runError": {
+                  "code": "BCOrderNoNumber",
+                  "message": "Business Central answered the approved credit order without an order number. The credit team was emailed."
+                }
+              },
+              "runAfter": {
+                "Email_no_SO_number": [
+                  "Succeeded"
+                ]
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "runAfter": {
+            "Create_BC_order": [
+              "Succeeded"
+            ]
+          }
+        },
         "Save_SO_number": {
           "type": "OpenApiConnection",
           "inputs": {
@@ -323,7 +432,45 @@
             "authentication": "@parameters('$authentication')"
           },
           "runAfter": {
-            "Create_BC_order": [
+            "No_SO_number": [
+              "Succeeded"
+            ]
+          }
+        },
+        "Email_SO_not_saved": {
+          "type": "OpenApiConnection",
+          "inputs": {
+            "host": {
+              "connectionName": "shared_office365",
+              "operationId": "SendEmailV2",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_office365"
+            },
+            "parameters": {
+              "emailMessage/To": "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
+              "emailMessage/Subject": "Approved credit order created in Business Central but not recorded in the portal",
+              "emailMessage/Body": "<p>Approved order for @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) was created in Business Central as @{body('Create_BC_order')?['salesOrderNo']}, but the portal couldn't record it.</p><p>PO ref: @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}<br>Estimated total: ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}<br>Approved by: @{outputs('First_response')?['responder']?['displayName']}</p><p>Do not create it again.</p>",
+              "emailMessage/Importance": "High"
+            },
+            "authentication": "@parameters('$authentication')"
+          },
+          "runAfter": {
+            "Save_SO_number": [
+              "Failed",
+              "TimedOut"
+            ]
+          }
+        },
+        "Stop_SO_not_saved": {
+          "type": "Terminate",
+          "inputs": {
+            "runStatus": "Failed",
+            "runError": {
+              "code": "SONumberNotSaved",
+              "message": "The approved credit order was created in Business Central but its number couldn't be saved on the row. The credit team was emailed."
+            }
+          },
+          "runAfter": {
+            "Email_SO_not_saved": [
               "Succeeded"
             ]
           }
@@ -339,7 +486,7 @@
             "parameters": {
               "emailMessage/To": "@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}",
               "emailMessage/Subject": "Approved credit order couldn't be created in Business Central",
-              "emailMessage/Body": "<p>Approved order for @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) couldn't be created in Business Central.</p><p>PO ref: @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}<br>Estimated total: ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}<br>Approved by: @{outputs('First_response')?['responder']?['displayName']}</p><p>Business Central error: @{coalesce(body('Create_BC_order')?['error']?['message'], actions('Create_BC_order')?['error']?['message'], 'no response')}</p><p>Please create it in Business Central.</p>",
+              "emailMessage/Body": "<p>Approved order for @{outputs('Get_account')?['body/name']} (@{outputs('Payload')?['salesOrder']?['sellToCustomerNo']}) couldn't be created in Business Central.</p><p>PO ref: @{if(empty(triggerOutputs()?['body/chp_poref']), '—', triggerOutputs()?['body/chp_poref'])}<br>Estimated total: ₱@{formatNumber(triggerOutputs()?['body/chp_estimatedtotal'], 'N2', 'en-US')}<br>Approved by: @{outputs('First_response')?['responder']?['displayName']}</p><p>Business Central error: @{coalesce(body('Create_BC_order')?['error']?['message'], actions('Create_BC_order')?['error']?['message'], 'no response')}</p><p>Check Business Central for this order before creating it.</p>",
               "emailMessage/Importance": "High"
             },
             "authentication": "@parameters('$authentication')"

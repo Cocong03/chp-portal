@@ -43,6 +43,27 @@ test('Approve marks the row Approved before BC; Reject marks it Declined and nev
   expect(JSON.stringify(declined)).not.toContain('Http')
 })
 
+test('a resubmitted run asks the credit team only while the row is Awaiting with no SO number', () => {
+  const read = action('Get_status_before_approval')
+  expect(read.inputs.host.operationId).toBe('GetItem')
+  expect(read.inputs.parameters).toMatchObject({
+    entityName: 'chp_creditapprovals',
+    recordId: "@triggerOutputs()?['body/chp_creditapprovalid']",
+    $select: 'chp_status,chp_salesorderno',
+  })
+  const guard = action('Still_awaiting')
+  expect(guard.runAfter).toEqual({ Get_status_before_approval: ['Succeeded'] })
+  expect(guard.expression).toEqual({
+    and: [
+      { equals: ["@outputs('Get_status_before_approval')?['body/chp_status']", 775000000] },
+      { equals: ["@empty(outputs('Get_status_before_approval')?['body/chp_salesorderno'])", true] },
+    ],
+  })
+  expect(guard.actions).toEqual({})
+  expect(guard.else.actions.Stop_already_decided).toMatchObject({ type: 'Terminate', inputs: { runStatus: 'Succeeded' } })
+  expect(action('Start_and_wait_for_an_approval').runAfter).toEqual({ Still_awaiting: ['Succeeded'] })
+})
+
 test('a resubmitted run stops before BC when the row already has an SO number', () => {
   const guard = action('Already_created')
   expect(guard.runAfter).toEqual({ Get_credit_approval: ['Succeeded'] })
@@ -64,15 +85,42 @@ test('a BC failure emails the credit team and ends the run Failed', () => {
   const mail = action('Email_credit_team')
   expect(mail.runAfter).toEqual({ Create_BC_order: ['Failed', 'TimedOut'] })
   expect(mail.inputs.parameters['emailMessage/Subject']).toBe("Approved credit order couldn't be created in Business Central")
+  // A timeout may still have created the order, so the email never invites a blind re-create.
+  const body = mail.inputs.parameters['emailMessage/Body']
+  expect(body).toContain('Check Business Central for this order before creating it.')
+  expect(body).not.toMatch(/Please create it/)
   expect(action('Stop_BC_failed')).toMatchObject({ type: 'Terminate', inputs: { runStatus: 'Failed' }, runAfter: { Email_credit_team: ['Succeeded'] } })
+})
+
+test('a 2xx answer without an SO number saves nothing, emails the credit team and ends Failed', () => {
+  const check = action('No_SO_number')
+  expect(check.runAfter).toEqual({ Create_BC_order: ['Succeeded'] })
+  expect(check.expression).toEqual({ equals: ["@empty(body('Create_BC_order')?['salesOrderNo'])", true] })
+  const mail = check.actions.Email_no_SO_number
+  expect(mail.inputs.parameters['emailMessage/Body']).toContain('without an order number')
+  expect(mail.inputs.parameters['emailMessage/Body']).toContain('Check Business Central for this order before creating it.')
+  expect(check.actions.Stop_no_SO_number).toMatchObject({ type: 'Terminate', inputs: { runStatus: 'Failed' }, runAfter: { Email_no_SO_number: ['Succeeded'] } })
+  expect(check.else.actions).toEqual({})
+  expect(action('Save_SO_number').runAfter).toEqual({ No_SO_number: ['Succeeded'] })
+})
+
+test('a failed SO number save emails the credit team not to create the order again and ends Failed', () => {
+  const mail = action('Email_SO_not_saved')
+  expect(mail.runAfter).toEqual({ Save_SO_number: ['Failed', 'TimedOut'] })
+  const body = mail.inputs.parameters['emailMessage/Body']
+  expect(body).toContain("created in Business Central as @{body('Create_BC_order')?['salesOrderNo']}, but the portal couldn't record it")
+  expect(body).toContain('Do not create it again.')
+  expect(action('Stop_SO_not_saved')).toMatchObject({ type: 'Terminate', inputs: { runStatus: 'Failed' }, runAfter: { Email_SO_not_saved: ['Succeeded'] } })
 })
 
 test('sends no email to the customer', () => {
   const mails = actions.filter(([, a]) => a.inputs?.host?.operationId === 'SendEmailV2')
-  expect(mails.map(([n]) => n)).toEqual(['Email_credit_team'])
-  expect(mails[0][1].inputs.parameters['emailMessage/To']).toBe("@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}")
-  // Sent as the Outlook connection user, like the other portal flows (controller ruling, fix round 1).
-  expect(mails[0][1].inputs.parameters['emailMessage/From']).toBeUndefined()
+  expect(mails.map(([n]) => n).sort()).toEqual(['Email_SO_not_saved', 'Email_credit_team', 'Email_no_SO_number'])
+  for (const [name, mail] of mails) {
+    expect(mail.inputs.parameters['emailMessage/To'], name).toBe("@{parameters('Credit Approval Group (chp_CreditApprovalGroup)')}")
+    // Sent as the Outlook connection user, like the other portal flows (controller ruling, fix round 1).
+    expect(mail.inputs.parameters['emailMessage/From'], name).toBeUndefined()
+  }
 })
 
 test('hides the client secret and the token from run history', () => {
