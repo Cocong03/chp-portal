@@ -387,7 +387,7 @@ async function get() {
         try {
             var pdf = await bcPost(scope, "portalDocumentPdfs", { customerNo: scope.customerNo, documentType: type, documentNo: no });
             return {
-                fileName: String(pdf.fileName || type + " " + no + ".pdf").replace(/[\/:*?"<>|]/g, "-"),
+                fileName: String(pdf.fileName || type + " " + no + ".pdf").replace(/[\\/:*?"<>|]/g, "-"),
                 contentType: "application/pdf",
                 base64: pdf.pdfBase64
             };

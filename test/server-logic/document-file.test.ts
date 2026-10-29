@@ -118,8 +118,8 @@ test('a lower-case number is upper-cased and accepted', async () => {
 })
 
 test("file names lose characters Windows can't save", async () => {
-  const { server } = fakeServer({ fileName: 'Invoice SPIN/01:"x".pdf' })
-  expect(JSON.parse(await load(server).get()).fileName).toBe('Invoice SPIN-01--x-.pdf')
+  const { server } = fakeServer({ fileName: 'Invoice SPIN/01\\02:"x".pdf' })
+  expect(JSON.parse(await load(server).get()).fileName).toBe('Invoice SPIN-01-02--x-.pdf')
 })
 
 test('BC down → only the customer-safe error', async () => {
