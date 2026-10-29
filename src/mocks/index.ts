@@ -2,6 +2,7 @@ import type { AnnouncementDto, CompanyDto, MeDto, SiteDto } from '@/api/types'
 import { getPortalUser } from '@/auth/session'
 import { dashboardMock } from './dashboard'
 import { draftsMock } from './drafts'
+import { documentFileMock, documentsMock } from './documents'
 import { ledgerMock } from './ledger'
 import { ORDER_OPTIONS_SAMPLE, orderQuoteMock, SOURCE_PLANTS_SAMPLE } from './orderOptions'
 import { ordersMock } from './orders'
@@ -62,6 +63,8 @@ export const mocks: Record<string, ((request: MockRequest) => unknown) | undefin
   }),
   dashboard: dashboardMock,
   drafts: draftsMock,
+  documents: documentsMock,
+  'document-file': documentFileMock,
   ledger: ledgerMock,
   orders: ordersMock,
   requests: requestsMock,

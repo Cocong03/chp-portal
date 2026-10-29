@@ -207,3 +207,31 @@ export interface ComplaintTaxonomyDto { categories: { name: string; types: { typ
 export interface RequestSubmitDto { category: string; requestType: string; contactMethod: ContactMethod; contactValue: string; details: string; additionalInfo: string; fields: Record<string, string>; attachment?: AttachmentDto }
 export interface ComplaintSubmitDto { category: string; complaintType: string; contactMethod: ContactMethod; contactValue: string; incidentDate: string; site: string; relatedOrder: string; subject: string; description: string; consent: boolean; attachment?: AttachmentDto }
 export type SubmitResultDto = { ref: string } | { invalid: true; field: string }
+
+export type DocumentType = 'Invoice' | 'Credit Memo' | 'Acknowledgement Receipt' | 'Delivery Receipt'
+
+export interface DocumentDto {
+  /** A DocumentType, or BC's own name for anything else. */
+  type: string
+  /** Document no. */
+  ref: string
+  soNo: string | null
+  poRef: string | null
+  /** YYYY-MM-DD (posting date) */
+  date: string
+  /** null for Delivery Receipt */
+  amount: number | null
+}
+
+export interface DocumentPageDto {
+  documents: DocumentDto[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface DocumentFileDto {
+  fileName: string
+  contentType: string
+  base64: string
+}
