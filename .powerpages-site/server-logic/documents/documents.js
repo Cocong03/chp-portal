@@ -463,7 +463,7 @@ async function get() {
                         $select: FIELDS,
                         // ponytail: newest 200 per query (as orders); page through BC if a customer's searches ever need more.
                         $orderby: ORDER_BY,
-                        $top: all ? String(EXPORT_CAP) : SEARCH_CAP
+                        $top: SEARCH_CAP
                     })
                 )
             )

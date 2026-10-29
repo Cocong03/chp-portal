@@ -165,6 +165,17 @@ test('all=true returns every match in one answer', async () => {
   expect(call).not.toMatch(/\$skip|\$count/)
 })
 
+test('search with all=true keeps the 200-per-query cap and answers every merged row', async () => {
+  const a = { ...DOC, documentNo: 'SPIN1' }
+  const b = { ...DOC, documentNo: 'SPIN2' }
+  const { server, http } = fakeServer({ query: { q: 'spin', all: 'true' }, search: { "contains(documentNo,'SPIN')": [a, b], "contains(salesOrderNo,'SPIN')": [b] }, docs: [] })
+  const page = JSON.parse(await load(server).get())
+  expect(page).toMatchObject({ total: 2, page: 1, pageSize: 2 })
+  const calls = docCalls(http)
+  expect(calls).toHaveLength(3)
+  for (const c of calls) expect(c).toContain('$top=200')
+})
+
 test('BC down → only the customer-safe error', async () => {
   const { server } = fakeServer({ bcDown: true })
   await expect(load(server).get()).rejects.toThrow(SAFE)
