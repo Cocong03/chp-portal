@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3
+description: 'One posted BC document''s PDF for the signed-in customer, after an ownership check (S2-16)'
+display_name: 'Document file (BC document PDF)'
+id: 247b608b-2dde-4a11-8b96-60c4e6b468e5
+name: document-file

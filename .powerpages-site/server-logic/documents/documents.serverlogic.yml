@@ -1,0 +1,7 @@
+adx_serverlogic_adx_webrole:
+  - 56b29291-b981-4ef0-865b-41c1e9523a97
+  - c60ee1d9-f8e5-4d3d-9e9f-203a5d64e3b3
+description: 'Signed-in customer''s posted BC documents, filtered and paged in BC (S2-16)'
+display_name: 'Documents (BC posted documents)'
+id: 2149bc05-f550-49ca-9cd1-33cd8aa35711
+name: documents
