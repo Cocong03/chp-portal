@@ -17,7 +17,7 @@ const SAMPLE: DraftDto = {
       receivingPerson: 'Ramon Cruz',
       receivingContact: '(02) 8531-4420',
       receivingEmail: '',
-      requestedDate: '2026-10-28',
+      requestedDate: '2099-10-28', // far future: a past date fails New Order's date check
       timeWindow: '7:00 – 9:00 AM',
       loadingType: 'Loose pile',
       callBefore: false,
