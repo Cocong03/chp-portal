@@ -1,10 +1,10 @@
 import { expect, test, type Page } from '@playwright/test'
 import type { OrderSubmitDto } from '../src/api/types'
 import { peso } from '../src/lib/format'
-import { ITEM, PRICED_SOURCE, isSubmit, oneLine, openNewOrder, pickSource, quoteAfter, uomOf } from './newOrder'
+import { ITEM, PRICED_SOURCE, WARNING, isSubmit, oneLine, openNewOrder, pickSource, quoteAfter, row, uomOf } from './newOrder'
 
-// The order journey on the deployed Dev site (S3-07/S3-10): one UOM per order, the instructions' auto line, the Submit
-// confirmation, and (opt-in) a real submit through to Orders and the order's details.
+// The order journey on the deployed Dev site (S3-07/S3-10/S3-04): one UOM per order, the instructions' auto line, Credit's terms, the Submit
+// confirmation, and (opt-in) real cash and credit submits through to Orders or Pending Approval.
 
 test.beforeEach(async ({ page }) => {
   await openNewOrder(page)
@@ -70,9 +70,53 @@ test('Submit asks first with the order total; Cancel sends nothing to BC', async
   await expect(page.getByRole('button', { name: 'Submit for approval' })).toBeEnabled()
 })
 
+test('Credit shows Payment terms instead of Prepayment terms, and Cash brings them back', async ({ page }) => {
+  await choosePayment(page, 'Credit')
+  await expect(page.getByLabel('Payment terms', { exact: true })).toBeVisible()
+  await expect(page.getByLabel('Prepayment terms')).toBeHidden()
+  await choosePayment(page, 'Cash')
+  await expect(page.getByLabel('Prepayment terms')).toBeVisible()
+  await expect(page.getByText(CREDIT_TEAM)).toBeHidden()
+})
+
+async function choosePayment(page: Page, method: 'Cash' | 'Credit') {
+  await page.getByRole('combobox', { name: 'Payment method' }).click()
+  await page.getByRole('option', { name: method, exact: true }).click()
+}
+
+// Both credit warnings end with this; neither shows for Cash.
+const CREDIT_TEAM = /submit (this order|it) for review by our credit team/
+
+/** Submit for approval → the confirmation with BC's total → Submit order. Returns what the browser sent and the server's answer. */
+async function confirmAndSubmit(page: Page, total: number) {
+  await page.getByRole('button', { name: 'Submit for approval' }).click()
+  const dialog = page.getByRole('dialog', { name: 'Submit this order?' })
+  await expect(dialog).toContainText(peso(total))
+  const submitted = page.waitForResponse(isSubmit, { timeout: 60_000 })
+  await dialog.getByRole('button', { name: 'Submit order' }).click()
+  // The spinner shows while BC re-quotes and creates the order (seconds: two BC calls).
+  await expect(page.getByText('Submitting your order…')).toBeVisible()
+  const response = await submitted
+  expect(response.ok()).toBe(true)
+  const envelope = (await response.json()) as { data?: unknown; Data?: unknown }
+  const raw = envelope.data ?? envelope.Data
+  const answer = (typeof raw === 'string' ? JSON.parse(raw) : raw) as OrderSubmitDto
+  return { body: response.request().postDataJSON() as Record<string, unknown>, answer }
+}
+
+/** Orders: the order found by its number, with its PO reference; returns its row. */
+async function findInOrders(page: Page, so: string, poRef: string) {
+  await page.getByLabel('Search orders').fill(so)
+  const order = page.getByRole('table', { name: 'Orders' }).getByRole('row').filter({ hasText: so })
+  await expect(order).toBeVisible({ timeout: 30_000 })
+  await expect(order).toContainText(poRef)
+  await expect.soft(order, 'a new order is Open').toContainText('Open')
+  return order
+}
+
 // Creates a real Open Sales Order in BC Dev, so it runs only with E2E_SUBMIT=1. Delete the order in BC afterwards
 // (its number is in the report's annotations).
-test('delivery order: confirm, submit, then find it in Orders with its details', async ({ page }) => {
+test('cash delivery order: confirm, submit, then find it in Orders with its details', async ({ page }) => {
   test.skip(process.env.E2E_SUBMIT !== '1', 'creates a BC Dev order: set E2E_SUBMIT=1 to run')
   const poRef = `E2E-${Date.now()}`
 
@@ -91,17 +135,9 @@ test('delivery order: confirm, submit, then find it in Orders with its details',
   await page.getByLabel('Special delivery instructions').pressSequentially('\nE2E test order, please delete')
   await page.getByLabel('Your PO reference (optional)').fill(poRef)
 
-  await page.getByRole('button', { name: 'Submit for approval' }).click()
-  const dialog = page.getByRole('dialog', { name: 'Submit this order?' })
-  await expect(dialog).toContainText(peso(quote!.total))
-  const submitted = page.waitForResponse(isSubmit, { timeout: 60_000 })
-  await dialog.getByRole('button', { name: 'Submit order' }).click()
-  // The spinner shows while BC re-quotes and creates the order (seconds: two BC calls).
-  await expect(page.getByText('Submitting your order…')).toBeVisible()
-  const response = await submitted
+  const { body, answer } = await confirmAndSubmit(page, quote!.total)
 
   // What the browser sent: the order's choices, never a price or total.
-  const body = response.request().postDataJSON() as Record<string, unknown>
   expect(Object.keys(body).sort()).toEqual(
     ['instructions', 'lines', 'paymentMethod', 'pickupDate', 'poRef', 'receivingContact', 'receivingEmail', 'receivingPerson', 'requestedDate', 'shipmentMethod', 'site', 'source', 'timeWindow'].sort(),
   )
@@ -119,22 +155,15 @@ test('delivery order: confirm, submit, then find it in Orders with its details',
     lines: [{ code: ITEM, qty: 10 }],
   })
   expect(Object.keys((body.lines as object[])[0]).sort()).toEqual(['code', 'qty', 'uom'])
-  expect(response.ok()).toBe(true)
-  const envelope = (await response.json()) as { data?: unknown; Data?: unknown }
-  const raw = envelope.data ?? envelope.Data
-  const answer = (typeof raw === 'string' ? JSON.parse(raw) : raw) as OrderSubmitDto
   expect(answer, 'BC priced every line again').toHaveProperty('so')
+  expect(answer, 'cash never goes to the credit team').not.toHaveProperty('autoApproved')
   const so = (answer as { so: string }).so
   test.info().annotations.push({ type: 'BC order (delete in BC Dev)', description: `${so} · PO ${poRef}` })
 
   // Orders: the note, then the order itself, found by its number.
   await expect(page).toHaveURL(/\/orders$/)
   await expect(page.getByRole('status').filter({ hasText: `${so} was submitted.` })).toBeVisible()
-  await page.getByLabel('Search orders').fill(so)
-  const order = page.getByRole('table', { name: 'Orders' }).getByRole('row').filter({ hasText: so })
-  await expect(order).toBeVisible({ timeout: 30_000 })
-  await expect(order).toContainText(poRef)
-  await expect.soft(order, 'a new order is Open').toContainText('Open')
+  const order = await findInOrders(page, so, poRef)
   test.info().annotations.push({ type: 'totals', description: `quote ${peso(quote!.total)} · BC order ${(await order.getByRole('cell').nth(8).textContent())?.trim()}` })
 
   // Its details, from BC.
@@ -145,4 +174,53 @@ test('delivery order: confirm, submit, then find it in Orders with its details',
   const line = details.getByRole('table', { name: 'Order lines' }).getByRole('row').filter({ hasText: new RegExp(`^${ITEM} — `) })
   await expect(line).toBeVisible()
   await expect(line.getByRole('cell').nth(1)).toHaveText('10')
+})
+
+// A real credit submit, so it runs only with E2E_SUBMIT=1. BC's live figures decide the path (S3-04):
+// within available credit and no past due → a BC order at once (delete it in BC Dev afterwards);
+// otherwise → held on Pending Approval and the credit team gets an approval in Outlook (approve or reject it there).
+test('credit pick-up order: auto-approved into Orders, or held on Pending Approval for the credit team', async ({ page }) => {
+  test.skip(process.env.E2E_SUBMIT !== '1', 'creates a BC Dev order or a credit approval: set E2E_SUBMIT=1 to run')
+  const poRef = `E2E-CR-${Date.now()}`
+
+  await pickSource(page, PRICED_SOURCE)
+  const { quote } = await oneLine(page, ITEM, '10')
+  test.skip(!quote || quote.lines.some((line) => line.unitPrice <= 0), `BC can't price ${ITEM} for pick up from ${PRICED_SOURCE}`)
+  await choosePayment(page, 'Credit')
+  await expect(row(page, 'Available credit')).toContainText('₱')
+  const available = Number((await row(page, 'Available credit').textContent())!.replace(/[^0-9.-]/g, ''))
+  const overCredit = quote!.total > available
+  const pastDue = await page.getByText('⚠ Your account has a past due balance.', { exact: false }).isVisible()
+  await expect(page.getByText(WARNING)).toBeVisible({ visible: overCredit })
+  await page.getByLabel('Your PO reference (optional)').fill(poRef)
+
+  const { body, answer } = await confirmAndSubmit(page, quote!.total)
+  expect(body).toMatchObject({ paymentMethod: 'credit', shipmentMethod: 'pickup', source: PRICED_SOURCE, poRef, lines: [{ code: ITEM, qty: 10 }] })
+  const held = 'pending' in answer
+  test.info().annotations.push({
+    type: 'credit check',
+    description: `total ${peso(quote!.total)} · available ${peso(available)} · past due warning ${pastDue ? 'yes' : 'no'} → ${held ? 'held' : 'auto-approved'}`,
+  })
+  if (overCredit || pastDue) expect(answer, 'over credit or past due goes to the credit team').toEqual({ pending: true })
+
+  if (held) {
+    test.info().annotations.push({ type: 'Credit approval (decide in Outlook)', description: `PO ${poRef}: Approve creates a BC order (delete it in BC Dev); Reject creates nothing` })
+    await expect(page).toHaveURL(/\/orders\/pending$/)
+    await expect(page.getByRole('status').filter({ hasText: 'Your order was sent to our credit team for review.' })).toBeVisible()
+    const pending = page.getByRole('table', { name: 'Pending Approval' }).getByRole('row').filter({ hasText: poRef })
+    await expect(pending).toContainText('Awaiting credit approval')
+    if (pastDue) await expect(pending).toContainText('Account has a past due balance')
+    if (overCredit) await expect(pending).toContainText('Order exceeds available credit')
+    return
+  }
+
+  expect(answer).toMatchObject({ autoApproved: true })
+  const so = (answer as { so: string }).so
+  test.info().annotations.push({ type: 'BC order (delete in BC Dev)', description: `${so} · PO ${poRef}` })
+  await expect(page).toHaveURL(/\/orders$/)
+  await expect(page.getByRole('status').filter({ hasText: `${so} was auto-approved — within available credit, no past due balance.` })).toBeVisible()
+  const order = await findInOrders(page, so, poRef)
+  await order.getByRole('button', { name: 'View' }).click()
+  const details = page.getByRole('dialog', { name: so })
+  await expect(details.getByText('Shipment method', { exact: true }).locator('..')).toContainText('Pick up')
 })
