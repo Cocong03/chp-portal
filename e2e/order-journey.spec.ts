@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test'
+import { addMonths, format, startOfMonth } from 'date-fns'
 import type { OrderSubmitDto } from '../src/api/types'
 import { peso } from '../src/lib/format'
 import { ITEM, PRICED_SOURCE, WARNING, isSubmit, oneLine, openNewOrder, pickSource, quoteAfter, row, uomOf } from './newOrder'
@@ -193,9 +194,23 @@ test('credit pick-up order: auto-approved into Orders, or held on Pending Approv
   const pastDue = await page.getByText('⚠ Your account has a past due balance.', { exact: false }).isVisible()
   await expect(page.getByText(WARNING)).toBeVisible({ visible: overCredit })
   await page.getByLabel('Your PO reference (optional)').fill(poRef)
+  // The 15th of next month: always in the future, and one "next month" click away.
+  const pickup = addMonths(startOfMonth(new Date()), 1)
+  pickup.setDate(15)
+  await page.getByLabel('Pick up date').click()
+  await page.getByRole('button', { name: 'Go to the Next Month' }).click()
+  await page.getByRole('button', { name: new RegExp(format(pickup, 'MMMM do, yyyy')) }).click()
+  await expect(page.getByLabel('Pick up date')).toHaveText(format(pickup, 'MMM d, yyyy'))
 
   const { body, answer } = await confirmAndSubmit(page, quote!.total)
-  expect(body).toMatchObject({ paymentMethod: 'credit', shipmentMethod: 'pickup', source: PRICED_SOURCE, poRef, lines: [{ code: ITEM, qty: 10 }] })
+  expect(body).toMatchObject({
+    paymentMethod: 'credit',
+    shipmentMethod: 'pickup',
+    source: PRICED_SOURCE,
+    pickupDate: format(pickup, 'yyyy-MM-dd'),
+    poRef,
+    lines: [{ code: ITEM, qty: 10 }],
+  })
   const held = 'pending' in answer
   test.info().annotations.push({
     type: 'credit check',
@@ -204,7 +219,7 @@ test('credit pick-up order: auto-approved into Orders, or held on Pending Approv
   if (overCredit || pastDue) expect(answer, 'over credit or past due goes to the credit team').toEqual({ pending: true })
 
   if (held) {
-    test.info().annotations.push({ type: 'Credit approval (decide in Outlook)', description: `PO ${poRef}: Approve creates a BC order (delete it in BC Dev); Reject creates nothing` })
+    test.info().annotations.push({ type: 'Credit approval (decide in Outlook)', description: `PO ${poRef}: the email shows Pick-up date ${format(pickup, 'yyyy-MM-dd')}. Approve creates a BC order (delete it in BC Dev); Reject creates nothing` })
     await expect(page).toHaveURL(/\/orders\/pending$/)
     await expect(page.getByRole('status').filter({ hasText: 'Your order was sent to our credit team for review.' })).toBeVisible()
     const pending = page.getByRole('table', { name: 'Pending Approval' }).getByRole('row').filter({ hasText: poRef })

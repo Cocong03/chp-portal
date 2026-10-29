@@ -144,7 +144,7 @@ On BC Dev (2026-10-29) the test customer C00000002 has a past-due balance, so th
 | Confirmation and Cancel | Submit for approval opens "Submit this order?" with BC's order total. Cancel sends nothing to BC, and Submit is available again |
 | Credit's terms | Choosing Credit shows Payment terms instead of Prepayment terms; back to Cash shows Prepayment terms and no credit team warning |
 | Cash delivery order (opt-in) | Fills a delivery order, confirms, sees the spinner, checks that the browser sent no prices or totals, lands on Orders with "SOR… was submitted.", finds the order by its number (PO reference, Open), and opens View (Delivery, the item, qty 10) |
-| Credit pick-up order (opt-in) | Chooses Credit, checks the over-credit warning against Available credit, submits, and follows the path BC's figures take: auto-approved into Orders, or held on Pending Approval with its reason (see section 3) |
+| Credit pick-up order (opt-in) | Chooses Credit, checks the over-credit warning against Available credit, picks the 15th of next month as Pick up date (sent as `pickupDate`; the approval email shows it), submits, and follows the path BC's figures take: auto-approved into Orders, or held on Pending Approval with its reason (see section 3) |
 
 ### `e2e/new-order-quote.spec.ts`
 
