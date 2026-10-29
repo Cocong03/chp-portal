@@ -11,6 +11,7 @@ const PAGES: Partial<Record<SectionKey, LazyExoticComponent<ComponentType>>> = {
   dashboard: lazy(() => import('@/modules/dashboard/DashboardPage').then((m) => ({ default: m.DashboardPage }))),
   orders: lazy(() => import('@/modules/orders/OrdersSection').then((m) => ({ default: m.OrdersSection }))),
   ledger: lazy(() => import('@/modules/ledger/LedgerPage').then((m) => ({ default: m.LedgerPage }))),
+  documents: lazy(() => import('@/modules/documents/DocumentsPage').then((m) => ({ default: m.DocumentsPage }))),
   sites: lazy(() => import('@/modules/sites/SitesPage').then((m) => ({ default: m.SitesPage }))),
   requests: lazy(() => import('@/modules/requests/RequestsPage').then((m) => ({ default: m.RequestsPage }))),
   complaints: lazy(() => import('@/modules/complaints/ComplaintsPage').then((m) => ({ default: m.ComplaintsPage }))),

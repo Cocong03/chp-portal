@@ -227,3 +227,31 @@ export interface ComplaintSubmitDto { category: string; complaintType: string; c
 /** The saved row; a file named in attachmentName follows through the Web API, then PUT {id} releases the row. */
 export type SubmitResultDto = { ref: string; id: string } | { invalid: true; field: string }
 export type AttachResultDto = { ref: string; attached: boolean } | { invalid: true; field: string }
+
+export type DocumentType = 'Invoice' | 'Credit Memo' | 'Acknowledgement Receipt' | 'Delivery Receipt'
+
+export interface DocumentDto {
+  /** A DocumentType, or BC's own name for anything else. */
+  type: string
+  /** Document no. */
+  ref: string
+  soNo: string | null
+  poRef: string | null
+  /** YYYY-MM-DD (posting date) */
+  date: string
+  /** null for Delivery Receipt */
+  amount: number | null
+}
+
+export interface DocumentPageDto {
+  documents: DocumentDto[]
+  total: number
+  page: number
+  pageSize: number
+}
+
+export interface DocumentFileDto {
+  fileName: string
+  contentType: string
+  base64: string
+}
