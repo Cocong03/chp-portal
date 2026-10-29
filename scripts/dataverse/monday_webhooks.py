@@ -6,7 +6,8 @@ printed. Each board gets one `change_specific_column_value` webhook on its statu
 other column edits don't run the flow; the flow re-reads the item, so only real status reaches Dataverse.
 
 Usage (from the repo root; .env or the shell holds DATAVERSE_URL=<Dev org URL>):
-    python scripts/dataverse/monday_webhooks.py
+    python scripts/dataverse/monday_webhooks.py [--add]
+--add registers a new hook even when the board already has one (another environment shares the boards). Run it once.
 """
 import json
 import os
@@ -69,7 +70,7 @@ for schema, columns in (('chp_MondayRequestsBoardId', 'chp_MondayRequestsColumns
     # delete it in monday to re-register.
     # monday returns config as a Ruby-style hash ('{"columnId" => "status"}'), not JSON, so match the quoted id.
     mine = [h for h in hooks if h['event'] == EVENT and f'"{config["columnId"]}"' in (h.get('config') or '')]
-    if mine:
+    if mine and '--add' not in sys.argv:
         print(f'= {schema} {board}: webhook {mine[0]["id"]} already registered')
         continue
     created = gql('mutation ($b: ID!, $u: String!, $c: JSON!) '
