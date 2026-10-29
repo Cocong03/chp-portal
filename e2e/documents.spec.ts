@@ -21,8 +21,8 @@ test('the list loads with the expected columns', async ({ page }) => {
 })
 
 test('the Invoice type filter leaves only invoices', async ({ page }) => {
-  await page.getByRole('combobox', { name: 'Filter by document type' }).click()
-  await page.getByRole('option', { name: 'Invoice' }).click()
+  // Load the filtered list directly: after a click the previous rows stay on screen (keepPreviousData).
+  await page.goto('/documents?type=Invoice')
   await expect(page.getByRole('button', { name: 'Download' }).first().or(page.getByText(EMPTY))).toBeVisible({ timeout: 60_000 })
   test.skip(await page.getByText(EMPTY).isVisible(), 'No invoices for the test customer')
   const count = (await rows(page).count()) - 1
@@ -55,8 +55,8 @@ test('CSV / Excel saves Documents-<date>.xlsx', async ({ page }) => {
 })
 
 test('the first invoice with an SO no. is found on Orders and its invoice no. on the Ledger', async ({ page }) => {
-  await page.getByRole('combobox', { name: 'Filter by document type' }).click()
-  await page.getByRole('option', { name: 'Invoice' }).click()
+  // Load the filtered list directly: after a click the previous rows stay on screen (keepPreviousData).
+  await page.goto('/documents?type=Invoice')
   await expect(page.getByRole('button', { name: 'Download' }).first().or(page.getByText(EMPTY))).toBeVisible({ timeout: 60_000 })
   test.skip(await page.getByText(EMPTY).isVisible(), 'No invoices for the test customer')
   const n = (await rows(page).count()) - 1
@@ -73,8 +73,8 @@ test('the first invoice with an SO no. is found on Orders and its invoice no. on
   test.skip(!so, 'No invoice with a sales order no. on the first page')
 
   await page.goto(`/orders?q=${encodeURIComponent(so)}`)
-  await expect(page.getByRole('table').getByText(so).first()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('table').getByText(so, { exact: true }).first()).toBeVisible({ timeout: 60_000 })
 
   await page.goto(`/ledger?show=all&q=${encodeURIComponent(ref)}`)
-  await expect(page.getByRole('table').getByText(ref).first()).toBeVisible({ timeout: 60_000 })
+  await expect(page.getByRole('table').getByText(ref, { exact: true }).first()).toBeVisible({ timeout: 60_000 })
 })
