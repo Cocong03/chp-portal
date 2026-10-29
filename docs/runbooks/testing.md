@@ -7,7 +7,7 @@ How to run the tests for the New Order and Submit journey (S3-06, S3-07, S3-10) 
 | Unit and component tests (Vitest) | Your machine, BC and Server Logic mocked | `npm test` | No |
 | Playwright: prices | Dev site + BC Dev | `npm run e2e -- new-order-quote` | One draft, deleted again by the test |
 | Playwright: order journey | Dev site + BC Dev | `npm run e2e -- order-journey` | Nothing, unless `E2E_SUBMIT=1` |
-| Playwright: real submits | Dev site + BC Dev | `E2E_SUBMIT=1` + the journey command | **Cash: one real Open Sales Order in BC Dev. Credit: one more BC order, or one held order on Pending Approval plus an approval email to the credit team** |
+| Playwright: real submits | Dev site + BC Dev | `E2E_SUBMIT=1` + the journey command | **Cash: one real Open Sales Order in BC Dev. Credit: one more BC order, or one held order on Pending Approval plus an approval email to the credit team. Blanket: one real Blanket Sales Order (BSO) in BC Dev** |
 
 > **Never point the Playwright tests at UAT or production** (`E2E_BASE_URL`). They save drafts and, with `E2E_SUBMIT=1`, create real BC orders and credit approvals.
 
@@ -30,7 +30,7 @@ What covers the journey:
 | `src/modules/orders/new/NewOrderPage.test.tsx` | New Order screen: prices, one UOM per order, Submit confirmation, the "Submitting your order…" spinner, error messages, drafts |
 | `src/modules/orders/new/instructions.test.ts` | The instructions' auto line (no duplicates) |
 | `src/modules/orders/new/form.test.ts` | Checks before submit (past dates, receiving email) |
-| `test/server-logic/orders-submit.test.ts` | The `orders` POST: re-quote, refusals, the body sent to BC; Credit auto-released or held (over available credit, past due) |
+| `test/server-logic/orders-submit.test.ts` | The `orders` POST: re-quote, refusals, the body sent to BC; Credit auto-released or held (over available credit, past due); Blanket Orders with the typed prices |
 | `test/server-logic/orders.test.ts` | The lists, including Pending Approval (`view=pending`) |
 | `test/server-logic/order-quote.test.ts` | The `order-quote` endpoint |
 | `src/modules/orders/PendingApprovalPage.test.tsx` | Pending Approval tab: statuses, the credit team's comment, paging |
@@ -99,7 +99,7 @@ The report has every test's result, the **annotations** (the BC order number to 
 
 ## 3. The real submits (create BC Dev records)
 
-The two submit tests (cash and credit) are skipped unless you set `E2E_SUBMIT=1`. To run only one of them, add `-g "cash delivery"` or `-g "credit pick-up"`.
+The three submit tests (cash, credit and blanket) are skipped unless you set `E2E_SUBMIT=1`. To run only one of them, add `-g "cash delivery"`, `-g "credit pick-up"` or `-g "blanket pick-up"`.
 
 **PowerShell**
 
@@ -129,6 +129,8 @@ For a held order, finish the journey by hand: open the approval in Outlook as a 
 - **Approve:** within seconds the row leaves Pending Approval and the order appears under Orders. Delete that BC order in BC Dev afterwards.
 - **Reject** (with a comment): the row shows *Declined* and *"Credit team: <comment>"*. Nothing is created in BC.
 
+**Blanket** (`blanket pick-up order`, PO reference like `E2E-BL-1761470000000`): switches to Blanket Order, types ₱150 as the unit price for 10 × `E2E_ITEM`, submits, and finds the new BSO on **Blanket Orders** with "BSO… was submitted.". A Blanket Order never goes to the credit team. The report's annotation **BC Blanket Order (delete in BC Dev)** gives its number: delete it in BC Dev.
+
 On BC Dev (2026-10-29) the test customer C00000002 has a past-due balance, so the credit test takes the **held** path. Testing the auto-approved path needs a customer with a credit limit and no overdue amount; BC Dev has none yet, so ask the BC team to set one up.
 
 ---
@@ -144,6 +146,7 @@ On BC Dev (2026-10-29) the test customer C00000002 has a past-due balance, so th
 | Confirmation and Cancel | Submit for approval opens "Submit this order?" with BC's order total. Cancel sends nothing to BC, and Submit is available again |
 | Credit's terms | Choosing Credit shows Payment terms instead of Prepayment terms; back to Cash shows Prepayment terms and no credit team warning |
 | Cash delivery order (opt-in) | Fills a delivery order, confirms, sees the spinner, checks that the browser sent no prices or totals, lands on Orders with "SOR… was submitted.", finds the order by its number (PO reference, Open), and opens View (Delivery, the item, qty 10) |
+| Blanket pick-up order (opt-in) | Types ₱150 per line in Blanket mode, checks the confirmation total (typed subtotal + BC's charges), that the browser sent `orderType: blanket` with the price, and that the BSO shows on Blanket Orders with its PO reference |
 | Credit pick-up order (opt-in) | Chooses Credit, checks the over-credit warning against Available credit, picks the 15th of next month as Pick up date (sent as `pickupDate`; the approval email shows it), submits, and follows the path BC's figures take: auto-approved into Orders, or held on Pending Approval with its reason (see section 3) |
 
 ### `e2e/new-order-quote.spec.ts`
@@ -174,7 +177,7 @@ Set these when BC Dev's data changes. Use `$env:NAME="value"` in PowerShell, or 
 | `E2E_ITEM` | `100016` | Main item |
 | `E2E_ITEM_2` | `100025` | Second item for the two- and ten-line tests. **Must have the same UOM as `E2E_ITEM`** (one UOM per order) |
 | `E2E_SOURCE` | `SOLID` | A plant with prices for `E2E_ITEM` at the customer's delivery site (CAVITE has none in BC Dev) |
-| `E2E_SUBMIT` | not set | `1` runs the real cash and credit submit tests |
+| `E2E_SUBMIT` | not set | `1` runs the real cash, credit and blanket submit tests |
 | `E2E_BASE_URL` | `https://chp-portal-dev.powerappsportals.com` | Dev only, never UAT or production |
 
 ---

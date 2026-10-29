@@ -36,9 +36,17 @@ test('typedSubtotal is null with no chosen line', () => {
   expect(typedSubtotal([{ code: '', qty: 1, price: 5 }], items)).toBeNull()
 })
 
-test('submitRequest never sends a typed price', () => {
+test('submitRequest never sends a typed price for a Single Order', () => {
   const body = submitRequest(form({ lines: [{ code: 'CEM-T1-40KG', qty: 10, price: 200 }] }), items)
   expect(body?.lines).toEqual([{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10 }])
+  expect(body).not.toHaveProperty('orderType')
+})
+
+test("submitRequest sends a Blanket Order's typed prices, skipping lines without an item; null while a price is missing", () => {
+  const lines = [{ code: '', qty: 0 }, { code: 'CEM-T1-40KG', qty: 10, price: 187.5 }]
+  const body = submitRequest(form({ orderType: 'blanket', lines }), items)
+  expect(body).toMatchObject({ orderType: 'blanket', lines: [{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10, price: 187.5 }] })
+  expect(submitRequest(form({ orderType: 'blanket', lines: [{ code: 'CEM-T1-40KG', qty: 10 }] }), items)).toBeNull()
 })
 
 test('submitRequest sends the chosen payment method', () => {

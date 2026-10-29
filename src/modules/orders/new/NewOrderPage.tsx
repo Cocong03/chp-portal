@@ -18,7 +18,7 @@ import { PageHeader } from '@/ui/PageHeader'
 import { QueryError } from '@/ui/QueryError'
 import { Skeleton } from '@/ui/skeleton'
 import { DeliveryScheduleCard } from './DeliveryScheduleCard'
-import { defaultSite, newOrderDefaults, submitProblem, submitRequest, type NewOrderForm } from './form'
+import { defaultSite, newOrderDefaults, submitProblem, submitRequest, typedSubtotal, type NewOrderForm } from './form'
 import { FulfillmentCard } from './FulfillmentCard'
 import { withAutoLine } from './instructions'
 import { OrderLinesCard } from './OrderLinesCard'
@@ -129,10 +129,11 @@ function OrderForm({
   })
 
   // S3-10/S3-04: BC prices the order again and creates it (or the credit team gets it); either way the draft it came from is removed.
+  // S3-16: a Blanket Order goes to BC with the customer's prices and opens the Blanket Orders tab.
   const removeDraft = useDeleteDraft()
   const submit = useMutation({
     mutationFn: (body: OrderSubmitRequest) => serverLogic<OrderSubmitDto>('orders', { method: 'POST', body }),
-    onSuccess: (answer) => {
+    onSuccess: (answer, body) => {
       if ('notPriced' in answer) {
         toast.error("We couldn't price every line. Please check your order and try again.")
         quote.retry()
@@ -142,7 +143,10 @@ function OrderForm({
       // ['orders'] covers ['orders', 'pending'] too.
       void client.invalidateQueries({ queryKey: ['orders'] })
       void client.invalidateQueries({ queryKey: ['dashboard'] })
-      if ('pending' in answer) navigate('/orders/pending', { state: { sentForReview: true } })
+      if (body.orderType === 'blanket') {
+        void client.invalidateQueries({ queryKey: ['blanket-orders'] })
+        if ('so' in answer) navigate('/orders/blanket', { state: { submitted: answer.so } })
+      } else if ('pending' in answer) navigate('/orders/pending', { state: { sentForReview: true } })
       else navigate('/orders', { state: { submitted: answer.so, autoApproved: answer.autoApproved } })
     },
     onError: () => toast.error("We couldn't submit this order. Please try again."),
@@ -159,6 +163,13 @@ function OrderForm({
   function confirmSubmit() {
     if (confirming) submit.mutate(confirming)
     setConfirming(null)
+  }
+  // The total Order summary shows: a Blanket Order's typed prices plus BC's charges (S3-16), otherwise BC's quote.
+  function confirmTotal() {
+    if (!quote.quote) return '—'
+    if (confirming?.orderType !== 'blanket') return peso(quote.quote.total)
+    const typed = typedSubtotal(form.getValues('lines'), options.items)
+    return typed === null ? '—' : peso(typed + quote.quote.freight + quote.quote.otherCharges)
   }
 
   return (
@@ -198,7 +209,7 @@ function OrderForm({
           <DialogHeader className="text-left">
             <DialogTitle>Submit this order?</DialogTitle>
             <DialogDescription>
-              Order total: {quote.quote ? peso(quote.quote.total) : '—'}. Please check your order lines and delivery details before you submit.
+              Order total: {confirmTotal()}. Please check your order lines and delivery details before you submit.
             </DialogDescription>
           </DialogHeader>
           <DialogFooter>

@@ -239,3 +239,30 @@ test('credit pick-up order: auto-approved into Orders, or held on Pending Approv
   const details = page.getByRole('dialog', { name: so })
   await expect(details.getByText('Shipment method', { exact: true }).locator('..')).toContainText('Pick up')
 })
+
+// A real Blanket Order in BC Dev (S3-16), so it runs only with E2E_SUBMIT=1: the customer's typed price goes to BC as is,
+// and a Blanket Order never goes to the credit team. Delete the BSO in BC Dev afterwards.
+test('blanket pick-up order: typed price, submit, then find the BSO on Blanket Orders', async ({ page }) => {
+  test.skip(process.env.E2E_SUBMIT !== '1', 'creates a BC Dev Blanket Order: set E2E_SUBMIT=1 to run')
+  const poRef = `E2E-BL-${Date.now()}`
+
+  await page.getByRole('radio', { name: 'Blanket Order' }).click()
+  await pickSource(page, PRICED_SOURCE)
+  const { quote } = await oneLine(page, ITEM, '10')
+  await page.getByRole('spinbutton', { name: 'Unit price, line 1' }).fill('150')
+  await expect(row(page, 'Subtotal')).toContainText(peso(1500))
+  await page.getByLabel('Your PO reference (optional)').fill(poRef)
+
+  const { body, answer } = await confirmAndSubmit(page, 1500 + quote!.freight + quote!.otherCharges)
+  expect(body).toMatchObject({ orderType: 'blanket', shipmentMethod: 'pickup', source: PRICED_SOURCE, poRef, lines: [{ code: ITEM, qty: 10, price: 150 }] })
+  expect(answer, 'a Blanket Order is created, never held').toHaveProperty('so')
+  const bso = (answer as { so: string }).so
+  test.info().annotations.push({ type: 'BC Blanket Order (delete in BC Dev)', description: `${bso} · PO ${poRef}` })
+
+  await expect(page).toHaveURL(/\/orders\/blanket$/)
+  await expect(page.getByRole('status').filter({ hasText: `${bso} was submitted.` })).toBeVisible()
+  const order = page.getByRole('table', { name: 'Blanket Orders' }).getByRole('row').filter({ hasText: bso })
+  await expect(order).toBeVisible({ timeout: 30_000 })
+  await expect(order).toContainText(poRef)
+  test.info().annotations.push({ type: 'totals', description: `typed ${peso(1500)} + charges · BC ${(await order.getByRole('cell').nth(4).textContent())?.trim()}` })
+})

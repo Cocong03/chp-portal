@@ -83,12 +83,18 @@ export function quoteRequest(form: QuoteChoices, items: OrderOptionsDto['items']
   return { request: ready ? { shipmentMethod: form.shipmentMethod, source: form.source, site, lines } : null, indexes }
 }
 
-/** The orders POST for this form, or null when there's nothing BC can price yet (see quoteRequest). */
+/**
+ * The orders POST for this form, or null when there's nothing BC can price yet (see quoteRequest). A Blanket Order sends
+ * each line's typed price, and is null until every chosen line has one.
+ */
 export function submitRequest(form: NewOrderForm, items: OrderOptionsDto['items']): OrderSubmitRequest | null {
-  const { request } = quoteRequest(form, items)
+  const { request, indexes } = quoteRequest(form, items)
   if (!request) return null
+  const blanket = form.orderType === 'blanket'
+  if (blanket && typedSubtotal(form.lines, items) === null) return null
   return {
     ...request,
+    ...(blanket && { orderType: 'blanket' as const, lines: request.lines.map((line, i) => ({ ...line, price: form.lines[indexes[i]].price })) }),
     paymentMethod: form.paymentMethod,
     poRef: form.poRef.trim(),
     pickupDate: form.pickupDate,
@@ -100,9 +106,6 @@ export function submitRequest(form: NewOrderForm, items: OrderOptionsDto['items'
     instructions: withAutoLine(form.instructions, form.loadingType, form.callBefore),
   }
 }
-
-// Wireframe gap (spec decision 10): Blanket submit waits on CHP (where a new Blanket Order starts) and BC (a writable price).
-export const BLANKET_SUBMIT_NOTE = "Blanket Orders can't be submitted from the portal yet. Save as draft to keep this order."
 
 /** A unit price the customer can agree to: a finite amount of at least ₱0.01. */
 export function validPrice(price: unknown): price is number {

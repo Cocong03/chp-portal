@@ -991,6 +991,14 @@ async function post() {
     var CASH = "CASH";
     // BC's Payment Method code for Credit (confirmed with BC 2026-10-28).
     var CREDIT = "CREDIT";
+    // Blanket Sales Orders (S3-16): BC encodes the space in the enum value.
+    var BLANKET_ORDER = "Blanket_x0020_Order";
+
+    // A Blanket Order line's agreed unit price (S3-16): a number from ₱0.01 to ₱1,000,000, in centavos; null otherwise.
+    function agreedPrice(value) {
+        var price = typeof value === "number" ? cents(value) : NaN;
+        return Number.isFinite(price) && price >= 0.01 && price <= 1000000 ? price : null;
+    }
 
     // "" when empty, the trimmed text when it fits, null when it's too long or not text.
     function optional(value, max) {
@@ -1023,6 +1031,13 @@ async function post() {
         if (!choices || (body.paymentMethod !== "cash" && body.paymentMethod !== "credit")) {
             return null;
         }
+        // Only a Blanket Order carries the customer's prices; a Single Order's prices always come from BC.
+        var blanket = body.orderType === "blanket";
+        if (blanket) {
+            choices.lines.forEach((line, i) => {
+                line.price = agreedPrice(body.lines[i] && body.lines[i].price);
+            });
+        }
         var delivery = choices.delivery;
         var details = {
             poRef: optional(body.poRef, 35),
@@ -1035,13 +1050,15 @@ async function post() {
             email: delivery ? optional(body.receivingEmail, 30) : "",
             timeWindow: delivery ? (TIME_WINDOWS.indexOf(body.timeWindow) >= 0 ? body.timeWindow : null) : ""
         };
-        var valid = Object.keys(details).every((key) => details[key] !== null) && (!details.email || details.email.indexOf("@") > 0);
-        return valid ? { choices: choices, details: details, paymentMethod: body.paymentMethod } : null;
+        var valid = Object.keys(details).every((key) => details[key] !== null) && (!details.email || details.email.indexOf("@") > 0) &&
+            choices.lines.every((line) => line.price !== null);
+        return valid ? { choices: choices, details: details, paymentMethod: body.paymentMethod, blanket: blanket } : null;
     }
 
     // mcrmSalesOrders with its lines (deep insert). Every line needs sourcePlant or BC prices nothing (2026-10-25); the
-    // header's locationCode is the same plant. Empty fields are left out for BC to default.
-    function salesOrder(scope, choices, details, paymentMethodCode) {
+    // header's locationCode is the same plant. Empty fields are left out for BC to default. A Blanket Order's lines carry the
+    // customer's agreed price, which BC keeps (2026-10-29).
+    function salesOrder(scope, choices, details, paymentMethodCode, blanket) {
         var order = {
             sellToCustomerNo: scope.customerNo,
             shipmentMethodCode: choices.delivery ? "DELIVERY" : "PICKUP",
@@ -1065,13 +1082,22 @@ async function post() {
                 order[key] = fields[key];
             }
         });
-        order.mcrmSalesOrderLines = choices.lines.map((line) => ({
-            type: "Item",
-            itemNo: line.code,
-            quantity: line.qty,
-            unitOfMeasureCode: line.uom,
-            sourcePlant: choices.source
-        }));
+        order.mcrmSalesOrderLines = choices.lines.map((line) => {
+            var orderLine = {
+                type: "Item",
+                itemNo: line.code,
+                quantity: line.qty,
+                unitOfMeasureCode: line.uom,
+                sourcePlant: choices.source
+            };
+            if (blanket) {
+                orderLine.unitPrice = line.price;
+            }
+            return orderLine;
+        });
+        if (blanket) {
+            order.documentType = BLANKET_ORDER;
+        }
         return order;
     }
 
@@ -1142,24 +1168,28 @@ async function post() {
         var scope = await sessionScope();
         var orderDate = manilaToday();
         var credit = request.paymentMethod === "credit";
-        // Credit orders read BC's credit overview while the lines are quoted.
-        var reads = await Promise.all([
-            Promise.all(request.choices.lines.map((line) => quoteLine(scope, request.choices, line, orderDate))),
-            credit ? creditOverview(scope) : null
-        ]);
-        var quotes = reads[0];
-        // BC may still discount the order below the quote (accepted 2026-10-26); a line it can't price stops it here.
-        if (quotes.some((line) => line.unitPrice <= 0)) {
-            return { notPriced: true };
-        }
-        var order = salesOrder(scope, request.choices, request.details, credit ? CREDIT : CASH);
-        if (credit) {
-            var total = cents(quotes.reduce((sum, line) => sum + line.total, 0));
-            var reason = heldReason(total, reads[1]);
-            if (reason) {
-                holdOrder(scope, request, order, quotes, total, reads[1], reason, orderDate);
-                Server.Logger.Log("orders POST held for credit approval: " + reason);
-                return { pending: true };
+        var order = salesOrder(scope, request.choices, request.details, credit ? CREDIT : CASH, request.blanket);
+        // A Blanket Order (S3-16) goes to BC as typed: its prices are the customer's, and CHP never sends it for credit approval.
+        var checked = credit && !request.blanket;
+        if (!request.blanket) {
+            // Credit orders read BC's credit overview while the lines are quoted.
+            var reads = await Promise.all([
+                Promise.all(request.choices.lines.map((line) => quoteLine(scope, request.choices, line, orderDate))),
+                credit ? creditOverview(scope) : null
+            ]);
+            var quotes = reads[0];
+            // BC may still discount the order below the quote (accepted 2026-10-26); a line it can't price stops it here.
+            if (quotes.some((line) => line.unitPrice <= 0)) {
+                return { notPriced: true };
+            }
+            if (credit) {
+                var total = cents(quotes.reduce((sum, line) => sum + line.total, 0));
+                var reason = heldReason(total, reads[1]);
+                if (reason) {
+                    holdOrder(scope, request, order, quotes, total, reads[1], reason, orderDate);
+                    Server.Logger.Log("orders POST held for credit approval: " + reason);
+                    return { pending: true };
+                }
             }
         }
         // ponytail: no duplicate guard yet (a portal reference field on mcrmSalesOrders is pending with BC), on this path or
@@ -1170,6 +1200,6 @@ async function post() {
             throw new Error("bc-post mcrmSalesOrders: no salesOrderNo");
         }
         Server.Logger.Log("orders POST created " + created.salesOrderNo);
-        return credit ? { so: created.salesOrderNo, autoApproved: true } : { so: created.salesOrderNo };
+        return checked ? { so: created.salesOrderNo, autoApproved: true } : { so: created.salesOrderNo };
     });
 }

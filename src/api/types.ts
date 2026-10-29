@@ -166,6 +166,9 @@ export interface OrderQuoteDto {
 
 /** orders POST (S3-10, S3-04): the order as the customer chose it; never a price or total (BC prices it again). */
 export interface OrderSubmitRequest extends OrderQuoteRequest {
+  /** A Blanket Order (S3-16): every line carries the customer's agreed unit price. Absent for a Single Order. */
+  orderType?: 'blanket'
+  lines: (OrderQuoteRequest['lines'][number] & { price?: number })[]
   paymentMethod: 'cash' | 'credit'
   poRef: string
   pickupDate: string

@@ -223,3 +223,48 @@ test('cash ignores credit: a past-due customer still gets the order and the over
   expect(orders()[0].body.paymentMethodCode).toBe('CASH')
   expect(creditReads()).toBe(0)
 })
+
+// S3-16 Blanket submit (2026-10-29: BC keeps a unitPrice sent on mcrmSalesOrderLines). The customer's agreed price goes to
+// BC as typed; per CHP's rules a Blanket Order never needs credit approval, Cash or Credit.
+const BLANKET_ORDER = { ...PICKUP, orderType: 'blanket', lines: [{ ...LINE, price: 123.45 }] }
+
+test.each(['cash', 'credit'])('blanket (%s): a Blanket Order with the typed unit price, no quote, no credit check', async (paymentMethod) => {
+  const { server, posts, orders, created, creditReads } = fakeServer({ ...BLANKET_ORDER, paymentMethod }, { credit: { overdueAmount: 24750, availableCredit: 0 } })
+  expect(JSON.parse(await load(server).post())).toEqual({ so: 'SOR000000024' })
+  expect(posts.map((post) => post.entity)).toEqual(['mcrmSalesOrders'])
+  expect(orders()[0].body).toMatchObject({
+    documentType: 'Blanket_x0020_Order',
+    sellToCustomerNo: 'C00000002',
+    paymentMethodCode: paymentMethod === 'cash' ? 'CASH' : 'CREDIT',
+    shipmentDate: '2026-10-27',
+    mcrmSalesOrderLines: [{ ...ORDER_LINE, unitPrice: 123.45 }],
+  })
+  expect(created).toEqual([])
+  expect(creditReads()).toBe(0)
+})
+
+test('blanket: a price with more than two decimals goes to BC in centavos', async () => {
+  const { server, orders } = fakeServer({ ...BLANKET_ORDER, lines: [{ ...LINE, price: 187.456 }] })
+  await load(server).post()
+  expect((orders()[0].body.mcrmSalesOrderLines as { unitPrice: number }[])[0].unitPrice).toBe(187.46)
+})
+
+test.each([
+  ['no price', undefined],
+  ['a price of 0', 0],
+  ['a negative price', -1],
+  ['a price under one centavo', 0.004],
+  ['a price that is text', '123.45'],
+  ['a price over ₱1,000,000', 1000000.01],
+])('blanket refused without calling BC: %s', async (_name, price) => {
+  const { server, posts } = fakeServer({ ...BLANKET_ORDER, lines: [{ ...LINE, price }] })
+  await expect(load(server).post()).rejects.toThrow("We couldn't load this information. Please try again.")
+  expect(posts).toEqual([])
+})
+
+test('a Single Order ignores a price sent from the browser: BC prices it', async () => {
+  const { server, orders } = fakeServer({ ...PICKUP, lines: [{ ...LINE, price: 1 }] })
+  await load(server).post()
+  expect(orders()[0].body.mcrmSalesOrderLines).toEqual([ORDER_LINE])
+  expect(orders()[0].body).not.toHaveProperty('documentType')
+})

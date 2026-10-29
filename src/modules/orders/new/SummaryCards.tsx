@@ -11,7 +11,7 @@ import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
 import { Skeleton } from '@/ui/skeleton'
-import { BLANKET_SUBMIT_NOTE, typedSubtotal, type NewOrderForm } from './form'
+import { typedSubtotal, type NewOrderForm } from './form'
 import type { OrderQuote } from './useOrderQuote'
 
 function Row({ label, value, total }: { label: string; value: ReactNode; total?: boolean }) {
@@ -25,7 +25,7 @@ function Row({ label, value, total }: { label: string; value: ReactNode; total?:
 
 /**
  * Credit standing (BC's credit overview, via the dashboard endpoint), Order summary (BC's quote, S3-06) and Submit (S3-10).
- * A Blanket Order (S3-16) sums the typed prices for its subtotal, keeps BC's freight and other charges, and can't be submitted.
+ * A Blanket Order (S3-16) sums the typed prices for its subtotal and keeps BC's freight and other charges.
  */
 export function SummaryCards({
   quote,
@@ -125,17 +125,16 @@ export function SummaryCards({
           <Button type="button" variant="outline" className="flex-1" onClick={onSaveDraft} disabled={saving}>
             {saving ? 'Saving…' : 'Save as draft'}
           </Button>
-          {/* Only an order BC has priced, every line of it. */}
+          {/* Only an order BC has priced, every line of it; a Blanket Order once BC has quoted its charges and every line has a typed price. */}
           <Button
             type="button"
             className="flex-1"
             onClick={onSubmit}
-            disabled={blanket || !priced || priced.lines.some((line) => line.unitPrice <= 0) || submitting}
+            disabled={!priced || (blanket ? typed === null : priced.lines.some((line) => line.unitPrice <= 0)) || submitting}
           >
             {submitting ? 'Submitting…' : 'Submit for approval'}
           </Button>
         </div>
-        {blanket && <p className="mt-2 text-[12.5px] text-muted-foreground">{BLANKET_SUBMIT_NOTE}</p>}
       </SectionCard>
     </>
   )

@@ -58,8 +58,12 @@ const MOCK_PENDING: PendingOrderDto[] = [
 
 /** Dev-server stand-in for the orders Server Logic (same query parameters, same answers). */
 export function ordersMock({ method, query = {}, body }: MockRequest): OrdersPageDto | BlanketOrdersDto | OrderDto | OrderSubmitDto | PendingOrderDto[] | { notFound: true } {
-  // A credit order is held for the credit team (S3-04); cash is created.
-  if (method === 'POST') return (body as { paymentMethod?: string } | undefined)?.paymentMethod === 'credit' ? { pending: true } : { so: 'SO-100500' }
+  // A credit order is held for the credit team (S3-04); cash is created; a Blanket Order is created either way (S3-16).
+  if (method === 'POST') {
+    const sent = body as { paymentMethod?: string; orderType?: string } | undefined
+    if (sent?.orderType === 'blanket') return { so: 'BSO-100500' }
+    return sent?.paymentMethod === 'credit' ? { pending: true } : { so: 'SO-100500' }
+  }
   if (query.view === 'pending') return MOCK_PENDING
   if (query.type === 'blanket') {
     if (query.id) return MOCK_BLANKET_ORDERS.find((o) => o.so === query.id) ?? { notFound: true }

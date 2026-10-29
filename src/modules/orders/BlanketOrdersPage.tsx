@@ -1,5 +1,5 @@
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
+import { Link, useLocation } from "react-router-dom";
 import type { OrderSummaryDto, SiteDto } from "@/api/types";
 import { formatDate, peso } from "@/lib/format";
 import { usePageTitle } from "@/lib/usePageTitle";
@@ -56,6 +56,8 @@ export function BlanketOrdersPage() {
   const [viewing, setViewing] = useState<string | null>(null);
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
+  // Set by New Order after a Blanket Order is submitted (S3-16).
+  const submitted = (useLocation().state as { submitted?: string } | null)?.submitted;
   const tableColumns = useMemo(() => columns(sites, setViewing, setScheduling), [sites]);
   const { pageRows, ...pager } = usePaged(orders.data?.orders ?? NO_ORDERS);
   return (
@@ -65,6 +67,11 @@ export function BlanketOrdersPage() {
           <Link to="/orders/new">+ New Order</Link>
         </Button>
       </PageHeader>
+      {submitted && (
+        <p role="status" className="mb-3.5 text-[12.5px] font-semibold text-success">
+          {submitted} was submitted.
+        </p>
+      )}
       {saved && (
         <p role="status" className="mb-3.5 text-[13px] font-medium text-success">
           Delivery schedule for {saved} has been updated.

@@ -312,7 +312,6 @@ test('Single Order: Submit for approval waits for a priced order, with no "Avail
 })
 
 describe('Blanket Order (S3-16)', () => {
-  const NOTE = "Blanket Orders can't be submitted from the portal yet. Save as draft to keep this order."
   const price = (line: number) => screen.getByRole('spinbutton', { name: `Unit price, line ${line}` })
   async function blanket(user: UserEvent) {
     await openForm()
@@ -348,15 +347,18 @@ describe('Blanket Order (S3-16)', () => {
     expect(summary('Order total')).toHaveTextContent('—')
   })
 
-  test('Submit is disabled with a note, even when every line has a price', async () => {
+  test('Submit waits for a typed price on every line, then asks with the typed total', async () => {
     const user = userEvent.setup()
     await blanket(user)
     await pickItem(user, 1, T1_BAG)
-    await user.type(price(1), '200')
+    await setQty(user, 1, '10')
     await quoted('Transport / Freight', '₱0.00')
-    expect(screen.getByRole('button', { name: 'Submit for approval' })).toBeDisabled()
-    expect(screen.getByText(NOTE)).toBeInTheDocument()
-    expect(vi.mocked(serverLogic).mock.calls.some(([name, options]) => name === 'orders' && options?.method === 'POST')).toBe(false)
+    const submit = screen.getByRole('button', { name: 'Submit for approval' })
+    expect(submit).toBeDisabled()
+    await user.type(price(1), '200')
+    expect(submit).toBeEnabled()
+    await user.click(submit)
+    expect(await screen.findByRole('dialog', { name: 'Submit this order?' })).toHaveTextContent('Order total: ₱2,000.00.')
   })
 
   test('the Delivery schedule starts with one row on the first line item; with no line item the footer asks for one', async () => {
@@ -394,7 +396,6 @@ describe('Blanket Order (S3-16)', () => {
     expect(await within(lineRow(1)).findAllByText('₱245.00')).toHaveLength(2)
     expect(screen.queryByRole('table', { name: 'Delivery schedule' })).not.toBeInTheDocument()
     expect(screen.getByText('For orders with agreed pricing, choose Blanket Order.')).toBeInTheDocument()
-    expect(screen.queryByText(NOTE)).not.toBeInTheDocument()
   })
 })
 
@@ -772,6 +773,21 @@ describe('submit (S3-10)', () => {
       poRef: 'PO-8915', pickupDate: '', requestedDate: '', receivingPerson: '', receivingContact: '', receivingEmail: '', timeWindow: 'DAY',
       instructions: 'Loading type: Loose pile. Call before delivery: No.',
     })
+  })
+
+  test('a Blanket Order sends its typed prices and opens Blanket Orders with its number', async () => {
+    const user = userEvent.setup()
+    openSection()
+    await screen.findByRole('table', { name: 'Order lines' })
+    await user.click(screen.getByRole('radio', { name: 'Blanket Order' }))
+    await pickItem(user, 1, T1_BAG)
+    await setQty(user, 1, '10')
+    await user.type(screen.getByRole('spinbutton', { name: 'Unit price, line 1' }), '187.5')
+    await quoted('Transport / Freight', '₱0.00')
+    await confirmSubmit(user)
+    expect(await screen.findByText('BSO-100500 was submitted.')).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Blanket Orders' })).toHaveAttribute('aria-current', 'page')
+    expect(orderPosts()[0][1]!.body).toMatchObject({ orderType: 'blanket', paymentMethod: 'cash', lines: [{ code: 'CEM-T1-40KG', uom: 'BAG', qty: 10, price: 187.5 }] })
   })
 
   test('Submit asks first, with the order total; Cancel sends nothing', async () => {
