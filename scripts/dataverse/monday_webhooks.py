@@ -1,12 +1,12 @@
 """Register the monday.com webhooks that call the status webhook flow (S4-07, real-time status). Dev only. Idempotent.
-Runs ONLY against org1945492c, after `requests_flows.py --only WEBHOOK` has created the flow.
+Dev only (dv.py refuses any other org), after `requests_flows.py --only WEBHOOK` has created the flow.
 
 The flow's trigger URL carries its own signature, so it is a secret like the token: both are read in memory and never
 printed. Each board gets one `change_specific_column_value` webhook on its status column (from the column map env var), so
 other column edits don't run the flow; the flow re-reads the item, so only real status reaches Dataverse.
 
-Usage (from the repo root; .env or the shell holds DATAVERSE_URL=https://org1945492c.crm.dynamics.com):
-    CHP_SOLUTION=ConcreatHubRequests python scripts/dataverse/monday_webhooks.py
+Usage (from the repo root; .env or the shell holds DATAVERSE_URL=<Dev org URL>):
+    python scripts/dataverse/monday_webhooks.py
 """
 import json
 import os
@@ -15,14 +15,12 @@ import sys
 import requests
 
 sys.path.insert(0, os.path.dirname(__file__))
-from dv import SOLUTION, Dataverse, load_env  # noqa: E402
+from dv import Dataverse, load_env  # noqa: E402
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), '..'))
 from auth import get_token  # noqa: E402
 
 load_env()
-assert 'org1945492c' in os.environ.get('DATAVERSE_URL', ''), 'DATAVERSE_URL must be https://org1945492c.crm.dynamics.com'
-assert SOLUTION == 'ConcreatHubRequests', 'set CHP_SOLUTION=ConcreatHubRequests'
 
 WEBHOOK_FLOW = 'Concreat Connect – Service center status webhook'  # as named in requests_flows.py
 TRIGGER = 'monday_webhook'

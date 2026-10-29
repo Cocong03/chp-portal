@@ -1,11 +1,11 @@
 """Create or update the S4-07 service-center (monday.com) flows in ConcreatHubRequests. Dev only. Idempotent.
-Runs ONLY against org1945492c (the Requests/Complaints dev environment), like requests_schema.py.
+Dev only (dv.py refuses any other org), like requests_schema.py.
 
 Each flow's definition is the JSON file named in FLOWS (next to this file). Environment-specific values (monday API URL,
 board ids, column maps, token) come from environment variables at run time; the definitions hold none of them. The token
 (chp_MondayAPIToken) is set by hand and never read, set or printed here.
 
-Usage (from the repo root; .env or the shell holds DATAVERSE_URL=https://org1945492c.crm.dynamics.com):
+Usage (from the repo root; .env or the shell holds DATAVERSE_URL=<Dev org URL>):
     CHP_SOLUTION=ConcreatHubRequests python scripts/dataverse/requests_flows.py [--columns <map.json>] [--only <key>]
 --columns sets chp_MondayRequestsColumns / chp_MondayComplaintsColumns from a JSON file keyed by those schema names
 (the Task 0 spike's monday_columns_map.json), before the flows are turned on so they load the new values.
@@ -19,7 +19,6 @@ sys.path.insert(0, os.path.dirname(__file__))
 from dv import SOLUTION, Dataverse, load_env  # noqa: E402
 
 load_env()
-assert 'org1945492c' in os.environ.get('DATAVERSE_URL', ''), 'DATAVERSE_URL must be https://org1945492c.crm.dynamics.com'
 assert SOLUTION == 'ConcreatHubRequests', 'set CHP_SOLUTION=ConcreatHubRequests'
 
 API = 'shared_commondataserviceforapps'

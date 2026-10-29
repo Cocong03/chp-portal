@@ -1,7 +1,7 @@
 """S4-01 / S4-02 Requests and Complaints schema, monday.com env vars and taxonomy seed, in ConcreatHubRequests.
-Idempotent: existing parts are skipped. Runs ONLY against org1945492c (the Requests/Complaints dev environment).
+Idempotent: existing parts are skipped. Dev only (dv.py refuses any other org).
 
-Usage (from the repo root; .env holds DATAVERSE_URL=https://org1945492c.crm.dynamics.com and
+Usage (from the repo root; .env holds DATAVERSE_URL=<Dev org URL> and
 TENANT_ID=5a4137bf-7862-4197-9431-fd17f2b264d9):
     CHP_SOLUTION=ConcreatHubRequests python scripts/dataverse/requests_schema.py
 
@@ -16,7 +16,6 @@ from pathlib import Path
 from dv import SOLUTION, label, load_env, odata_literal, required  # dv puts scripts/ on sys.path
 
 load_env()
-assert 'org1945492c' in os.environ.get('DATAVERSE_URL', ''), 'DATAVERSE_URL must be https://org1945492c.crm.dynamics.com'
 assert os.environ.get('CHP_SOLUTION') == 'ConcreatHubRequests', 'set CHP_SOLUTION=ConcreatHubRequests'
 
 from identity_schema import choice, dv, ensure_attribute, ensure_lookup, ensure_table, text  # noqa: E402
