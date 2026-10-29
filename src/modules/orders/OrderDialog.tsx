@@ -37,7 +37,7 @@ export function OrderDialog({
 
   return (
     <Dialog open={!!id} onOpenChange={(open) => !open && onClose()}>
-      <DialogContent showCloseButton={false} className="max-h-[calc(100vh-40px)] max-w-[720px] overflow-y-auto rounded-2xl p-[22px]">
+      <DialogContent showCloseButton={false} className="max-h-[calc(100vh-40px)] overflow-y-auto sm:max-w-[720px] rounded-2xl p-[22px]">
         <DialogHeader>
           <DialogTitle className="font-mono">{id}</DialogTitle>
           <DialogDescription className="sr-only">{blanket ? "Blanket sales order details" : "Sales order details"}</DialogDescription>
