@@ -3,16 +3,23 @@ import { downloadDocument } from './downloadDocument'
 const serverLogic = vi.hoisted(() => vi.fn())
 vi.mock('@/api/serverLogic', () => ({ serverLogic }))
 
-afterEach(() => vi.restoreAllMocks())
+afterEach(() => {
+  vi.useRealTimers()
+  vi.restoreAllMocks()
+  vi.unstubAllGlobals()
+})
 
-test('downloads the PDF under its file name and revokes the URL', async () => {
+test('downloads the PDF under its file name and revokes the URL a minute later', async () => {
+  vi.useFakeTimers()
   serverLogic.mockResolvedValue({ fileName: 'Invoice INV-1.pdf', contentType: 'application/pdf', base64: btoa('%PDF-1.4') })
   const createObjectURL = vi.fn((_blob: Blob) => 'blob:x')
   const revokeObjectURL = vi.fn()
   vi.stubGlobal('URL', { createObjectURL, revokeObjectURL })
   let downloaded = ''
+  let attached = false
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) {
     downloaded = this.download
+    attached = this.isConnected
   })
 
   await downloadDocument({ type: 'Invoice', ref: 'INV-1' })
@@ -22,6 +29,9 @@ test('downloads the PDF under its file name and revokes the URL', async () => {
   expect(blob.type).toBe('application/pdf')
   expect(await blob.text()).toBe('%PDF-1.4')
   expect(downloaded).toBe('Invoice INV-1.pdf')
+  expect(attached).toBe(true)
+  expect(revokeObjectURL).not.toHaveBeenCalled()
+  vi.advanceTimersByTime(60_000)
   expect(revokeObjectURL).toHaveBeenCalledWith('blob:x')
 })
 

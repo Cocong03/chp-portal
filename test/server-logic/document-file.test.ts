@@ -122,6 +122,11 @@ test("file names lose characters Windows can't save", async () => {
   expect(JSON.parse(await load(server).get()).fileName).toBe('Invoice SPIN-01-02--x-.pdf')
 })
 
+test('BC answers an empty pdfBase64 → only the customer-safe error', async () => {
+  const { server } = fakeServer({ pdfAnswer: ok({ fileName: 'x.pdf', pdfBase64: '' }) })
+  await expect(load(server).get()).rejects.toThrow(SAFE)
+})
+
 test('BC down → only the customer-safe error', async () => {
   const { server } = fakeServer({ bcDown: true })
   await expect(load(server).get()).rejects.toThrow(SAFE)

@@ -47,7 +47,7 @@ function columns(downloading: Set<string>, onDownload: (doc: DocumentDto) => voi
     { id: 'type', header: 'Document type', cell: ({ row }) => row.original.type },
     { id: 'ref', header: 'Reference no.', cell: ({ row }) => row.original.ref, meta: mono },
     { id: 'soNo', header: 'Sales order no.', cell: ({ row }) => row.original.soNo ?? '—', meta: mono },
-    { id: 'date', header: 'Date', cell: ({ row }) => formatDate(row.original.date) },
+    { id: 'date', header: 'Date', cell: ({ row }) => formatDate(row.original.date), meta: mono },
     { id: 'amount', header: 'Amount', cell: ({ row }) => (row.original.amount === null ? '—' : peso(row.original.amount)), meta: amount },
     {
       id: 'download',
@@ -55,9 +55,16 @@ function columns(downloading: Set<string>, onDownload: (doc: DocumentDto) => voi
       cell: ({ row }) => {
         const busy = downloading.has(keyOf(row.original))
         return (
-          <Button variant="ghost" size="sm" disabled={busy} onClick={() => onDownload(row.original)}>
-            {busy ? 'Preparing…' : 'Download'}
-          </Button>
+          <TooltipProvider>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button variant="ghost" size="sm" disabled={busy} onClick={() => onDownload(row.original)}>
+                  {busy ? 'Preparing…' : 'Download'}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent>Downloads that document's current PDF.</TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         )
       },
     },

@@ -10,6 +10,8 @@ export async function downloadDocument(doc: Pick<DocumentDto, 'type' | 'ref'>): 
   const link = document.createElement('a')
   link.href = url
   link.download = file.fileName
+  document.body.appendChild(link) // Safari/older Firefox ignore clicks on detached links
   link.click()
-  URL.revokeObjectURL(url)
+  link.remove()
+  setTimeout(() => URL.revokeObjectURL(url), 60_000) // an immediate revoke can cancel the download
 }
