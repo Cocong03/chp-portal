@@ -2,8 +2,10 @@ import { useLocation } from 'react-router-dom'
 import type { PendingOrderDto } from '@/api/types'
 import { formatDate, peso } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { usePaged } from '@/lib/usePaged'
 import { useSites } from '@/modules/sites/useSites'
 import { PageHeader } from '@/ui/PageHeader'
+import { Pager } from '@/ui/Pager'
 import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Skeleton } from '@/ui/skeleton'
@@ -12,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { SiteCell } from './orderDisplay'
 import { usePendingOrders } from './useOrders'
 
+const NO_ORDERS: PendingOrderDto[] = []
 const TONE: Record<PendingOrderDto['status'], PillTone> = {
   'Awaiting credit approval': 'warn',
   'Approved — being processed': 'progress',
@@ -22,6 +25,7 @@ const TONE: Record<PendingOrderDto['status'], PillTone> = {
 export function PendingApprovalPage() {
   usePageTitle('Pending Approval')
   const orders = usePendingOrders()
+  const { pageRows, ...pager } = usePaged(orders.data ?? NO_ORDERS)
   const sites = useSites().data ?? []
   const sentForReview = (useLocation().state as { sentForReview?: boolean } | null)?.sentForReview
 
@@ -62,7 +66,7 @@ export function PendingApprovalPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                orders.data.map((order) => (
+                pageRows.map((order) => (
                   <TableRow key={order.id}>
                     <TableCell>{formatDate(order.submitted)}</TableCell>
                     <TableCell>{order.po || '—'}</TableCell>
@@ -88,6 +92,7 @@ export function PendingApprovalPage() {
             </TableBody>
           </Table>
         )}
+        {orders.data && <Pager {...pager} noun="order" />}
       </SectionCard>
     </>
   )

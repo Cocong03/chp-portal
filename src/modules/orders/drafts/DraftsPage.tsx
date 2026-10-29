@@ -5,10 +5,12 @@ import { toast } from 'sonner'
 import type { DraftDto, OrderOptionsDto } from '@/api/types'
 import { formatDate, peso } from '@/lib/format'
 import { usePageTitle } from '@/lib/usePageTitle'
+import { usePaged } from '@/lib/usePaged'
 import { useSites } from '@/modules/sites/useSites'
 import { Button } from '@/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/ui/dialog'
 import { PageHeader } from '@/ui/PageHeader'
+import { Pager } from '@/ui/Pager'
 import { QueryError } from '@/ui/QueryError'
 import { SectionCard } from '@/ui/SectionCard'
 import { Skeleton } from '@/ui/skeleton'
@@ -17,6 +19,8 @@ import { quoteRequest, typedSubtotal } from '../new/form'
 import { useOrderOptions } from '../new/useOrderOptions'
 import { quoteQuery } from '../new/useOrderQuote'
 import { useDeleteDraft, useDrafts } from './useDrafts'
+
+const NO_DRAFTS: DraftDto[] = []
 
 /**
  * A draft's Est. total: BC's quote at today's prices (S3-06), shared with New Order's cache; "—" when it can't be priced.
@@ -41,6 +45,7 @@ export function DraftsPage() {
   const sites = useSites().data
   const remove = useDeleteDraft()
   const [pending, setPending] = useState<DraftDto | null>(null)
+  const { pageRows, ...pager } = usePaged(drafts.data ?? NO_DRAFTS)
 
   const siteLabel = (code: string) => {
     const site = sites?.find((each) => each.code === code)
@@ -91,7 +96,7 @@ export function DraftsPage() {
                   </TableCell>
                 </TableRow>
               ) : (
-                drafts.data.map((draft) => (
+                pageRows.map((draft) => (
                   <TableRow key={draft.id}>
                     <TableCell>
                       {draft.label}{' '}
@@ -120,6 +125,7 @@ export function DraftsPage() {
             </TableBody>
           </Table>
         )}
+        {drafts.data && <Pager {...pager} noun="draft" />}
       </SectionCard>
       <Dialog open={pending !== null} onOpenChange={(open) => !open && !remove.isPending && setPending(null)}>
         <DialogContent className="sm:max-w-[420px]">

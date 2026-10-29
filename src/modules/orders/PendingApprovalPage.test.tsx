@@ -50,6 +50,18 @@ test('after a held submit, says it was sent to the credit team', async () => {
   expect(await screen.findByRole('status')).toHaveTextContent('Your order was sent to our credit team for review.')
 })
 
+test('pages 10 orders at a time, like the Orders tab', async () => {
+  const user = userEvent.setup()
+  answerPending(Array.from({ length: 12 }, (_, i) => ({ ...ROWS[0], id: `p${i}`, po: `PO-${i + 1}` })))
+  open()
+  const table = await screen.findByRole('table', { name: 'Pending Approval' })
+  expect(within(table).getAllByRole('row')).toHaveLength(11)
+  expect(screen.getByText('Showing 1–10 of 12 orders')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Next →' }))
+  expect(screen.getByText('Showing 11–12 of 12 orders')).toBeInTheDocument()
+  expect(within(table).getByRole('row', { name: /PO-12/ })).toBeInTheDocument()
+})
+
 test('shows an empty message', async () => {
   answerPending([])
   open()

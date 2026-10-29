@@ -3,10 +3,12 @@ import { Link } from "react-router-dom";
 import type { OrderSummaryDto, SiteDto } from "@/api/types";
 import { formatDate, peso } from "@/lib/format";
 import { usePageTitle } from "@/lib/usePageTitle";
+import { usePaged } from "@/lib/usePaged";
 import { useSites } from "@/modules/sites/useSites";
 import { Button } from "@/ui/button";
 import { DataTable, type DataColumn } from "@/ui/DataTable";
 import { PageHeader } from "@/ui/PageHeader";
+import { Pager } from "@/ui/Pager";
 import { QueryError } from "@/ui/QueryError";
 import { SectionCard } from "@/ui/SectionCard";
 import { ManageScheduleDialog } from "./ManageScheduleDialog";
@@ -55,6 +57,7 @@ export function BlanketOrdersPage() {
   const [scheduling, setScheduling] = useState<string | null>(null);
   const [saved, setSaved] = useState<string | null>(null);
   const tableColumns = useMemo(() => columns(sites, setViewing, setScheduling), [sites]);
+  const { pageRows, ...pager } = usePaged(orders.data?.orders ?? NO_ORDERS);
   return (
     <>
       <PageHeader title="Blanket Orders">
@@ -71,14 +74,17 @@ export function BlanketOrdersPage() {
         {orders.isError ? (
           <QueryError onRetry={() => void orders.refetch()} />
         ) : (
-          <DataTable
-            label="Blanket Orders"
-            columns={tableColumns}
-            data={orders.data?.orders ?? NO_ORDERS}
-            loading={orders.isPending}
-            emptyMessage="No Blanket Sales Orders yet."
-            className="shadow-none"
-          />
+          <>
+            <DataTable
+              label="Blanket Orders"
+              columns={tableColumns}
+              data={pageRows}
+              loading={orders.isPending}
+              emptyMessage="No Blanket Sales Orders yet."
+              className="shadow-none"
+            />
+            {orders.data && <Pager {...pager} noun="blanket order" />}
+          </>
         )}
       </SectionCard>
       <OrderDialog
