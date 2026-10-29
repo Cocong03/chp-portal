@@ -2,7 +2,7 @@
 
 Usage (from the repo root): python scripts/dataverse/identity_schema.py
 """
-from dv import Dataverse, label, required
+from dv import SOLUTION, Dataverse, label, required
 
 dv = Dataverse()
 
@@ -36,7 +36,7 @@ def ensure_attribute(table, attr):
     print(f'  + {table}.{logical}')
 
 
-def ensure_table(schema, display, plural, description, primary):
+def ensure_table(schema, display, plural, description, primary, has_notes=False):
     logical = schema.lower()
     if dv.get(f"EntityDefinitions(LogicalName='{logical}')?$select=LogicalName"):
         print(f'  = table {logical} exists')
@@ -44,7 +44,7 @@ def ensure_table(schema, display, plural, description, primary):
     dv.post('EntityDefinitions', {
         '@odata.type': 'Microsoft.Dynamics.CRM.EntityMetadata', 'SchemaName': schema,
         'DisplayName': label(display), 'DisplayCollectionName': label(plural), 'Description': label(description),
-        'OwnershipType': 'OrganizationOwned', 'IsActivity': False, 'HasActivities': False, 'HasNotes': False,
+        'OwnershipType': 'OrganizationOwned', 'IsActivity': False, 'HasActivities': False, 'HasNotes': has_notes,
         'Attributes': [primary],
     })
     print(f'  + table {logical}')
@@ -73,7 +73,7 @@ def ensure_option(table, column, value, text):
         print(f'  = {table}.{column} option {value} exists')
         return
     dv.post('InsertOptionValue', {'EntityLogicalName': table, 'AttributeLogicalName': column, 'Value': value,
-                                  'Label': label(text), 'SolutionUniqueName': 'ConcreatHub'})
+                                  'Label': label(text), 'SolutionUniqueName': SOLUTION})
     print(f'  + {table}.{column} option {value} {text}')
 
 

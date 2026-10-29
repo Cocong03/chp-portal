@@ -1,0 +1,14 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+append: true
+appendto: false
+create: true
+delete: false
+entitylogicalname: annotation
+entityname: Complaint note (create)
+id: 5d20b7e9-9c41-4a36-a8f3-e1c07b64d52a
+parententitypermission: 8e1b6c42-3a9d-4f07-b5c8-72d0e4a91f36
+parentrelationship: chp_complaint_Annotations
+read: true
+scope: 756150003
+write: false

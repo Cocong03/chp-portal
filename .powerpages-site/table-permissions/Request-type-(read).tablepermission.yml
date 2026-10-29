@@ -1,0 +1,13 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+append: false
+appendto: false
+create: false
+delete: false
+entitylogicalname: chp_requesttype
+entityname: Request type (read)
+id: c295bea2-6ac6-4d03-a940-547ee4f660fb
+read: true
+scope: 756150000
+write: false

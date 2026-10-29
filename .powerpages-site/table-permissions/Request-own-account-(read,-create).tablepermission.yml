@@ -1,0 +1,14 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+accountrelationship: chp_account_chp_request
+append: true
+appendto: true
+create: true
+delete: false
+entitylogicalname: chp_request
+entityname: Request - own account (read, create)
+id: d571c78d-ced9-499b-8d0b-819e59401649
+read: true
+scope: 756150002
+write: false

@@ -1,0 +1,474 @@
+{
+  "requests": [
+    {
+      "category": "Sales Order",
+      "active": true,
+      "fields": {
+        "rows": [
+          "order"
+        ],
+        "orderLabel": "Sales Order Number"
+      },
+      "types": [
+        {
+          "type": "Inquiry",
+          "group": "Service Center"
+        },
+        {
+          "type": "Modification",
+          "group": "Service Center"
+        },
+        {
+          "type": "Blocking/Unblocking",
+          "group": "Service Center"
+        },
+        {
+          "type": "Cancellation",
+          "group": "Service Center"
+        }
+      ]
+    },
+    {
+      "category": "Trip Reference",
+      "active": true,
+      "fields": {
+        "rows": [
+          "trip",
+          "order"
+        ],
+        "orderLabel": "Related Sales Order"
+      },
+      "types": [
+        {
+          "type": "Inquiry",
+          "group": "Logistics"
+        },
+        {
+          "type": "Creation",
+          "group": "Logistics"
+        },
+        {
+          "type": "Concern",
+          "group": "Logistics"
+        }
+      ]
+    },
+    {
+      "category": "Delivery",
+      "active": true,
+      "fields": {
+        "rows": [
+          "trip",
+          "order",
+          "site"
+        ],
+        "orderLabel": "Related Sales Order"
+      },
+      "types": [
+        {
+          "type": "Inquiry",
+          "group": "Logistics"
+        },
+        {
+          "type": "Concern",
+          "group": "Logistics"
+        }
+      ]
+    },
+    {
+      "category": "Adjustment",
+      "active": false,
+      "fields": {
+        "rows": [
+          "order",
+          "qty"
+        ],
+        "orderLabel": "Sales Order Number"
+      },
+      "types": [
+        {
+          "type": "Weight Discrepancy",
+          "group": "Finance"
+        },
+        {
+          "type": "Debit/Credit Memo",
+          "group": "Finance"
+        },
+        {
+          "type": "Diversion",
+          "group": "Finance"
+        },
+        {
+          "type": "Hardened Cement",
+          "group": "Finance"
+        },
+        {
+          "type": "Short-Landed Bags",
+          "group": "Finance"
+        },
+        {
+          "type": "Damaged Bags",
+          "group": "Finance"
+        },
+        {
+          "type": "Other Adjustment",
+          "group": "Finance"
+        }
+      ]
+    },
+    {
+      "category": "Document Copy",
+      "active": true,
+      "fields": {
+        "rows": [
+          "docref",
+          "docdate"
+        ]
+      },
+      "types": [
+        {
+          "type": "Delivery Receipt (DR)",
+          "group": "Service Center"
+        },
+        {
+          "type": "Bill of Lading",
+          "group": "Service Center"
+        },
+        {
+          "type": "Mill Certificate",
+          "group": "Service Center"
+        },
+        {
+          "type": "Offshore Documents",
+          "group": "Service Center"
+        }
+      ]
+    },
+    {
+      "category": "CHP Ordering Tool",
+      "active": true,
+      "fields": {
+        "rows": [
+          "userEmail"
+        ]
+      },
+      "types": [
+        {
+          "type": "Account Enrollment",
+          "group": "Service Center"
+        },
+        {
+          "type": "Technical Support",
+          "group": "Service Center"
+        }
+      ]
+    },
+    {
+      "category": "Customer Account",
+      "active": false,
+      "fields": {
+        "rows": [
+          "requestedAmount"
+        ]
+      },
+      "types": [
+        {
+          "type": "Credit Exposure & Limit",
+          "group": "Credit"
+        },
+        {
+          "type": "Available Credit Line",
+          "group": "Credit"
+        },
+        {
+          "type": "Account Enrollment",
+          "group": "Credit"
+        },
+        {
+          "type": "Invoice Reference",
+          "group": "Credit"
+        },
+        {
+          "type": "Past Due Balance",
+          "group": "Credit"
+        },
+        {
+          "type": "Credit Block/Unblock",
+          "group": "Credit"
+        }
+      ]
+    },
+    {
+      "category": "Sample Request",
+      "active": false,
+      "fields": {
+        "rows": [
+          "sampleDate",
+          "projectName",
+          "estVolume",
+          "projectUse"
+        ]
+      },
+      "types": [
+        {
+          "type": "Trial Mix",
+          "group": "Technical Services"
+        }
+      ]
+    },
+    {
+      "category": "Account Receivables",
+      "active": false,
+      "fields": {
+        "rows": [
+          "paymentRef",
+          "paymentDate",
+          "paymentAmount"
+        ]
+      },
+      "types": [
+        {
+          "type": "Auto-Debit Arrangement (ADA)",
+          "group": "Finance"
+        },
+        {
+          "type": "Past Due Balance",
+          "group": "Finance"
+        },
+        {
+          "type": "Account Details",
+          "group": "Finance"
+        },
+        {
+          "type": "Deposit Slip",
+          "group": "Finance"
+        },
+        {
+          "type": "Dragon Pay",
+          "group": "Finance"
+        },
+        {
+          "type": "Payment Method",
+          "group": "Finance"
+        }
+      ]
+    },
+    {
+      "category": "Technical Client Visit",
+      "active": false,
+      "fields": {
+        "rows": [
+          "visitSite",
+          "visitDate",
+          "order",
+          "siteContact"
+        ],
+        "orderLabel": "Related order (optional)",
+        "optional": [
+          "order"
+        ]
+      },
+      "types": [
+        {
+          "type": "Cement",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Concrete",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Admixture",
+          "group": "Technical Services"
+        }
+      ]
+    },
+    {
+      "category": "Other Request",
+      "active": true,
+      "fields": {
+        "rows": []
+      },
+      "types": [
+        {
+          "type": "Others",
+          "group": "Service Center"
+        }
+      ]
+    }
+  ],
+  "complaints": [
+    {
+      "category": "Billing & Documentation",
+      "types": [
+        {
+          "type": "Incorrect Delivery Receipt",
+          "group": "Finance"
+        },
+        {
+          "type": "Incorrect Invoice",
+          "group": "Finance"
+        },
+        {
+          "type": "Account Reconciliation",
+          "group": "Finance"
+        },
+        {
+          "type": "Other Billing or Documentation Concern",
+          "group": "Finance"
+        }
+      ]
+    },
+    {
+      "category": "Delivery & Handling",
+      "types": [
+        {
+          "type": "Delivery Delay",
+          "group": "Logistics"
+        },
+        {
+          "type": "Dispatch Coordination Issue",
+          "group": "Logistics"
+        },
+        {
+          "type": "Incorrect Product Delivered",
+          "group": "Logistics"
+        },
+        {
+          "type": "Missing Bags (Short Delivery)",
+          "group": "Logistics"
+        },
+        {
+          "type": "Missing Empty Bags (Offshore)",
+          "group": "Logistics"
+        },
+        {
+          "type": "Delivery Instructions Not Followed",
+          "group": "Logistics"
+        },
+        {
+          "type": "Undelivered Order",
+          "group": "Logistics"
+        },
+        {
+          "type": "Slow Loading for Pick-up Orders",
+          "group": "Logistics"
+        },
+        {
+          "type": "Unloading Issue",
+          "group": "Logistics"
+        },
+        {
+          "type": "Broken or Missing Seal",
+          "group": "Logistics"
+        },
+        {
+          "type": "Damaged Bulk Delivery Hose",
+          "group": "Logistics"
+        },
+        {
+          "type": "Forklift Issue",
+          "group": "Operations"
+        },
+        {
+          "type": "Pallet - Related Issue",
+          "group": "Operations"
+        },
+        {
+          "type": "Driver Conduct Concern",
+          "group": "Logistics"
+        },
+        {
+          "type": "Helper Conduct Concern",
+          "group": "Logistics"
+        },
+        {
+          "type": "Piler Service Concern",
+          "group": "Operations"
+        },
+        {
+          "type": "Customer Service Concern",
+          "group": "Service Center"
+        },
+        {
+          "type": "Area Sales Manager Concern",
+          "group": "Sales"
+        },
+        {
+          "type": "Other Delivery & Handling Concern",
+          "group": "Logistics"
+        }
+      ]
+    },
+    {
+      "category": "Product Quality",
+      "types": [
+        {
+          "type": "Weight Discrepancy",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Damaged Bags",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Hardened Cement",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Blaine-Related Issue",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Color Deviation",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Cracking Issue",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Fast Setting Time",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Slow Setting Time",
+          "group": "Technical Services"
+        },
+        {
+          "type": "High Cement Temperature",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Low Compressive Strength",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Dusty Bags",
+          "group": "Technical Services"
+        },
+        {
+          "type": "Other Quality Concern",
+          "group": "Technical Services"
+        }
+      ]
+    },
+    {
+      "category": "Safety Incident",
+      "types": [
+        {
+          "type": "Property Damage",
+          "group": "Healthy, Safety & Environment"
+        },
+        {
+          "type": "Personal Protective Equipment (PPE) Non-Compliance",
+          "group": "Healthy, Safety & Environment"
+        },
+        {
+          "type": "Other Safety Concern",
+          "group": "Healthy, Safety & Environment"
+        }
+      ]
+    }
+  ]
+}

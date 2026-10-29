@@ -1,0 +1,13 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+accountrelationship: chp_account_chp_complaint
+append: true
+appendto: true
+create: true
+delete: false
+entitylogicalname: chp_complaint
+entityname: Complaint - own account (read, create)
+id: 8e1b6c42-3a9d-4f07-b5c8-72d0e4a91f36
+read: true
+scope: 756150002
+write: false

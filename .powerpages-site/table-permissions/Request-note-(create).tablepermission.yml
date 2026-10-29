@@ -1,0 +1,15 @@
+adx_entitypermission_webrole:
+- 56b29291-b981-4ef0-865b-41c1e9523a97
+- 11bb7218-55fb-4cae-b8a1-5af2f41237c5
+append: true
+appendto: false
+create: true
+delete: false
+entitylogicalname: annotation
+entityname: Request note (create)
+id: 31290f4c-04b7-4a00-962e-1f54be89c570
+parententitypermission: d571c78d-ced9-499b-8d0b-819e59401649
+parentrelationship: chp_request_Annotations
+read: true
+scope: 756150003
+write: false
