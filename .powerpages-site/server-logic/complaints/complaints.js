@@ -186,6 +186,64 @@ async function get() {
         return archived.filter((row) => liveNos.indexOf(row.salesOrderNo) === -1).sort(newestOrderFirst);
     }
 
+    // New Order choices shared by order-quote and the orders POST (S3-06/S3-10): shipment method, source plant, delivery site
+    // ("" for pick up) and 1–50 lines; null when anything is missing or out of range.
+    function orderChoices(body) {
+        var delivery = body.shipmentMethod === "delivery";
+        var lines = Array.isArray(body.lines) ? body.lines : [];
+        var choices = {
+            delivery: delivery,
+            source: requestText(body.source, 20),
+            site: delivery ? requestText(body.site, 20) : "",
+            lines: lines.map((line) => ({
+                code: requestText(line && line.code, 20),
+                uom: requestText(line && line.uom, 10),
+                qty: Number(line && line.qty)
+            }))
+        };
+        var valid = (delivery || body.shipmentMethod === "pickup") && choices.source && choices.site !== null &&
+            lines.length > 0 && lines.length <= 50 &&
+            choices.lines.every((line) => line.code && line.uom && Number.isFinite(line.qty) && line.qty > 0 && line.qty <= 1000000);
+        return valid ? choices : null;
+    }
+
+    // A non-empty string of at most max characters, trimmed; null otherwise.
+    function requestText(value, max) {
+        return typeof value === "string" && value.trim() && value.length <= max ? value.trim() : null;
+    }
+
+    // Today's date in the Philippines (UTC+8): the Server Logic clock is UTC.
+    function manilaToday() {
+        return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    }
+
+    function cents(value) {
+        return Math.round(value * 100) / 100;
+    }
+
+    // BC's price for one line (portalPriceQuotes: one line per call, computed in memory, never stored). chargeRateMissing is
+    // left out for now (decided 2026-10-23); message is written for customers.
+    async function quoteLine(scope, choices, line, orderDate) {
+        var row = await bcPost(scope, "portalPriceQuotes", {
+            customerNo: scope.customerNo,
+            itemNo: line.code,
+            sourcePlant: choices.source,
+            shipmentMethodCode: choices.delivery ? "DELIVERY" : "PICKUP",
+            shipToCode: choices.site,
+            unitOfMeasureCode: line.uom,
+            quantity: line.qty,
+            orderDate: orderDate
+        });
+        return {
+            unitPrice: Number(row.unitPrice) || 0,
+            lineAmount: Number(row.lineAmount) || 0,
+            freight: Number(row.freightAmount) || 0,
+            otherCharges: cents((Number(row.fuelSurchargeAmount) || 0) + (Number(row.portChargesAmount) || 0)),
+            total: Number(row.totalAmount) || 0,
+            message: String(row.message || "")
+        };
+    }
+
     // OData string literal with single quotes doubled (architecture rule 4).
     function odataLiteral(value) {
         return "'" + String(value).split("'").join("''") + "'";
@@ -545,6 +603,64 @@ async function post() {
         var live = await bcGet(scope, "mcrmSalesOrders", odataQuery({ $filter: base, $select: "salesOrderNo", $top: "1000" }));
         var liveNos = ((live && live.value) || []).map((row) => row.salesOrderNo);
         return archived.filter((row) => liveNos.indexOf(row.salesOrderNo) === -1).sort(newestOrderFirst);
+    }
+
+    // New Order choices shared by order-quote and the orders POST (S3-06/S3-10): shipment method, source plant, delivery site
+    // ("" for pick up) and 1–50 lines; null when anything is missing or out of range.
+    function orderChoices(body) {
+        var delivery = body.shipmentMethod === "delivery";
+        var lines = Array.isArray(body.lines) ? body.lines : [];
+        var choices = {
+            delivery: delivery,
+            source: requestText(body.source, 20),
+            site: delivery ? requestText(body.site, 20) : "",
+            lines: lines.map((line) => ({
+                code: requestText(line && line.code, 20),
+                uom: requestText(line && line.uom, 10),
+                qty: Number(line && line.qty)
+            }))
+        };
+        var valid = (delivery || body.shipmentMethod === "pickup") && choices.source && choices.site !== null &&
+            lines.length > 0 && lines.length <= 50 &&
+            choices.lines.every((line) => line.code && line.uom && Number.isFinite(line.qty) && line.qty > 0 && line.qty <= 1000000);
+        return valid ? choices : null;
+    }
+
+    // A non-empty string of at most max characters, trimmed; null otherwise.
+    function requestText(value, max) {
+        return typeof value === "string" && value.trim() && value.length <= max ? value.trim() : null;
+    }
+
+    // Today's date in the Philippines (UTC+8): the Server Logic clock is UTC.
+    function manilaToday() {
+        return new Date(Date.now() + 8 * 3600000).toISOString().slice(0, 10);
+    }
+
+    function cents(value) {
+        return Math.round(value * 100) / 100;
+    }
+
+    // BC's price for one line (portalPriceQuotes: one line per call, computed in memory, never stored). chargeRateMissing is
+    // left out for now (decided 2026-10-23); message is written for customers.
+    async function quoteLine(scope, choices, line, orderDate) {
+        var row = await bcPost(scope, "portalPriceQuotes", {
+            customerNo: scope.customerNo,
+            itemNo: line.code,
+            sourcePlant: choices.source,
+            shipmentMethodCode: choices.delivery ? "DELIVERY" : "PICKUP",
+            shipToCode: choices.site,
+            unitOfMeasureCode: line.uom,
+            quantity: line.qty,
+            orderDate: orderDate
+        });
+        return {
+            unitPrice: Number(row.unitPrice) || 0,
+            lineAmount: Number(row.lineAmount) || 0,
+            freight: Number(row.freightAmount) || 0,
+            otherCharges: cents((Number(row.fuelSurchargeAmount) || 0) + (Number(row.portChargesAmount) || 0)),
+            total: Number(row.totalAmount) || 0,
+            message: String(row.message || "")
+        };
     }
 
     // OData string literal with single quotes doubled (architecture rule 4).
