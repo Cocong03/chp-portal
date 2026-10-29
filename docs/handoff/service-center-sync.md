@@ -35,7 +35,8 @@ If the service center team changes a column on a board, the column id usually ch
 
 Each board needs one webhook pointing at the webhook flow's trigger URL. It should be set to "when a specific column changes" on the Status column only, so edits to other columns don't start the flow.
 
-- **Dev:** already registered.
+- **Dev:** registered 2026-10-29 with `monday_webhooks.py --add`. The boards also carry the reco environment's hooks, so each status change runs both environments' webhook flows; each only updates its own rows.
+- **Shared boards:** the send flows reuse an existing item with the same reference. Two environments on the same boards must use different reference ranges, or one links to the other's items. Our Dev's autonumber seed starts at 20000 (RQ-20000, CMP-20000).
 - **A new environment:** it has its own trigger URL, so the webhooks have to be registered again. The URL carries its own signature, so treat it like a password. There are two ways:
   - `scripts/dataverse/monday_webhooks.py` gets the URL from the flow and registers it on both boards. It needs a token with permission to add webhooks, and it only runs against the dev org unless you change the check at the top.
   - Or someone with board admin rights adds them in monday: Integrate → Webhooks → "When a column changes" → Status, then paste the URL.
