@@ -1,0 +1,863 @@
+{
+  "$schema": "https://schema.management.azure.com/providers/Microsoft.Logic/schemas/2016-06-01/workflowdefinition.json#",
+  "contentVersion": "1.0.0.0",
+  "parameters": {
+    "$authentication": {
+      "defaultValue": {},
+      "type": "SecureObject"
+    },
+    "$connections": {
+      "defaultValue": {},
+      "type": "Object"
+    },
+    "monday.com API URL (chp_MondayApiUrl)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayApiUrl",
+        "description": "monday.com API URL"
+      }
+    },
+    "monday API Token (chp_MondayAPIToken)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayAPIToken",
+        "description": "monday API Token"
+      }
+    },
+    "monday.com Complaints board ID (chp_MondayComplaintsBoardId)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayComplaintsBoardId",
+        "description": "monday.com Complaints board ID"
+      }
+    },
+    "monday.com Complaints column map (chp_MondayComplaintsColumns)": {
+      "defaultValue": "",
+      "type": "String",
+      "metadata": {
+        "schemaName": "chp_MondayComplaintsColumns",
+        "description": "monday.com Complaints column map"
+      }
+    }
+  },
+  "triggers": {
+    "When_a_complaint_is_added_or_modified": {
+      "type": "OpenApiConnectionWebhook",
+      "inputs": {
+        "host": {
+          "connectionName": "shared_commondataserviceforapps",
+          "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+          "operationId": "SubscribeWebhookTrigger"
+        },
+        "parameters": {
+          "subscriptionRequest/message": 4,
+          "subscriptionRequest/entityname": "chp_complaint",
+          "subscriptionRequest/scope": 4,
+          "subscriptionRequest/filteringattributes": "chp_syncattempts,chp_syncstate"
+        }
+      },
+      "runtimeConfiguration": {
+        "concurrency": {
+          "runs": 1
+        }
+      },
+      "conditions": [
+        {
+          "expression": "@and(empty(triggerOutputs()?['body/chp_mondayitemid']), equals(triggerOutputs()?['body/chp_syncstate'], 775000000))"
+        }
+      ]
+    }
+  },
+  "actions": {
+    "Init_failure": {
+      "type": "InitializeVariable",
+      "runAfter": {},
+      "inputs": {
+        "variables": [
+          {
+            "name": "Failure",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Init_item_id": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Init_failure": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "ItemId",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Init_sync_note": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Init_item_id": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "SyncNote",
+            "type": "string",
+            "value": ""
+          }
+        ]
+      }
+    },
+    "Init_values": {
+      "type": "InitializeVariable",
+      "runAfter": {
+        "Init_sync_note": [
+          "Succeeded"
+        ]
+      },
+      "inputs": {
+        "variables": [
+          {
+            "name": "Values",
+            "type": "object",
+            "value": {}
+          }
+        ]
+      }
+    },
+    "Send_to_monday": {
+      "type": "Scope",
+      "runAfter": {
+        "Init_values": [
+          "Succeeded"
+        ]
+      },
+      "actions": {
+        "Get_complaint": {
+          "type": "OpenApiConnection",
+          "runAfter": {},
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "GetItem"
+            },
+            "parameters": {
+              "entityName": "chp_complaints",
+              "recordId": "@triggerOutputs()?['body/chp_complaintid']",
+              "$select": "chp_reference,chp_category,chp_complainttype,chp_contactmethod,chp_contactvalue,chp_contactperson,chp_subject,chp_description,chp_incidentdate,chp_sitelabel,chp_relatedorder,chp_consent,chp_attachmentname,_chp_account_value,chp_mondayitemid,chp_syncstate"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Already_handled": {
+          "type": "If",
+          "runAfter": {
+            "Get_complaint": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "or": [
+              {
+                "equals": [
+                  "@empty(outputs('Get_complaint')?['body/chp_mondayitemid'])",
+                  false
+                ]
+              },
+              {
+                "not": {
+                  "equals": [
+                    "@outputs('Get_complaint')?['body/chp_syncstate']",
+                    775000000
+                  ]
+                }
+              }
+            ]
+          },
+          "actions": {
+            "Nothing_to_send": {
+              "type": "Terminate",
+              "runAfter": {},
+              "inputs": {
+                "runStatus": "Succeeded"
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "description": "R13: another run already sent this row (or it is no longer Pending): do nothing."
+        },
+        "Get_account": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Already_handled": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "GetItem"
+            },
+            "parameters": {
+              "entityName": "accounts",
+              "recordId": "@outputs('Get_complaint')?['body/_chp_account_value']",
+              "$select": "name,chp_bccustomerno"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "List_notes": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Get_account": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "ListRecords"
+            },
+            "parameters": {
+              "entityName": "annotations",
+              "$select": "filename,mimetype,documentbody",
+              "$filter": "_objectid_value eq @{triggerOutputs()?['body/chp_complaintid']} and isdocument eq true",
+              "$orderby": "createdon asc",
+              "$top": 1
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        },
+        "Check_attachment": {
+          "type": "If",
+          "runAfter": {
+            "List_notes": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "and": [
+              {
+                "equals": [
+                  "@empty(outputs('Get_complaint')?['body/chp_attachmentname'])",
+                  false
+                ]
+              },
+              {
+                "equals": [
+                  "@empty(outputs('List_notes')?['body/value'])",
+                  true
+                ]
+              }
+            ]
+          },
+          "actions": {
+            "Fail_attachment": {
+              "type": "SetVariable",
+              "runAfter": {},
+              "inputs": {
+                "name": "Failure",
+                "value": "attachment not found yet"
+              }
+            },
+            "Throw_attachment": {
+              "type": "Compose",
+              "runAfter": {
+                "Fail_attachment": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@div(1, 0)",
+              "description": "Fails the send on purpose: Mark_failed writes the Failure text to the row."
+            }
+          },
+          "else": {
+            "actions": {}
+          },
+          "description": "R11: the note is deep-inserted with the row; if it is missing, fail so the sync flow re-sends later."
+        },
+        "Columns": {
+          "type": "Compose",
+          "runAfter": {
+            "Check_attachment": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@json(parameters('monday.com Complaints column map (chp_MondayComplaintsColumns)'))"
+        },
+        "Find_existing_item": {
+          "type": "Http",
+          "runAfter": {
+            "Columns": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "method": "POST",
+            "uri": "@parameters('monday.com API URL (chp_MondayApiUrl)')",
+            "headers": {
+              "Authorization": "@parameters('monday API Token (chp_MondayAPIToken)')",
+              "API-Version": "2026-10",
+              "Content-Type": "application/json"
+            },
+            "body": {
+              "query": "query ($board: ID!, $columns: [ItemsPageByColumnValuesQuery!]) { items_page_by_column_values(board_id: $board, columns: $columns, limit: 1) { items { id } } boards(ids: [$board]) { groups { id title } } }",
+              "variables": {
+                "board": "@parameters('monday.com Complaints board ID (chp_MondayComplaintsBoardId)')",
+                "columns": [
+                  {
+                    "column_id": "@outputs('Columns')?['reference']?['id']",
+                    "column_values": [
+                      "@outputs('Get_complaint')?['body/chp_reference']"
+                    ]
+                  }
+                ]
+              }
+            },
+            "retryPolicy": {
+              "type": "exponential",
+              "count": 4,
+              "interval": "PT10S"
+            }
+          },
+          "runtimeConfiguration": {
+            "secureData": {
+              "properties": [
+                "inputs",
+                "outputs"
+              ]
+            }
+          }
+        },
+        "Check_find": {
+          "type": "If",
+          "runAfter": {
+            "Find_existing_item": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "equals": [
+              "@empty(body('Find_existing_item')?['errors'])",
+              false
+            ]
+          },
+          "actions": {
+            "Fail_Find_existing_item": {
+              "type": "SetVariable",
+              "runAfter": {},
+              "inputs": {
+                "name": "Failure",
+                "value": "@concat('monday find: ', string(body('Find_existing_item')?['errors']))"
+              }
+            },
+            "Throw_Find_existing_item": {
+              "type": "Compose",
+              "runAfter": {
+                "Fail_Find_existing_item": [
+                  "Succeeded"
+                ]
+              },
+              "inputs": "@div(1, 0)",
+              "description": "Fails the send on purpose: Mark_failed writes the Failure text to the row."
+            }
+          },
+          "else": {
+            "actions": {}
+          }
+        },
+        "Existing_item_found": {
+          "type": "If",
+          "runAfter": {
+            "Check_find": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "equals": [
+              "@empty(body('Find_existing_item')?['data']?['items_page_by_column_values']?['items'])",
+              false
+            ]
+          },
+          "actions": {
+            "Use_existing_item": {
+              "type": "SetVariable",
+              "runAfter": {},
+              "inputs": {
+                "name": "ItemId",
+                "value": "@{first(body('Find_existing_item')?['data']?['items_page_by_column_values']?['items'])?['id']}"
+              }
+            }
+          },
+          "else": {
+            "actions": {
+              "Block_lines": {
+                "type": "Query",
+                "runAfter": {},
+                "inputs": {
+                  "from": "@createArray(if(empty(outputs('Get_complaint')?['body/chp_relatedorder']), '', concat('Related order: ', outputs('Get_complaint')?['body/chp_relatedorder'])), if(empty(outputs('Get_complaint')?['body/chp_sitelabel']), '', concat('Delivery site: ', outputs('Get_complaint')?['body/chp_sitelabel'])))",
+                  "where": "@not(empty(item()))"
+                }
+              },
+              "Details_text": {
+                "type": "Compose",
+                "runAfter": {
+                  "Block_lines": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": "@if(empty(body('Block_lines')), coalesce(outputs('Get_complaint')?['body/chp_description'], ''), concat(join(body('Block_lines'), decodeUriComponent('%0A')), decodeUriComponent('%0A'), decodeUriComponent('%0A'), coalesce(outputs('Get_complaint')?['body/chp_description'], '')))"
+              },
+              "Row_columns": {
+                "type": "Compose",
+                "runAfter": {
+                  "Details_text": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": [
+                  {
+                    "id": "@outputs('Columns')?['reference']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_reference']}",
+                    "value": "@{outputs('Get_complaint')?['body/chp_reference']}"
+                  },
+                  {
+                    "id": "@outputs('Columns')?['status']?['id']",
+                    "raw": "Submitted",
+                    "value": {
+                      "label": "Submitted"
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['category']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_category']}",
+                    "value": {
+                      "labels": [
+                        "@{outputs('Get_complaint')?['body/chp_category']}"
+                      ]
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['subject']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_subject']}",
+                    "value": {
+                      "text": "@{outputs('Get_complaint')?['body/chp_subject']}"
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['complaintType']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_complainttype']}",
+                    "value": {
+                      "labels": [
+                        "@{outputs('Get_complaint')?['body/chp_complainttype']}"
+                      ]
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['contactMethod']?['id']",
+                    "raw": "@{if(equals(outputs('Get_complaint')?['body/chp_contactmethod'], 775000001), 'Mobile', 'Email')}",
+                    "value": {
+                      "labels": [
+                        "@{if(equals(outputs('Get_complaint')?['body/chp_contactmethod'], 775000001), 'Mobile', 'Email')}"
+                      ]
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['contactValue']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_contactvalue']}",
+                    "value": {
+                      "text": "@{outputs('Get_complaint')?['body/chp_contactvalue']}"
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['contactPerson']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_contactperson']}",
+                    "value": "@{outputs('Get_complaint')?['body/chp_contactperson']}"
+                  },
+                  {
+                    "id": "@outputs('Columns')?['incidentDate']?['id']",
+                    "raw": "@{outputs('Get_complaint')?['body/chp_incidentdate']}",
+                    "value": {
+                      "date": "@{take(coalesce(outputs('Get_complaint')?['body/chp_incidentdate'], ''), 10)}"
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['description']?['id']",
+                    "raw": "@{outputs('Details_text')}",
+                    "value": {
+                      "text": "@{outputs('Details_text')}"
+                    }
+                  },
+                  {
+                    "id": "@outputs('Columns')?['consent']?['id']",
+                    "raw": "@{if(equals(outputs('Get_complaint')?['body/chp_consent'], true), 'true', '')}",
+                    "value": {
+                      "checked": "true"
+                    }
+                  }
+                ]
+              },
+              "Column_values": {
+                "type": "Query",
+                "runAfter": {
+                  "Row_columns": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "from": "@outputs('Row_columns')",
+                  "where": "@and(not(empty(item()?['id'])), not(empty(item()?['raw'])))"
+                },
+                "description": "Empty values are left out (Task 0: omitting a column is the simplest empty value)."
+              },
+              "Build_values": {
+                "type": "Foreach",
+                "runAfter": {
+                  "Column_values": [
+                    "Succeeded"
+                  ]
+                },
+                "foreach": "@body('Column_values')",
+                "runtimeConfiguration": {
+                  "concurrency": {
+                    "repetitions": 1
+                  }
+                },
+                "actions": {
+                  "Add_value": {
+                    "type": "Compose",
+                    "runAfter": {},
+                    "inputs": "@setProperty(variables('Values'), items('Build_values')?['id'], items('Build_values')?['value'])"
+                  },
+                  "Set_values": {
+                    "type": "SetVariable",
+                    "runAfter": {
+                      "Add_value": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": {
+                      "name": "Values",
+                      "value": "@outputs('Add_value')"
+                    }
+                  }
+                }
+              },
+              "Matching_group": {
+                "type": "Query",
+                "runAfter": {
+                  "Build_values": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "from": "@first(body('Find_existing_item')?['data']?['boards'])?['groups']",
+                  "where": "@equals(item()?['title'], outputs('Get_complaint')?['body/chp_category'])"
+                }
+              },
+              "Set_sync_note": {
+                "type": "SetVariable",
+                "runAfter": {
+                  "Matching_group": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "name": "SyncNote",
+                  "value": "@if(empty(body('Matching_group')), concat('group not found: ', outputs('Get_complaint')?['body/chp_category']), '')"
+                }
+              },
+              "Create_item": {
+                "type": "Http",
+                "runAfter": {
+                  "Set_sync_note": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "method": "POST",
+                  "uri": "@parameters('monday.com API URL (chp_MondayApiUrl)')",
+                  "headers": {
+                    "Authorization": "@parameters('monday API Token (chp_MondayAPIToken)')",
+                    "API-Version": "2026-10",
+                    "Content-Type": "application/json"
+                  },
+                  "body": {
+                    "query": "mutation ($board: ID!, $group: String!, $name: String!, $values: JSON!) { create_item(board_id: $board, group_id: $group, item_name: $name, column_values: $values, create_labels_if_missing: true) { id } }",
+                    "variables": {
+                      "board": "@parameters('monday.com Complaints board ID (chp_MondayComplaintsBoardId)')",
+                      "group": "@if(empty(body('Matching_group')), first(first(body('Find_existing_item')?['data']?['boards'])?['groups'])?['id'], first(body('Matching_group'))?['id'])",
+                      "name": "@{outputs('Get_complaint')?['body/chp_reference']} · @{outputs('Get_account')?['body/name']} (@{outputs('Get_account')?['body/chp_bccustomerno']})",
+                      "values": "@string(variables('Values'))"
+                    }
+                  },
+                  "retryPolicy": {
+                    "type": "none"
+                  }
+                },
+                "runtimeConfiguration": {
+                  "secureData": {
+                    "properties": [
+                      "inputs",
+                      "outputs"
+                    ]
+                  }
+                }
+              },
+              "Check_create": {
+                "type": "If",
+                "runAfter": {
+                  "Create_item": [
+                    "Succeeded"
+                  ]
+                },
+                "expression": {
+                  "or": [
+                    {
+                      "equals": [
+                        "@empty(body('Create_item')?['errors'])",
+                        false
+                      ]
+                    },
+                    {
+                      "equals": [
+                        "@empty(body('Create_item')?['data']?['create_item']?['id'])",
+                        true
+                      ]
+                    }
+                  ]
+                },
+                "actions": {
+                  "Fail_Create_item": {
+                    "type": "SetVariable",
+                    "runAfter": {},
+                    "inputs": {
+                      "name": "Failure",
+                      "value": "@concat('monday create: ', string(body('Create_item')?['errors']))"
+                    }
+                  },
+                  "Throw_Create_item": {
+                    "type": "Compose",
+                    "runAfter": {
+                      "Fail_Create_item": [
+                        "Succeeded"
+                      ]
+                    },
+                    "inputs": "@div(1, 0)",
+                    "description": "Fails the send on purpose: Mark_failed writes the Failure text to the row."
+                  }
+                },
+                "else": {
+                  "actions": {}
+                }
+              },
+              "Use_new_item": {
+                "type": "SetVariable",
+                "runAfter": {
+                  "Check_create": [
+                    "Succeeded"
+                  ]
+                },
+                "inputs": {
+                  "name": "ItemId",
+                  "value": "@{body('Create_item')?['data']?['create_item']?['id']}"
+                }
+              }
+            }
+          },
+          "description": "Review Focus 4: an item with this Reference already exists when an earlier id write-back failed."
+        },
+        "Has_note": {
+          "type": "If",
+          "runAfter": {
+            "Existing_item_found": [
+              "Succeeded"
+            ]
+          },
+          "expression": {
+            "equals": [
+              "@empty(outputs('List_notes')?['body/value'])",
+              false
+            ]
+          },
+          "actions": {
+            "Upload_file": {
+              "type": "Http",
+              "runAfter": {},
+              "inputs": {
+                "method": "POST",
+                "uri": "@{parameters('monday.com API URL (chp_MondayApiUrl)')}/file",
+                "headers": {
+                  "Authorization": "@parameters('monday API Token (chp_MondayAPIToken)')",
+                  "API-Version": "2026-10"
+                },
+                "body": {
+                  "$content-type": "multipart/form-data",
+                  "$multipart": [
+                    {
+                      "headers": {
+                        "Content-Disposition": "form-data; name=\"query\""
+                      },
+                      "body": "mutation ($file: File!) { add_file_to_column(item_id: @{int(variables('ItemId'))}, column_id: \"@{outputs('Columns')?['file']?['id']}\", file: $file) { id } }"
+                    },
+                    {
+                      "headers": {
+                        "Content-Disposition": "form-data; name=\"variables[file]\"; filename=\"@{replace(first(outputs('List_notes')?['body/value'])?['filename'], '\"', '')}\""
+                      },
+                      "body": {
+                        "$content-type": "@{coalesce(first(outputs('List_notes')?['body/value'])?['mimetype'], 'application/octet-stream')}",
+                        "$content": "@{first(outputs('List_notes')?['body/value'])?['documentbody']}"
+                      }
+                    }
+                  ]
+                },
+                "retryPolicy": {
+                  "type": "exponential",
+                  "count": 4,
+                  "interval": "PT10S"
+                }
+              },
+              "runtimeConfiguration": {
+                "secureData": {
+                  "properties": [
+                    "inputs",
+                    "outputs"
+                  ]
+                }
+              }
+            },
+            "Check_upload": {
+              "type": "If",
+              "runAfter": {
+                "Upload_file": [
+                  "Succeeded"
+                ]
+              },
+              "expression": {
+                "equals": [
+                  "@empty(body('Upload_file')?['errors'])",
+                  false
+                ]
+              },
+              "actions": {
+                "Fail_Upload_file": {
+                  "type": "SetVariable",
+                  "runAfter": {},
+                  "inputs": {
+                    "name": "Failure",
+                    "value": "@concat('monday file upload: ', string(body('Upload_file')?['errors']))"
+                  }
+                },
+                "Throw_Upload_file": {
+                  "type": "Compose",
+                  "runAfter": {
+                    "Fail_Upload_file": [
+                      "Succeeded"
+                    ]
+                  },
+                  "inputs": "@div(1, 0)",
+                  "description": "Fails the send on purpose: Mark_failed writes the Failure text to the row."
+                }
+              },
+              "else": {
+                "actions": {}
+              }
+            }
+          },
+          "else": {
+            "actions": {}
+          }
+        },
+        "Set_sync_sent": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Has_note": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord"
+            },
+            "parameters": {
+              "entityName": "chp_complaints",
+              "recordId": "@triggerOutputs()?['body/chp_complaintid']",
+              "item/chp_mondayitemid": "@variables('ItemId')",
+              "item/chp_syncstate": 775000001,
+              "item/chp_syncerror": "@variables('SyncNote')"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    },
+    "Mark_failed": {
+      "type": "Scope",
+      "runAfter": {
+        "Send_to_monday": [
+          "Failed",
+          "TimedOut"
+        ]
+      },
+      "actions": {
+        "Failed_steps": {
+          "type": "Query",
+          "runAfter": {},
+          "inputs": {
+            "from": "@result('Send_to_monday')",
+            "where": "@equals(item()?['status'], 'Failed')"
+          }
+        },
+        "Error_text": {
+          "type": "Compose",
+          "runAfter": {
+            "Failed_steps": [
+              "Succeeded"
+            ]
+          },
+          "inputs": "@if(empty(variables('Failure')), concat('send failed: ', coalesce(first(body('Failed_steps'))?['error']?['message'], 'unknown error')), variables('Failure'))"
+        },
+        "Set_sync_failed": {
+          "type": "OpenApiConnection",
+          "runAfter": {
+            "Error_text": [
+              "Succeeded"
+            ]
+          },
+          "inputs": {
+            "host": {
+              "connectionName": "shared_commondataserviceforapps",
+              "apiId": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+              "operationId": "UpdateOnlyRecord"
+            },
+            "parameters": {
+              "entityName": "chp_complaints",
+              "recordId": "@triggerOutputs()?['body/chp_complaintid']",
+              "item/chp_syncstate": 775000002,
+              "item/chp_syncerror": "@take(outputs('Error_text'), 2000)"
+            },
+            "authentication": "@parameters('$authentication')"
+          }
+        }
+      }
+    }
+  }
+}
