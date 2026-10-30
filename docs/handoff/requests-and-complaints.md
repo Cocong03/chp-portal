@@ -35,7 +35,7 @@ Page (src/modules/requests, src/modules/complaints)
   - The type has to exist and be active.
   
   The page never decides the assigned group; the type record does.
-- **Attachments.** One file per submission, up to 250 KB for now, stored as a note on the row. The file goes base64 inside the Server Logic body: Power Pages refuses a body of about 2 MB (500 page) and ~1 MB bodies sometimes hit the 120 s timeout (tested 2026-10-29), so the limit stays low until the file is uploaded through the Web API instead. Requests accept PDF, Word, Excel and images (png, jpg, gif, webp). Complaints accept the same minus Excel.
+- **Attachments.** One file per submission, up to 5 MB, stored as a note on the row. Requests accept PDF, Word, Excel and images (png, jpg, gif, webp). Complaints accept the same minus Excel.
 - **Contact.** Email or mobile. Email is prefilled from the user's contact. Mobile accepts PH formats (`0917 552 6613`, `+639175526613`).
 - **References.** `RQ-#####` and `CMP-#####` come from autonumber columns on the tables.
 

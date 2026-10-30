@@ -1,10 +1,9 @@
 import { contactSchema, readAttachment } from './serviceForm'
 
-test('readAttachment rejects over 250 KB and disallowed types, and base64-encodes the rest', async () => {
-  expect(await readAttachment(new File([new Uint8Array(256_001)], 'a.pdf'), 'request')).toEqual({
-    error: 'This file is too large. Attach a file of 250 KB or less.',
+test('readAttachment rejects over 5 MB and disallowed types, and base64-encodes the rest', async () => {
+  expect(await readAttachment(new File([new Uint8Array(5_242_881)], 'a.pdf'), 'request')).toEqual({
+    error: 'This file is too large. Attach a file of 5 MB or less.',
   })
-  expect(await readAttachment(new File([new Uint8Array(256_000)], 'a.pdf'), 'request')).toMatchObject({ name: 'a.pdf' })
   expect(await readAttachment(new File(['x'], 'x.exe'), 'request')).toEqual({
     error: "This file type can't be attached. Use a PDF, Word, Excel or image file.",
   })

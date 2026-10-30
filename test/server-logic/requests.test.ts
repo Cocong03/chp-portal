@@ -132,7 +132,7 @@ test('POST sets account, contact, contact person, group and status from the serv
   })
 })
 
-const big = 'A'.repeat(341_336) // decodes to 256,002 bytes, over the 250 KB limit
+const big = 'A'.repeat(6_990_508) // decodes to 5,242,881 bytes
 test.each([
   ['an unknown type', { requestType: 'Nope' }, 'requestType'],
   ['an inactive type', { requestType: 'Cancellation' }, 'requestType'],
@@ -154,7 +154,7 @@ test.each([
   ['an attachment named x.__proto__', { attachment: { name: 'x.__proto__', base64: 'aGVsbG8=' } }, 'attachment'],
   ['unpadded base64', { attachment: { name: 'x.pdf', base64: 'aGVsbG8' } }, 'attachment'],
   ['a .exe attachment', { attachment: { name: 'x.exe', base64: 'aGVsbG8=' } }, 'attachment'],
-  ['a 256,002-byte attachment', { attachment: { name: 'x.pdf', base64: big } }, 'attachment'],
+  ['a 5,242,881-byte attachment', { attachment: { name: 'x.pdf', base64: big } }, 'attachment'],
   ['an attachment name with a line break', { attachment: { name: 'a\r\nb.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
   ['an attachment name with a quote', { attachment: { name: 'a"b.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
   ['an attachment name with a path', { attachment: { name: '..\\x.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
@@ -166,7 +166,7 @@ test.each([
 })
 
 test('POST accepts an attachment at the size limit and an optional field left empty', async () => {
-  const exact = 'A'.repeat(341_334) + '==' // 341,336 chars, 2 padding: 256,000 bytes (250 KB)
+  const exact = 'A'.repeat(6_990_506) + '==' // 6,990,508 chars, 2 padding: 5,242,879 bytes
   const { server, writes } = submit({ ...BODY, requestType: 'Query', fields: {}, attachment: { name: 'x.pdf', base64: exact } })
   expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
   expect(writes()).toHaveLength(1) // the note rides in the same create

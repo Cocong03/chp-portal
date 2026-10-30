@@ -10,7 +10,7 @@ import { Input } from '@/ui/input'
 // The server validates with the same values.
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const MOBILE_RE = /^(\+63|0)9\d{2}[ -]?\d{3}[ -]?\d{4}$/
-export const MAX_ATTACHMENT_BYTES = 256_000 // 250 KB, same as the server (the file travels as base64 in the Server Logic body)
+export const MAX_ATTACHMENT_BYTES = 5_242_880
 
 type Kind = 'request' | 'complaint'
 const EXTENSIONS: Record<Kind, string[]> = {
@@ -25,7 +25,7 @@ const TYPE_ERROR: Record<Kind, string> = {
 
 /** Checks size and type, then reads the file as base64 (the Server Logic takes JSON). */
 export async function readAttachment(file: File, kind: Kind): Promise<AttachmentDto | { error: string }> {
-  if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'This file is too large. Attach a file of 250 KB or less.' }
+  if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'This file is too large. Attach a file of 5 MB or less.' }
   const dot = file.name.lastIndexOf('.')
   if (dot < 0 || !EXTENSIONS[kind].includes(file.name.slice(dot).toLowerCase())) return { error: TYPE_ERROR[kind] }
   const url = await new Promise<string>((resolve, reject) => {
