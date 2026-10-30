@@ -16,7 +16,8 @@ The same roles are set on the Server Logic records and the table permissions, so
 ```
 Page (src/modules/requests, src/modules/complaints)
   -> Server Logic: requests / complaints
-      -> Dataverse: chp_request / chp_complaint (+ note for the attachment)
+      -> Dataverse: chp_request / chp_complaint
+Page -> Web API: the file as a note on that row, then PUT on the same endpoint releases the row
           -> service center flows (see service-center-sync.md)
 ```
 
@@ -35,7 +36,11 @@ Page (src/modules/requests, src/modules/complaints)
   - The type has to exist and be active.
   
   The page never decides the assigned group; the type record does.
-- **Attachments.** One file per submission, up to 5 MB, stored as a note on the row. Requests accept PDF, Word, Excel and images (png, jpg, gif, webp). Complaints accept the same minus Excel.
+- **Attachments.** One file per submission, up to 3.75 MB (Dataverse's 5 MB note limit counts the base64 text), stored as a note on the row. Requests accept PDF, Word, Excel and images (png, jpg, gif, webp). Complaints accept the same minus Excel.
+  - The file doesn't go through Server Logic: Power Pages refused a ~2.3 MB Server Logic body, and ~1 MB bodies sometimes hit the 120 s timeout (tested on Dev 2026-10-29).
+  - Instead the POST saves the row with **no sync state**, so the send flow ignores it. The browser uploads the file as a note through the Web API (`Webapi/annotation/*` site settings; the note table permissions allow notes on the customer's own rows only). Then `PUT {id}` checks the note (exactly one, allowed type, matching MIME type, within the limit), names the attachment on the row and sets it Pending.
+  - A missing or bad note sends the row without the file, and the customer sees "submitted, but the file couldn't be attached". The send flow only uploads a note when the row names the attachment, so an unchecked note never reaches the service center.
+  - If the browser never calls PUT (tab closed mid-upload), the hourly sync sends the row without the file after 10 minutes.
 - **Contact.** Email or mobile. Email is prefilled from the user's contact. Mobile accepts PH formats (`0917 552 6613`, `+639175526613`).
 - **References.** `RQ-#####` and `CMP-#####` come from autonumber columns on the tables.
 
@@ -47,7 +52,7 @@ Page (src/modules/requests, src/modules/complaints)
 | `chp_complaint` | the same idea for complaints, plus subject, incident date, delivery site, related order and consent |
 | `chp_requesttype`, `chp_complainttype` | the category > type > assigned group list, with an active flag and sort order. For requests, `chp_fieldconfig` says which extra fields a category needs |
 
-Status is Submitted, In Review or Resolved. Sync state is Pending, Sent or Failed. Both are choices on the row.
+Status is Submitted, In Review or Resolved. Sync state is Pending, Sent or Failed (empty while the row waits for its file). Both are choices on the row.
 
 ## Table permissions
 

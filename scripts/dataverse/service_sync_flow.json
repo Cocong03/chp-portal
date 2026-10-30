@@ -293,7 +293,7 @@
             "parameters": {
               "entityName": "chp_requests",
               "$select": "chp_requestid,chp_syncattempts",
-              "$filter": "chp_mondayitemid eq null and (chp_syncstate eq 775000002 or (chp_syncstate eq 775000000 and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))"
+              "$filter": "chp_mondayitemid eq null and (chp_syncstate eq 775000002 or ((chp_syncstate eq 775000000 or chp_syncstate eq null) and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))"
             },
             "authentication": "@parameters('$authentication')"
           }
@@ -571,7 +571,7 @@
             "parameters": {
               "entityName": "chp_complaints",
               "$select": "chp_complaintid,chp_syncattempts",
-              "$filter": "chp_mondayitemid eq null and (chp_syncstate eq 775000002 or (chp_syncstate eq 775000000 and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))"
+              "$filter": "chp_mondayitemid eq null and (chp_syncstate eq 775000002 or ((chp_syncstate eq 775000000 or chp_syncstate eq null) and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))"
             },
             "authentication": "@parameters('$authentication')"
           }

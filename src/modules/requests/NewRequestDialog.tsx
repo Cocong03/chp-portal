@@ -15,7 +15,7 @@ import { Field, FieldError, FieldLabel } from '@/ui/field'
 import { Input } from '@/ui/input'
 import { QueryError } from '@/ui/QueryError'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/ui/select'
-import { AttachmentField, ATTACHMENT_ACCEPT, checkContact, ContactFields, contactShape, EMAIL_RE, useAttachment } from './serviceForm'
+import { attachFile, AttachmentField, ATTACHMENT_ACCEPT, checkContact, ContactFields, contactShape, EMAIL_RE, useAttachment } from './serviceForm'
 import { useOrderNumbers } from './useOrderNumbers'
 import { useRequestTaxonomy } from './useRequests'
 
@@ -95,11 +95,14 @@ function RequestForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: RequestTa
     try {
       const result = await send.mutateAsync({
         category: values.category, requestType: values.requestType, contactMethod: values.contactMethod,
-        contactValue: values.contactValue, details: values.details, additionalInfo: values.additionalInfo, fields, attachment: file.attachment,
+        contactValue: values.contactValue, details: values.details, additionalInfo: values.additionalInfo, fields, attachmentName: file.attachment?.name,
       })
       if ('invalid' in result) return void toast.error('Please check the form and try again.')
+      const attached = file.attachment ? await attachFile('request', result.id, file.attachment) : true
       // The server answers an empty ref when the request was saved but its number could not be read back.
-      toast.success(result.ref ? `Request ${result.ref} submitted.` : 'Request submitted.')
+      const saved = result.ref ? `Request ${result.ref} submitted` : 'Request submitted'
+      if (attached) toast.success(`${saved}.`)
+      else toast.warning(`${saved}, but the file couldn't be attached. Please send it to us another way.`)
       void queryClient.invalidateQueries({ queryKey: ['requests'] })
       onClose()
     } catch {

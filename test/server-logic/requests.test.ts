@@ -1,9 +1,9 @@
 import { readFileSync } from 'node:fs'
 import { resolve } from 'node:path'
 
-type Endpoint = Record<'get' | 'post', () => Promise<string>>
+type Endpoint = Record<'get' | 'post' | 'put', () => Promise<string>>
 const source = readFileSync(resolve('.powerpages-site/server-logic/requests/requests.js'), 'utf8')
-const load = (server: unknown): Endpoint => new Function('Server', `${source}\nreturn { get, post }`)(server)
+const load = (server: unknown): Endpoint => new Function('Server', `${source}\nreturn { get, post, put }`)(server)
 
 const CONTACT = '11111111-1111-4111-8111-111111111111'
 const ACCOUNT = '22222222-2222-4222-8222-222222222222'
@@ -31,7 +31,7 @@ const ROW = {
 }
 
 /** A signed-in contact with portal access on; `portal` is the MCRMContacts answer (empty = blocked). */
-function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name: 'Buyer' }], rows = [ROW], bcCustomer = 'C00000002', orderCustomer = bcCustomer }: { query?: Record<string, string>; body?: string; portal?: unknown[]; rows?: unknown[]; bcCustomer?: string; orderCustomer?: string } = {}) {
+function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name: 'Buyer' }], rows = [ROW], notes = [], bcCustomer = 'C00000002', orderCustomer = bcCustomer }: { query?: Record<string, string>; body?: string; portal?: unknown[]; rows?: unknown[]; notes?: unknown[]; bcCustomer?: string; orderCustomer?: string } = {}) {
   const calls: { op: string; args: unknown[] }[] = []
   const server = {
     User: { contactid: CONTACT },
@@ -54,12 +54,14 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
           calls.push({ op: 'RetrieveMultipleRecords', args })
           const options = decodeURIComponent(String(args[1]))
           if (args[0] === 'chp_requests') return JSON.stringify({ value: options.includes('chp_requestid,chp_reference') ? rows.slice(0, 1) : rows })
+          if (args[0] === 'annotations') return JSON.stringify({ value: notes })
           const category = /chp_category eq '([^']*)'/.exec(options)?.[1]
           const name = /chp_name eq '([^']*)'/.exec(options)?.[1]
           const active = TYPES.filter((t) => t.chp_active)
           return JSON.stringify({ value: category ? active.filter((t) => t.chp_category.toLowerCase() === category.toLowerCase() && t.chp_name === name) : active })
         },
         CreateRecord: (...args: unknown[]) => calls.push({ op: 'CreateRecord', args }) && '',
+        UpdateRecord: (...args: unknown[]) => calls.push({ op: 'UpdateRecord', args }) && '',
       },
       HttpClient: {
         PostAsync: async () => ok({ access_token: 'tok' }),
@@ -75,13 +77,12 @@ function fakeServer({ query = {}, body = '', portal = [{ companyNo: 'CT1', name:
       },
     },
   }
-  return { server, calls, writes: () => calls.filter((c) => c.op === 'CreateRecord') }
+  return { server, calls, writes: () => calls.filter((c) => c.op === 'CreateRecord' || c.op === 'UpdateRecord') }
 }
 const answer = async (result: Promise<string>) => JSON.parse(await result)
 const BODY = { category: 'Sales Order', requestType: 'Modification', contactMethod: 'Email', contactValue: 'jd@808.ph', details: 'Please move it', additionalInfo: '', fields: { order: 'SO-100467' } }
 const submit = (body: unknown) => fakeServer({ body: JSON.stringify(body) })
 const created = (calls: { op: string; args: unknown[] }[], table = 'chp_requests') => JSON.parse(calls.find((c) => c.op === 'CreateRecord' && c.args[0] === table)!.args[1] as string)
-const PDF = { name: 'po.pdf', base64: 'aGVsbG8=' }
 
 test("GET lists the session account's rows, newest first, through the Power Pages cache bypass", async () => {
   const { server, calls } = fakeServer()
@@ -123,7 +124,7 @@ test('GET as a blocked contact answers blocked', async () => {
 
 test('POST sets account, contact, contact person, group and status from the server, never from the body', async () => {
   const { server, calls } = submit({ ...BODY, account: 'evil', assignedGroup: 'Hackers', status: 'Resolved', contactPerson: 'Evil' })
-  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
+  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001', id: REQUEST_ID })
   expect(created(calls)).toMatchObject({
     'chp_Account@odata.bind': `/accounts(${ACCOUNT})`, 'chp_Contact@odata.bind': `/contacts(${CONTACT})`,
     chp_contactperson: 'Buyer Name', chp_assignedgroup: 'Service Center', chp_status: 775000000, chp_syncstate: 775000000, chp_syncattempts: 0,
@@ -132,7 +133,6 @@ test('POST sets account, contact, contact person, group and status from the serv
   })
 })
 
-const big = 'A'.repeat(6_990_508) // decodes to 5,242,881 bytes
 test.each([
   ['an unknown type', { requestType: 'Nope' }, 'requestType'],
   ['an inactive type', { requestType: 'Cancellation' }, 'requestType'],
@@ -150,14 +150,13 @@ test.each([
   ['a bad affected user email', { category: 'Account', requestType: 'User Access', fields: { userEmail: 'nope' } }, 'userEmail'],
   ['a 51-character trip', { category: 'Delivery', requestType: 'Concern', fields: { trip: 'T'.repeat(51), order: 'SO-100467', site: 'PLANT1' } }, 'trip'],
   ['contact method toString', { contactMethod: 'toString' }, 'contactMethod'],
-  ['an attachment named evil.constructor', { attachment: { name: 'evil.constructor', base64: 'aGVsbG8=' } }, 'attachment'],
-  ['an attachment named x.__proto__', { attachment: { name: 'x.__proto__', base64: 'aGVsbG8=' } }, 'attachment'],
-  ['unpadded base64', { attachment: { name: 'x.pdf', base64: 'aGVsbG8' } }, 'attachment'],
-  ['a .exe attachment', { attachment: { name: 'x.exe', base64: 'aGVsbG8=' } }, 'attachment'],
-  ['a 5,242,881-byte attachment', { attachment: { name: 'x.pdf', base64: big } }, 'attachment'],
-  ['an attachment name with a line break', { attachment: { name: 'a\r\nb.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
-  ['an attachment name with a quote', { attachment: { name: 'a"b.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
-  ['an attachment name with a path', { attachment: { name: '..\\x.pdf', base64: 'aGVsbG8=' } }, 'attachment'],
+  ['an attachment named evil.constructor', { attachmentName: 'evil.constructor' }, 'attachment'],
+  ['an attachment named x.__proto__', { attachmentName: 'x.__proto__' }, 'attachment'],
+  ['a .exe attachment', { attachmentName: 'x.exe' }, 'attachment'],
+  ['an attachment name that is not text', { attachmentName: 5 }, 'attachment'],
+  ['an attachment name with a line break', { attachmentName: 'a\r\nb.pdf' }, 'attachment'],
+  ['an attachment name with a quote', { attachmentName: 'a"b.pdf' }, 'attachment'],
+  ['an attachment name with a path', { attachmentName: '..\\x.pdf' }, 'attachment'],
   ['a 51-character document reference', { category: 'Document Copy', requestType: 'Delivery Receipt (DR)', fields: { docref: 'D'.repeat(51), docdate: '2026-09-01' } }, 'docref'],
 ])('POST with %s is invalid, nothing written', async (_case, change, field) => {
   const { server, writes } = submit({ ...BODY, ...change })
@@ -165,39 +164,48 @@ test.each([
   expect(writes()).toEqual([])
 })
 
-test('POST accepts an attachment at the size limit and an optional field left empty', async () => {
-  const exact = 'A'.repeat(6_990_506) + '==' // 6,990,508 chars, 2 padding: 5,242,879 bytes
-  const { server, writes } = submit({ ...BODY, requestType: 'Query', fields: {}, attachment: { name: 'x.pdf', base64: exact } })
-  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
-  expect(writes()).toHaveLength(1) // the note rides in the same create
+test('POST accepts an optional field left empty', async () => {
+  const { server, writes } = submit({ ...BODY, requestType: 'Query', fields: {} })
+  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001', id: REQUEST_ID })
+  expect(writes()).toHaveLength(1)
 })
 
 test("POST stores the taxonomy row's category, not the casing the client sent", async () => {
   const { server, calls } = submit({ ...BODY, category: 'sales order' })
-  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
+  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001', id: REQUEST_ID })
   expect(created(calls)).toMatchObject({ chp_category: 'Sales Order', chp_requesttype: 'Modification' })
 })
 
 test('POST stores the site as "<code> — <name>" from BC, not the label the client sent', async () => {
   const { server, calls } = submit({ ...BODY, category: 'Delivery', requestType: 'Concern', fields: { order: 'SO-100467', site: 'PLANT1' }, siteLabel: 'Evil' })
-  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001' })
+  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001', id: REQUEST_ID })
   expect(JSON.parse(created(calls).chp_fields)).toEqual([
     { key: 'order', label: 'Related Sales Order', value: 'SO-100467' },
     { key: 'site', label: 'Delivery site (Ship-to Address)', value: 'PLANT1 — Plant 1 — Main Yard' },
   ])
 })
 
-test('POST with a file deep-inserts one note in the same create, no separate annotations create', async () => {
-  const { server, calls, writes } = submit({ ...BODY, attachment: PDF })
-  await load(server).post()
+// The file goes straight to Dataverse through the Web API once the row exists (a ~2 MB Server Logic body fails on Power
+// Pages). Until PUT has checked the note, the row has no sync state, so the send flow leaves it alone.
+test('POST with a file to follow saves the row with no sync state, no attachment name and no note', async () => {
+  const { server, calls, writes } = submit({ ...BODY, attachmentName: 'po.pdf' })
+  expect(await answer(load(server).post())).toEqual({ ref: 'RQ-00001', id: REQUEST_ID })
   expect(writes().map((c) => c.args[0])).toEqual(['chp_requests'])
-  expect(created(calls).chp_attachmentname).toBe('po.pdf')
-  expect(created(calls).chp_request_Annotations).toEqual([{ subject: 'po.pdf', filename: 'po.pdf', mimetype: 'application/pdf', documentbody: 'aGVsbG8=' }])
+  const row = created(calls)
+  expect(row.chp_syncstate).toBeNull()
+  expect(row).not.toHaveProperty('chp_attachmentname')
+  expect(row).not.toHaveProperty('chp_request_Annotations')
+})
+
+test('POST without a file saves the row Pending, so the send flow picks it up at once', async () => {
+  const { server, calls } = submit(BODY)
+  await load(server).post()
+  expect(created(calls).chp_syncstate).toBe(775000000)
 })
 
 test('POST answers an empty ref, not an error, when the new row cannot be read back', async () => {
   const { server, writes } = fakeServer({ body: JSON.stringify(BODY), rows: [] })
-  expect(await answer(load(server).post())).toEqual({ ref: '' })
+  expect(await answer(load(server).post())).toEqual({ ref: '', id: '' })
   expect(writes()).toHaveLength(1)
 })
 
@@ -233,11 +241,73 @@ test('POST as a blocked contact answers blocked and writes nothing', async () =>
 
 // Reads right after writes must not come from the Power Pages data cache (seen stale for 15 minutes elsewhere).
 test('every request read skips the Power Pages cache', async () => {
-  const runs = [fakeServer(), fakeServer({ query: { taxonomy: '1' } }), submit({ ...BODY, attachment: PDF })]
+  const runs = [fakeServer(), fakeServer({ query: { taxonomy: '1' } }), submit({ ...BODY, attachmentName: 'po.pdf' }), finish({ notes: [NOTE] })]
   await load(runs[0].server).get()
   await load(runs[1].server).get()
   await load(runs[2].server).post()
+  await load(runs[3].server).put()
   for (const { calls } of runs) {
     for (const call of calls.filter((c) => c.op.startsWith('Retrieve'))) expect(call.args.at(-1), `${call.op} ${String(call.args[1])}`).toBe(true)
   }
+})
+
+// PUT {id}: the browser has uploaded the note (or failed to); check it and release the row to the send flow.
+const WAITING = { chp_requestid: REQUEST_ID, chp_reference: 'RQ-00001', chp_syncstate: null, chp_attachmentname: null }
+const NOTE = { annotationid: '44444444-4444-4444-8444-444444444444', filename: 'po.pdf', mimetype: 'application/pdf', filesize: 5 }
+const MAX = 3_932_160 // Dataverse's 5 MB note limit counts the base64 text: 3.75 MB of file
+function finish({ id = REQUEST_ID as unknown, rows = [WAITING] as unknown[], notes = [] as unknown[], portal }: { id?: unknown; rows?: unknown[]; notes?: unknown[]; portal?: unknown[] } = {}) {
+  return fakeServer({ body: JSON.stringify({ id }), rows, notes, ...(portal ? { portal } : {}) })
+}
+const updated = (calls: { op: string; args: unknown[] }[]) => calls.filter((c) => c.op === 'UpdateRecord').map((c) => [c.args[0], c.args[1], JSON.parse(c.args[2] as string)])
+
+test("PUT with one valid note names the attachment and sets the row Pending, scoped to the session's own row", async () => {
+  const { server, calls } = finish({ notes: [NOTE] })
+  expect(await answer(load(server).put())).toEqual({ ref: 'RQ-00001', attached: true })
+  expect(updated(calls)).toEqual([['chp_requests', REQUEST_ID, { chp_attachmentname: 'po.pdf', chp_syncstate: 775000000 }]])
+  const row = decodeURIComponent(String(calls.find((c) => c.args[0] === 'chp_requests')!.args[1]))
+  expect(row).toContain(`chp_requestid eq ${REQUEST_ID}`)
+  expect(row).toContain(`_chp_account_value eq ${ACCOUNT}`)
+  expect(row).toContain(`_chp_contact_value eq ${CONTACT}`)
+  expect(decodeURIComponent(String(calls.find((c) => c.args[0] === 'annotations')!.args[1]))).toContain(`_objectid_value eq ${REQUEST_ID}`)
+})
+
+test('PUT accepts a note of exactly 3.75 MB', async () => {
+  const { server } = finish({ notes: [{ ...NOTE, filesize: MAX }] })
+  expect(await answer(load(server).put())).toEqual({ ref: 'RQ-00001', attached: true })
+})
+
+test.each([
+  ['no note (the upload failed)', []],
+  ['a .exe note', [{ ...NOTE, filename: 'x.exe', mimetype: 'application/octet-stream' }]],
+  ['a note whose type does not match its name', [{ ...NOTE, mimetype: 'text/html' }]],
+  ['a note over 3.75 MB', [{ ...NOTE, filesize: MAX + 1 }]],
+  ['a note name with a quote', [{ ...NOTE, filename: 'a"b.pdf' }]],
+  ['a note named x.constructor', [{ ...NOTE, filename: 'x.constructor' }]],
+  ['two notes', [NOTE, { ...NOTE, annotationid: '55555555-5555-4555-8555-555555555555' }]],
+])('PUT with %s sends it without the file', async (_case, notes) => {
+  const { server, calls } = finish({ notes })
+  expect(await answer(load(server).put())).toEqual({ ref: 'RQ-00001', attached: false })
+  expect(updated(calls)).toEqual([['chp_requests', REQUEST_ID, { chp_syncstate: 775000000 }]])
+})
+
+test.each([
+  ['an id that is not a GUID', { id: "x' or 1 eq 1" }],
+  ['no id', { id: null }],
+  ["another contact's or account's row", { rows: [] }],
+])('PUT with %s is invalid and writes nothing', async (_case, change) => {
+  const { server, writes } = finish(change)
+  expect(await answer(load(server).put())).toEqual({ invalid: true, field: 'id' })
+  expect(writes()).toEqual([])
+})
+
+test('PUT on a row already released answers its state and writes nothing (a retried finish)', async () => {
+  const { server, writes } = finish({ rows: [{ ...WAITING, chp_syncstate: 775000001, chp_attachmentname: 'po.pdf' }], notes: [NOTE] })
+  expect(await answer(load(server).put())).toEqual({ ref: 'RQ-00001', attached: true })
+  expect(writes()).toEqual([])
+})
+
+test('PUT as a blocked contact answers blocked and writes nothing', async () => {
+  const { server, writes } = finish({ notes: [NOTE], portal: [] })
+  expect(await answer(load(server).put())).toEqual({ blocked: true })
+  expect(writes()).toEqual([])
 })

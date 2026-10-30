@@ -691,9 +691,19 @@
             ]
           },
           "expression": {
-            "equals": [
-              "@empty(outputs('List_notes')?['body/value'])",
-              false
+            "and": [
+              {
+                "equals": [
+                  "@empty(outputs('List_notes')?['body/value'])",
+                  false
+                ]
+              },
+              {
+                "equals": [
+                  "@empty(outputs('Get_complaint')?['body/chp_attachmentname'])",
+                  false
+                ]
+              }
             ]
           },
           "actions": {

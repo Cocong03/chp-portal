@@ -206,13 +206,14 @@ describe.each(TABLES)('the $table branch', ({ table, entity, idColumn, columns, 
     })
   }
 
-  test('re-sends Failed rows and Pending rows older than 10 minutes by bumping chp_syncattempts', () => {
+  // A row waiting for its file (no sync state) is stuck when the browser never finished, e.g. the tab closed mid-upload.
+  test('re-sends Failed rows, and Pending or still-waiting rows older than 10 minutes, by bumping chp_syncattempts', () => {
     const definition = load()
     const list = findAction(definition.actions, `List_${table}s_to_resend`)
     expect(list.runAfter).toEqual({})
     expect(list.inputs.parameters.entityName).toBe(entity)
     expect(list.inputs.parameters.$filter).toBe(
-      `chp_mondayitemid eq null and (chp_syncstate eq ${FAILED} or (chp_syncstate eq ${PENDING} and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))`,
+      `chp_mondayitemid eq null and (chp_syncstate eq ${FAILED} or ((chp_syncstate eq ${PENDING} or chp_syncstate eq null) and createdon lt @{formatDateTime(addMinutes(utcNow(), -10), 'yyyy-MM-ddTHH:mm:ssZ')}))`,
     )
     const loop = findAction(definition.actions, `For_each_${table}_resend`)
     expect(loop.foreach).toBe(`@outputs('List_${table}s_to_resend')?['body/value']`)

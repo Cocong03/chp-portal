@@ -53,6 +53,27 @@ test('a request with an affected user, mobile contact, additional info and a PDF
   await expect(top).toContainText('Submitted')
 })
 
+// A 1.7 MB photo failed when files went through Server Logic (Power Pages refused the ~2.3 MB body, 2026-10-29).
+// The file now goes to Dataverse through the Web API; "submitted, but the file couldn't be attached" fails this check.
+test('a request with a 3 MB PDF is submitted with its file', async ({ page }) => {
+  await page.goto('/requests')
+  await page.getByRole('button', { name: 'New request' }).click()
+  const dialog = page.getByRole('dialog', { name: 'New request' })
+
+  await dialog.getByLabel('Category', { exact: true }).click()
+  await page.getByRole('option', { name: 'Other Request' }).click()
+  await dialog.getByLabel('Request type').click()
+  await page.getByRole('option').first().click()
+  await dialog.getByLabel('Request details').fill(`${STAMP} large file`)
+  const large = Buffer.concat([PDF, Buffer.alloc(3 * 1024 * 1024 - PDF.length, ' ')])
+  await dialog.getByLabel('Attach a supporting document (optional)').setInputFiles({ name: 'e2e-3mb.pdf', mimeType: 'application/pdf', buffer: large })
+  await dialog.getByRole('button', { name: 'Submit request' }).click()
+
+  await expect(page.getByText(/^Request RQ-\d+ submitted\.$/)).toBeVisible({ timeout: 60_000 })
+  const top = page.getByRole('table').getByRole('row').nth(1)
+  await expect(top).toContainText(`${STAMP} large file`)
+})
+
 test('a Delivery request with a trip, order and site is listed as Submitted', async ({ page }) => {
   await page.goto('/requests')
   await page.getByRole('button', { name: 'New request' }).click()

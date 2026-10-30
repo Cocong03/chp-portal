@@ -32,7 +32,7 @@ FLOWS = [
      'Creates the monday.com item for a new portal complaint (Pending, no item yet) and writes back the item id. S4-07.'),
     ('SYNC', 'Concreat Connect – Sync with service center', 'service_sync_flow.json',
      'Every hour (backstop for a missed webhook): reads the status of the portal\'s monday.com items back into Dataverse, '
-     'and re-sends Failed or stuck Pending rows by bumping chp_syncattempts. S4-07. shortcut: re-sends every hour without '
+     'and re-sends Failed rows and Pending or still-waiting-for-a-file rows (no sync state) older than 10 minutes by bumping chp_syncattempts. S4-07. shortcut: re-sends every hour without '
      'a cap; add a max-attempts stop if ops see repeat failures.'),
     ('WEBHOOK', 'Concreat Connect – Service center status webhook', 'service_webhook_flow.json',
      'Called by the monday.com boards\' webhooks when the status column changes: re-reads that one item from monday and writes its '

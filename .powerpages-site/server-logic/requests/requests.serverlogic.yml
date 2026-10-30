@@ -1,7 +1,7 @@
 adx_serverlogic_adx_webrole:
   - 56b29291-b981-4ef0-865b-41c1e9523a97
   - 11bb7218-55fb-4cae-b8a1-5af2f41237c5
-description: 'Signed-in customer''s service requests in Dataverse: list, taxonomy, create (S4-04)'
+description: 'Signed-in customer''s service requests in Dataverse: list, taxonomy, create, release after the file upload (S4-04)'
 display_name: Requests
 id: e2415ec1-27a5-4fbf-a955-e1dbc0b31b09
 name: requests

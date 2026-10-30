@@ -9,7 +9,7 @@ Plan task S4-07. The service center works out of two monday.com boards, Requests
 | Send request to service center | a request row is created or re-queued (sync state Pending, no item yet) | creates the board item with all the columns, uploads the attachment, writes the item id back and sets Sent. On an error it sets Failed with the reason |
 | Send complaint to service center | same, for complaints | same |
 | Service center status webhook | monday calls it when a **Status** column changes | re-reads that one item from monday and writes the status (and the resolved date) back to the row |
-| Sync with service center | every hour | catches anything the webhook missed, and re-sends Failed or stuck Pending rows |
+| Sync with service center | every hour | catches anything the webhook missed, and re-sends Failed rows and Pending or still-waiting-for-a-file rows older than 10 minutes |
 
 A few details that matter:
 

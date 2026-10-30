@@ -6,7 +6,7 @@ import { z } from 'zod'
 import { GENERIC_ERROR, serverLogic } from '@/api/serverLogic'
 import type { ComplaintSubmitDto, ComplaintTaxonomyDto, MeDto, SubmitResultDto } from '@/api/types'
 import { useMe } from '@/auth/useMe'
-import { AttachmentField, ATTACHMENT_ACCEPT, checkContact, ContactFields, contactShape, useAttachment } from '@/modules/requests/serviceForm'
+import { attachFile, AttachmentField, ATTACHMENT_ACCEPT, checkContact, ContactFields, contactShape, useAttachment } from '@/modules/requests/serviceForm'
 import { useOrderNumbers } from '@/modules/requests/useOrderNumbers'
 import { useSites } from '@/modules/sites/useSites'
 import { Button } from '@/ui/button'
@@ -79,11 +79,14 @@ function ComplaintForm({ me, taxonomy, onClose }: { me: MeDto; taxonomy: Complai
       const result = await send.mutateAsync({
         category: values.category, complaintType: values.complaintType, contactMethod: values.contactMethod,
         contactValue: values.contactValue, incidentDate: values.incidentDate, site: values.site, relatedOrder: values.relatedOrder,
-        subject: values.subject, description: values.description, consent: values.consent, attachment: file.attachment,
+        subject: values.subject, description: values.description, consent: values.consent, attachmentName: file.attachment?.name,
       })
       if ('invalid' in result) return void toast.error('Please check the form and try again.')
+      const attached = file.attachment ? await attachFile('complaint', result.id, file.attachment) : true
       // The server answers an empty ref when the complaint was saved but its number could not be read back.
-      toast.success(result.ref ? `Complaint ${result.ref} submitted.` : 'Complaint submitted.')
+      const saved = result.ref ? `Complaint ${result.ref} submitted` : 'Complaint submitted'
+      if (attached) toast.success(`${saved}.`)
+      else toast.warning(`${saved}, but the file couldn't be attached. Please send it to us another way.`)
       void queryClient.invalidateQueries({ queryKey: ['complaints'] })
       onClose()
     } catch {

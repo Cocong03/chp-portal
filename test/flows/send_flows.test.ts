@@ -172,6 +172,13 @@ describe.each(FLOWS)('the $flow send flow', ({ file, table, idColumn, neverWritt
     expect(JSON.stringify(attachment.actions)).toContain('attachment not found yet')
   })
 
+  // The browser uploads the note through the Web API; only a note the PUT endpoint checked has its name on the row.
+  test('uploads a note only when the row names the attachment', () => {
+    const condition = JSON.stringify(findAction(load(file).actions, 'Has_note').expression)
+    expect(condition).toContain("outputs('List_notes')?['body/value']")
+    expect(condition).toContain(`outputs('Get_${table.replace('chp_', '')}')?['body/chp_attachmentname']`)
+  })
+
   test('a failure marks the row Failed with the error', () => {
     const definition = load(file)
     const catcher = definition.actions.Mark_failed

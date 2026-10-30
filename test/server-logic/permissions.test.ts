@@ -131,3 +131,15 @@ test('complaints: Full Access only — Orders & Delivery never sees complaints',
   expect(yml).toContain('56b29291-b981-4ef0-865b-41c1e9523a97')
   expect(yml).not.toContain('11bb7218')
 })
+
+// S4-04/S4-05: the browser uploads a request's or complaint's file as a note through the Web API. Only notes are open
+// to the Web API, with only the columns that upload sets; the note permissions above limit them to the customer's rows.
+test('Web API: notes only, with only the columns the file upload sets', () => {
+  const folder = resolve('.powerpages-site/site-settings')
+  const settings = Object.fromEntries(
+    readdirSync(folder).map((file) => readFileSync(join(folder, file), 'utf8')).map((text) => [/^name: (.*)$/m.exec(text)?.[1], /^value: (.*)$/m.exec(text)?.[1]]),
+  )
+  expect(settings['Webapi/annotation/enabled']).toBe('true')
+  expect(settings['Webapi/annotation/fields']).toBe('subject,filename,mimetype,documentbody,objectid')
+  expect(Object.keys(settings).filter((name) => /^webapi\/[^/]+\/enabled$/i.test(name))).toEqual(['Webapi/annotation/enabled'])
+})

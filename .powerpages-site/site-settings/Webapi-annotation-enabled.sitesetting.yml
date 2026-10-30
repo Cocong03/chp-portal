@@ -1,0 +1,4 @@
+description: Lets the portal attach a request's or complaint's file as a note through the Web API (S4-04/S4-05). The note table permissions limit it to the customer's own rows.
+id: 9b8486bb-cb8d-4241-bd24-7098b5373f87
+name: Webapi/annotation/enabled
+value: true

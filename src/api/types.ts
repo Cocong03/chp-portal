@@ -222,6 +222,8 @@ export interface ComplaintDto { id: string; ref: string; submitted: string; cate
 export interface RequestFieldConfig { rows: string[]; orderLabel?: string; optional?: string[] }
 export interface RequestTaxonomyDto { categories: { name: string; fields: RequestFieldConfig; types: { type: string; group: string }[] }[] }
 export interface ComplaintTaxonomyDto { categories: { name: string; types: { type: string; group: string }[] }[] }
-export interface RequestSubmitDto { category: string; requestType: string; contactMethod: ContactMethod; contactValue: string; details: string; additionalInfo: string; fields: Record<string, string>; attachment?: AttachmentDto }
-export interface ComplaintSubmitDto { category: string; complaintType: string; contactMethod: ContactMethod; contactValue: string; incidentDate: string; site: string; relatedOrder: string; subject: string; description: string; consent: boolean; attachment?: AttachmentDto }
-export type SubmitResultDto = { ref: string } | { invalid: true; field: string }
+export interface RequestSubmitDto { category: string; requestType: string; contactMethod: ContactMethod; contactValue: string; details: string; additionalInfo: string; fields: Record<string, string>; attachmentName?: string }
+export interface ComplaintSubmitDto { category: string; complaintType: string; contactMethod: ContactMethod; contactValue: string; incidentDate: string; site: string; relatedOrder: string; subject: string; description: string; consent: boolean; attachmentName?: string }
+/** The saved row; a file named in attachmentName follows through the Web API, then PUT {id} releases the row. */
+export type SubmitResultDto = { ref: string; id: string } | { invalid: true; field: string }
+export type AttachResultDto = { ref: string; attached: boolean } | { invalid: true; field: string }

@@ -1,6 +1,6 @@
 adx_serverlogic_adx_webrole:
   - 56b29291-b981-4ef0-865b-41c1e9523a97
-description: 'Signed-in customer''s complaints in Dataverse: list, taxonomy, create (S4-05)'
+description: 'Signed-in customer''s complaints in Dataverse: list, taxonomy, create, release after the file upload (S4-05)'
 display_name: Complaints
 id: 4a7d2f10-6c3e-4b58-9e21-0d8f5a1c7b93
 name: complaints

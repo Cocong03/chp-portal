@@ -1,7 +1,9 @@
 import { useId, useRef, useState } from 'react'
 import { Controller, useFormState, useWatch, type Control } from 'react-hook-form'
 import { z } from 'zod'
-import type { AttachmentDto, ContactMethod } from '@/api/types'
+import { serverLogic } from '@/api/serverLogic'
+import type { AttachResultDto, AttachmentDto, ContactMethod } from '@/api/types'
+import { createNote } from '@/api/webApi'
 import { useMe } from '@/auth/useMe'
 import { SegmentedToggle } from '@/modules/orders/new/SegmentedToggle'
 import { Field, FieldError, FieldLabel } from '@/ui/field'
@@ -10,12 +12,19 @@ import { Input } from '@/ui/input'
 // The server validates with the same values.
 export const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 export const MOBILE_RE = /^(\+63|0)9\d{2}[ -]?\d{3}[ -]?\d{4}$/
-export const MAX_ATTACHMENT_BYTES = 5_242_880
+// Dataverse's note limit (5 MB on Dev) counts the base64 text, so 3.75 MB of file.
+export const MAX_ATTACHMENT_BYTES = 3_932_160
 
 type Kind = 'request' | 'complaint'
 const EXTENSIONS: Record<Kind, string[]> = {
   request: ['.pdf', '.doc', '.docx', '.xls', '.xlsx', '.png', '.jpg', '.jpeg', '.gif', '.webp'],
   complaint: ['.pdf', '.doc', '.docx', '.png', '.jpg', '.jpeg', '.gif', '.webp'],
+}
+// The note's type, exactly as the server expects it for the extension.
+const MIME: Record<string, string> = {
+  pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  xls: 'application/vnd.ms-excel', xlsx: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  jpg: 'image/jpeg', jpeg: 'image/jpeg', png: 'image/png', gif: 'image/gif', webp: 'image/webp',
 }
 export const ATTACHMENT_ACCEPT: Record<Kind, string> = { request: EXTENSIONS.request.join(','), complaint: EXTENSIONS.complaint.join(',') }
 const TYPE_ERROR: Record<Kind, string> = {
@@ -23,9 +32,9 @@ const TYPE_ERROR: Record<Kind, string> = {
   complaint: "This file type can't be attached. Use a PDF, Word or image file.",
 }
 
-/** Checks size and type, then reads the file as base64 (the Server Logic takes JSON). */
+/** Checks size and type, then reads the file as base64 (the note's documentbody). */
 export async function readAttachment(file: File, kind: Kind): Promise<AttachmentDto | { error: string }> {
-  if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'This file is too large. Attach a file of 5 MB or less.' }
+  if (file.size > MAX_ATTACHMENT_BYTES) return { error: 'This file is too large. Attach a file of 3.75 MB or less.' }
   const dot = file.name.lastIndexOf('.')
   if (dot < 0 || !EXTENSIONS[kind].includes(file.name.slice(dot).toLowerCase())) return { error: TYPE_ERROR[kind] }
   const url = await new Promise<string>((resolve, reject) => {
@@ -35,6 +44,26 @@ export async function readAttachment(file: File, kind: Kind): Promise<Attachment
     reader.readAsDataURL(file)
   })
   return { name: file.name, base64: url.slice(url.indexOf(',') + 1) }
+}
+
+/**
+ * After the row is saved: upload the file as a note on it, then let the server check the note and send the row on.
+ * Answers whether the file made it. The row is saved either way, so failures answer false instead of throwing: the
+ * server sends the row without the file (or the hourly sync does, if the release itself failed).
+ */
+export async function attachFile(kind: Kind, id: string, attachment: AttachmentDto): Promise<boolean> {
+  if (!id) return false
+  try {
+    await createNote(`chp_${kind}`, id, attachment, MIME[attachment.name.split('.').pop()!.toLowerCase()])
+  } catch {
+    // The release below still sends the row, without the file.
+  }
+  try {
+    const result = await serverLogic<AttachResultDto>(`${kind}s`, { method: 'PUT', body: { id } })
+    return 'attached' in result && result.attached
+  } catch {
+    return false
+  }
 }
 
 export const contactShape = {

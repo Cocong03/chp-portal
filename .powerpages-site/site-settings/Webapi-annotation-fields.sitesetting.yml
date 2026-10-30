@@ -1,0 +1,4 @@
+description: Note columns the file upload sets (S4-04/S4-05). Keep to this list.
+id: f2e3def0-3f42-4139-8898-b5d3c0020667
+name: Webapi/annotation/fields
+value: subject,filename,mimetype,documentbody,objectid

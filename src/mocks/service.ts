@@ -58,9 +58,16 @@ const nextRef = (prefix: string, rows: { ref: string }[]) =>
 const newestFirst = <T extends { submitted: string }>(rows: T[]) => [...rows].sort((a, b) => b.submitted.localeCompare(a.submitted))
 const groupOf = (types: { type: string; group: string }[] | undefined, type: string) => types?.find((t) => t.type === type)?.group ?? ''
 
+// PUT {id} after the file upload (a no-op on the dev server): the row is released with its file.
+const released = (rows: { id: string; ref: string }[], body: unknown) => {
+  const row = rows.find((r) => r.id === (body as { id?: string })?.id)
+  return row ? { ref: row.ref, attached: true } : { invalid: true, field: 'id' }
+}
+
 /** Answers like the requests Server Logic (S4-03). The mock does not validate. */
 export function requestsMock({ method, query = {}, body }: MockRequest): unknown {
   if (method === 'GET') return query.taxonomy ? REQUEST_TAXONOMY : newestFirst(requests)
+  if (method === 'PUT') return released(requests, body)
   if (method !== 'POST') return { notFound: true }
   const b = body as RequestSubmitDto
   const category = REQUEST_TAXONOMY.categories.find((c) => c.name === b.category)
@@ -68,26 +75,29 @@ export function requestsMock({ method, query = {}, body }: MockRequest): unknown
     .filter(([, value]) => value)
     .map(([key, value]) => ({ label: key === 'order' ? (category?.fields.orderLabel ?? 'Sales Order Number') : (FIELD_LABELS[key] ?? key), value: key === 'site' ? siteLabel(value) : value }))
   const ref = nextRef('RQ', requests)
+  const id = crypto.randomUUID()
   requests.push({
-    id: crypto.randomUUID(), ref, submitted: new Date().toISOString(), category: b.category, requestType: b.requestType,
+    id, ref, submitted: new Date().toISOString(), category: b.category, requestType: b.requestType,
     assignedGroup: groupOf(category?.types, b.requestType), contactMethod: b.contactMethod, contactValue: b.contactValue,
-    contactPerson: ME, details: b.details, additionalInfo: b.additionalInfo, attachmentName: b.attachment?.name ?? '', extra, status: 'Submitted',
+    contactPerson: ME, details: b.details, additionalInfo: b.additionalInfo, attachmentName: b.attachmentName ?? '', extra, status: 'Submitted',
   })
-  return { ref }
+  return { ref, id }
 }
 
 /** Answers like the complaints Server Logic (S4-04). The mock does not validate. */
 export function complaintsMock({ method, query = {}, body }: MockRequest): unknown {
   if (method === 'GET') return query.taxonomy ? COMPLAINT_TAXONOMY : newestFirst(complaints)
+  if (method === 'PUT') return released(complaints, body)
   if (method !== 'POST') return { notFound: true }
   const b = body as ComplaintSubmitDto
   const category = COMPLAINT_TAXONOMY.categories.find((c) => c.name === b.category)
   const ref = nextRef('CMP', complaints)
+  const id = crypto.randomUUID()
   complaints.push({
-    id: crypto.randomUUID(), ref, submitted: new Date().toISOString(), category: b.category, complaintType: b.complaintType,
+    id, ref, submitted: new Date().toISOString(), category: b.category, complaintType: b.complaintType,
     assignedGroup: groupOf(category?.types, b.complaintType), incidentDate: b.incidentDate, deliverySite: siteLabel(b.site),
     subject: b.subject, description: b.description, relatedOrder: b.relatedOrder, contactMethod: b.contactMethod,
-    contactValue: b.contactValue, contactPerson: ME, attachmentName: b.attachment?.name ?? '', status: 'Submitted', dateResolved: '', resolutionNote: '',
+    contactValue: b.contactValue, contactPerson: ME, attachmentName: b.attachmentName ?? '', status: 'Submitted', dateResolved: '', resolutionNote: '',
   })
-  return { ref }
+  return { ref, id }
 }

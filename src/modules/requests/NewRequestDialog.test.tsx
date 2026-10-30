@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { GENERIC_ERROR, serverLogic } from '@/api/serverLogic'
+import { createNote } from '@/api/webApi'
 import { resetServiceMocks } from '@/mocks/service'
 import { renderApp } from '@/test/render'
 import { NewRequestDialog } from './NewRequestDialog'
@@ -11,7 +12,8 @@ vi.mock('@/api/serverLogic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/serverLogic')>()
   return { ...actual, serverLogic: vi.fn(actual.serverLogic) }
 })
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
+vi.mock('@/api/webApi', () => ({ createNote: vi.fn() }))
 
 beforeEach(() => {
   resetServiceMocks()
@@ -221,7 +223,7 @@ test('Submit is disabled while an attachment is being read', async () => {
   await waitFor(() => expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled())
   await user.click(screen.getByRole('button', { name: 'Submit request' }))
   await waitFor(() => expect(posts()).toHaveLength(1))
-  expect(posts()[0][1]?.body).toMatchObject({ attachment: { name: 'a.pdf' } })
+  expect(posts()[0][1]?.body).toMatchObject({ attachmentName: 'a.pdf' })
 })
 
 test('a stale attachment read does not overwrite a newer pick', async () => {
@@ -236,7 +238,7 @@ test('a stale attachment read does not overwrite a newer pick', async () => {
   held.get('old.pdf')!()
   await user.click(screen.getByRole('button', { name: 'Submit request' }))
   await waitFor(() => expect(posts()).toHaveLength(1))
-  expect(posts()[0][1]?.body).toMatchObject({ attachment: { name: 'new.pdf' } })
+  expect(posts()[0][1]?.body).toMatchObject({ attachmentName: 'new.pdf' })
 })
 
 test('a Delivery request posts the delivery site as its ship-to code, not the label', async () => {
@@ -250,4 +252,38 @@ test('a Delivery request posts the delivery site as its ship-to code, not the la
   await user.click(screen.getByRole('button', { name: 'Submit request' }))
   await waitFor(() => expect(posts()).toHaveLength(1))
   expect(posts()[0][1]?.body).toMatchObject({ category: 'Delivery', fields: { site: 'PLANT1' } })
+})
+
+// The file goes to Dataverse through the Web API after the request is saved; the server then checks it and sends the request.
+test('a request with a file saves the request, uploads the file to it, then finishes it', async () => {
+  const held = holdReads()
+  const { user, onClose } = await open()
+  await fillMinimal(user)
+  await user.upload(screen.getByLabelText('Attach a supporting document (optional)'), new File(['x'], 'a.pdf'))
+  held.get('a.pdf')!()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: 'Submit request' }))
+  await waitFor(() => expect(onClose).toHaveBeenCalled())
+  expect(posts()[0][1]?.body).not.toHaveProperty('attachment')
+  const id = vi.mocked(createNote).mock.calls[0][1]
+  expect(createNote).toHaveBeenCalledWith('chp_request', id, { name: 'a.pdf', base64: btoa('a.pdf') }, 'application/pdf')
+  expect(serverLogic).toHaveBeenCalledWith('requests', { method: 'PUT', body: { id } })
+  expect(toast.success).toHaveBeenCalledWith(expect.stringMatching(/^Request RQ-\d+ submitted\.$/))
+})
+
+test('a file that could not be uploaded still submits the request and says the file is missing', async () => {
+  vi.mocked(createNote).mockRejectedValueOnce(new Error('413'))
+  const held = holdReads()
+  const { user, onClose } = await open()
+  await fillMinimal(user)
+  await user.upload(screen.getByLabelText('Attach a supporting document (optional)'), new File(['x'], 'a.pdf'))
+  held.get('a.pdf')!()
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Submit request' })).toBeEnabled())
+  // The POST saves as usual; with no note uploaded, the server's PUT answers attached: false.
+  const real = vi.mocked(serverLogic).getMockImplementation()!
+  vi.mocked(serverLogic).mockImplementationOnce(real).mockImplementationOnce(async () => ({ ref: 'RQ-30104', attached: false }) as never)
+  await user.click(screen.getByRole('button', { name: 'Submit request' }))
+  await waitFor(() => expect(onClose).toHaveBeenCalled())
+  expect(toast.warning).toHaveBeenCalledWith(expect.stringMatching(/^Request RQ-\d+ submitted, but the file couldn't be attached\. Please send it to us another way\.$/))
+  expect(toast.success).not.toHaveBeenCalled()
 })

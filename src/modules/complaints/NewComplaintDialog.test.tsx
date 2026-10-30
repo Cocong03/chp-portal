@@ -2,6 +2,7 @@ import { screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { toast } from 'sonner'
 import { serverLogic } from '@/api/serverLogic'
+import { createNote } from '@/api/webApi'
 import { resetServiceMocks } from '@/mocks/service'
 import { renderApp } from '@/test/render'
 import { ComplaintsPage } from './ComplaintsPage'
@@ -11,7 +12,8 @@ vi.mock('@/api/serverLogic', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/api/serverLogic')>()
   return { ...actual, serverLogic: vi.fn(actual.serverLogic) }
 })
-vi.mock('sonner', () => ({ toast: { success: vi.fn(), error: vi.fn() } }))
+vi.mock('sonner', () => ({ toast: { success: vi.fn(), warning: vi.fn(), error: vi.fn() } }))
+vi.mock('@/api/webApi', () => ({ createNote: vi.fn() }))
 
 beforeEach(() => {
   resetServiceMocks()
@@ -155,4 +157,19 @@ test('a Delivery & Handling complaint posts the delivery site as its ship-to cod
   await user.click(screen.getByRole('button', { name: 'Submit' }))
   await waitFor(() => expect(posts()).toHaveLength(1))
   expect(posts()[0][1]?.body).toMatchObject({ category: 'Delivery & Handling', site: 'PLANT1', consent: true })
+})
+
+// The file goes to Dataverse through the Web API after the complaint is saved; the server then checks it and sends it.
+test('a complaint with a photo saves the complaint, uploads the photo to it, then finishes it', async () => {
+  const { user, onClose } = await open()
+  await fillMinimal(user)
+  await user.upload(screen.getByLabelText('Attach a photo or document (optional)'), new File(['x'], 'photo.jpg'))
+  await waitFor(() => expect(screen.getByRole('button', { name: 'Submit' })).toBeEnabled())
+  await user.click(screen.getByRole('button', { name: 'Submit' }))
+  await waitFor(() => expect(onClose).toHaveBeenCalled())
+  expect(posts()[0][1]?.body).toMatchObject({ attachmentName: 'photo.jpg' })
+  const id = vi.mocked(createNote).mock.calls[0][1]
+  expect(createNote).toHaveBeenCalledWith('chp_complaint', id, { name: 'photo.jpg', base64: 'eA==' }, 'image/jpeg')
+  expect(serverLogic).toHaveBeenCalledWith('complaints', { method: 'PUT', body: { id } })
+  expect(toast.success).toHaveBeenCalledWith('Complaint CMP-20106 submitted.')
 })
