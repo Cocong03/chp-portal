@@ -64,6 +64,22 @@ test('Cancel closes without saving', async () => {
   expect(onSaved).not.toHaveBeenCalled()
 })
 
+// BC adds Freight and Fuel Surcharge to a delivery Blanket Order as SERV lines (BSO000000029, 2026-10-30); View lists them, but
+// they aren't products, so they can't be scheduled.
+test("BC's freight and fuel surcharge lines can't be scheduled", async () => {
+  const charge = (code: string, description: string) => ({ code, description, qty: 1, uom: 'LOT', unitPrice: 10, lineTotal: 10 })
+  vi.mocked(serverLogic).mockImplementation(async (name, options) =>
+    name === 'orders'
+      ? ({ ...MOCK_BLANKET_ORDERS[0], lines: [...MOCK_BLANKET_ORDERS[0].lines, charge('SERV000001', 'Freight'), charge('SERV000002', 'Fuel Surcharge')] } as never)
+      : actualServerLogic(name, options),
+  )
+  const user = userEvent.setup()
+  const dialog = await openDialog()
+  await user.click(within(dialog).getByRole('combobox', { name: 'Delivery item, row 1' }))
+  expect(await screen.findByRole('option', { name: 'CEM-T1-40KG — Portland Cement Type I — 40kg Bag' })).toBeInTheDocument()
+  expect(screen.queryByRole('option', { name: /SERV0000/ })).not.toBeInTheDocument()
+})
+
 test('a BSO with no lines shows No items on this Blanket Order. and disables Add delivery and Save', async () => {
   vi.mocked(serverLogic).mockImplementation(async (name, options) =>
     name === 'orders' ? ({ ...MOCK_BLANKET_ORDERS[0], lines: [] } as never) : actualServerLogic(name, options),

@@ -33,7 +33,9 @@ export function ManageScheduleDialog({ so, onClose, onSaved }: { so: string | nu
 
 function ScheduleForm({ so, onClose, onSaved }: { so: string; onClose: () => void; onSaved: (so: string) => void }) {
   const order = useOrder(so, "blanket");
-  const ordered = order.data?.lines.map(({ code, description, qty }) => ({ code, description, qty })) ?? NO_ITEMS;
+  // BC's charge lines (SERV000001 Freight, SERV000002 Fuel Surcharge) show in View but aren't products to schedule.
+  const ordered =
+    order.data?.lines.filter((line) => !line.code.startsWith("SERV")).map(({ code, description, qty }) => ({ code, description, qty })) ?? NO_ITEMS;
   // Seeded once the lines arrive: one row on the first item, as the wireframe opens it.
   const [rows, setRows] = useState<ScheduleRow[] | null>(null);
   const current = rows ?? (order.data ? (ordered.length ? [newScheduleRow(ordered)] : []) : null);
