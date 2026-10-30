@@ -779,7 +779,7 @@ async function post() {
     var MOBILE = /^(\+63|0)9\d{2}[ -]?\d{3}[ -]?\d{4}$/;
     var ISO_DATE = /^\d{4}-\d{2}-\d{2}$/;
     var BASE64 = /^[A-Za-z0-9+/]+={0,2}$/;
-    var MAX_FILE = 5242880;
+    var MAX_FILE = 256000; // ponytail: 250 KB; Power Pages refuses ~2 MB bodies and ~1 MB ones can time out. Lift with a direct Web API upload.
     var DELIVERY_CATEGORY = "Delivery & Handling";
     // Complaints take no spreadsheets (unlike requests).
     var MIME = {
